@@ -3,14 +3,14 @@
   "displayName": "Intercept Wave",
   "description": "A powerful VSCode extension that combines proxy and interception capabilities similar to Nginx and Charles, designed for local development",
   "version": "1.0.2",
-  "publisher": "github-ci-publisher",
+  "publisher": "Ark65",
   "repository": {
     "type": "git",
     "url": "https://github.com/zhongmiao-org/intercept-wave-vscode.git"
   },
   "license": "MIT",
   "engines": {
-    "vscode": "^1.105.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Other",

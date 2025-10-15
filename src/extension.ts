@@ -2,35 +2,111 @@ import * as vscode from 'vscode';
 import { MockServerManager } from './mockServer';
 import { ConfigManager } from './configManager';
 import { SidebarProvider } from './sidebarProvider';
+import { t } from './i18n';
 
 let mockServerManager: MockServerManager;
 let configManager: ConfigManager;
+let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Intercept Wave extension is now active');
+    // Create output channel for logging
+    outputChannel = vscode.window.createOutputChannel('Intercept Wave');
+    context.subscriptions.push(outputChannel);
 
-    // Initialize managers
-    configManager = new ConfigManager(context);
-    mockServerManager = new MockServerManager(configManager);
+    outputChannel.appendLine('=== Intercept Wave extension is activating ===');
 
-    // Register sidebar provider
-    const sidebarProvider = new SidebarProvider(context.extensionUri, mockServerManager, configManager);
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider('interceptWaveView', sidebarProvider)
-    );
+    // Check if workspace folder exists
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+        outputChannel.appendLine('⚠ No workspace folder found. Extension requires a workspace to activate.');
+        outputChannel.appendLine('=== Activation skipped ===');
+
+        // Register a placeholder view provider that shows a message
+        const emptyProvider: vscode.WebviewViewProvider = {
+            resolveWebviewView(webviewView: vscode.WebviewView) {
+                outputChannel.appendLine('[EmptyProvider] resolveWebviewView called');
+
+                const title = t('noWorkspace.title');
+                const message = t('noWorkspace.message');
+
+                webviewView.webview.options = {
+                    enableScripts: true
+                };
+                webviewView.webview.html = `
+                    <!DOCTYPE html>
+                    <html lang="en">
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>Intercept Wave</title>
+                        <style>
+                            body {
+                                padding: 20px;
+                                font-family: var(--vscode-font-family);
+                                color: var(--vscode-foreground);
+                            }
+                            h3 {
+                                color: var(--vscode-foreground);
+                                margin-top: 0;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h3>${title}</h3>
+                        <p>${message}</p>
+                    </body>
+                    </html>
+                `;
+
+                outputChannel.appendLine('[EmptyProvider] HTML set successfully');
+            }
+        };
+
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider('interceptWaveView', emptyProvider)
+        );
+        outputChannel.appendLine('✓ Empty provider registered for interceptWaveView');
+        outputChannel.show(true);
+        return;
+    }
+
+    try {
+        // Initialize managers
+        configManager = new ConfigManager(context);
+        outputChannel.appendLine('✓ ConfigManager initialized');
+
+        mockServerManager = new MockServerManager(configManager, outputChannel);
+        outputChannel.appendLine('✓ MockServerManager initialized');
+
+        // Register sidebar provider
+        const sidebarProvider = new SidebarProvider(context.extensionUri, mockServerManager, configManager);
+        outputChannel.appendLine('✓ SidebarProvider created');
+
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider('interceptWaveView', sidebarProvider, {
+                webviewOptions: {
+                    retainContextWhenHidden: true
+                }
+            })
+        );
+        outputChannel.appendLine('✓ WebviewViewProvider registered for: interceptWaveView');
+        outputChannel.appendLine('=== Activation completed successfully ===');
+        outputChannel.show(true);
+    } catch (error: any) {
+        outputChannel.appendLine(`✗ Activation error: ${error.message}`);
+        outputChannel.appendLine(`Stack: ${error.stack}`);
+        outputChannel.show(true);
+        vscode.window.showErrorMessage(`Intercept Wave activation failed: ${error.message}`);
+        throw error;
+    }
 
     // Register commands
     context.subscriptions.push(
         vscode.commands.registerCommand('interceptWave.startServer', async () => {
             try {
                 const url = await mockServerManager.start();
-                vscode.window.showInformationMessage(
-                    `Mock server started successfully! Access URL: ${url}`
-                );
+                vscode.window.showInformationMessage(t('server.started', url));
             } catch (error: any) {
-                vscode.window.showErrorMessage(
-                    `Failed to start mock server: ${error.message}`
-                );
+                vscode.window.showErrorMessage(t('server.startFailed', error.message));
             }
         })
     );
@@ -39,11 +115,9 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('interceptWave.stopServer', async () => {
             try {
                 await mockServerManager.stop();
-                vscode.window.showInformationMessage('Mock server stopped successfully');
+                vscode.window.showInformationMessage(t('server.stopped'));
             } catch (error: any) {
-                vscode.window.showErrorMessage(
-                    `Failed to stop mock server: ${error.message}`
-                );
+                vscode.window.showErrorMessage(t('server.stopFailed', error.message));
             }
         })
     );
@@ -52,7 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('interceptWave.configure', async () => {
             const panel = vscode.window.createWebviewPanel(
                 'interceptWaveConfig',
-                'Intercept Wave Configuration',
+                t('config.title'),
                 vscode.ViewColumn.One,
                 {
                     enableScripts: true
@@ -66,7 +140,7 @@ export function activate(context: vscode.ExtensionContext) {
                     switch (message.command) {
                         case 'save':
                             await configManager.saveConfig(message.config);
-                            vscode.window.showInformationMessage('Configuration saved successfully');
+                            vscode.window.showInformationMessage(t('config.saved'));
                             panel.dispose();
                             break;
                     }

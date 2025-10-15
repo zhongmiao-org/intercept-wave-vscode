@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "publisher": "github-ci-publisher",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.105.0"
   },
   "categories": [
     "Other",

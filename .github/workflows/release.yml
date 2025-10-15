@@ -45,7 +45,7 @@ jobs:
           echo "Checking vsce version..."
           vsce --version
           echo "Attempting to publish extension..."
-          echo "Publisher: github-ci-publisher"
+          echo "Publisher: Ark65"
           echo "Package version: $(node -p "require('./package.json').version")"
           echo "Token length: ${#VSCE_PAT}"
           vsce publish --pat "$VSCE_PAT"

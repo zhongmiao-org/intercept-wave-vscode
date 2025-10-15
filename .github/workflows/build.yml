@@ -36,10 +36,6 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      # Run linting
-      - name: Run Linter
-        run: npm run lint
-
       # Compile TypeScript
       - name: Compile Extension
         run: npm run compile

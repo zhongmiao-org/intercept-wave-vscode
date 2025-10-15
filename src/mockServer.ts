@@ -200,16 +200,16 @@ export class MockServerManager {
             const isHttps = url.protocol === 'https:';
             const httpModule = isHttps ? https : http;
 
+            const headers = { ...req.headers };
+            delete headers.host;
+
             const options: https.RequestOptions = {
                 method: req.method,
-                headers: { ...req.headers },
+                headers: headers,
                 hostname: url.hostname,
                 port: url.port || (isHttps ? 443 : 80),
                 path: url.pathname + url.search
             };
-
-            // Remove Host header to avoid conflicts
-            delete options.headers?.host;
 
             const proxyReq = httpModule.request(options, proxyRes => {
                 // Copy response headers (excluding problematic ones)

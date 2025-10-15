@@ -1,0 +1,55 @@
+# GitHub Actions Workflow for publishing the VS Code extension
+# Triggered when a draft release is manually published
+# Publishes the extension to VS Code Marketplace using vsce
+
+name: Release
+on:
+  release:
+    types: [prereleased, released]
+
+jobs:
+  # Publish the extension to VS Code Marketplace
+  release:
+    name: Publish Extension
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Check out the current repository at the release tag
+      - name: Fetch Sources
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      # Set up Node.js environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Install dependencies
+      - name: Install Dependencies
+        run: npm ci
+
+      # Compile the extension
+      - name: Compile Extension
+        run: npm run compile
+
+      # Publish to VS Code Marketplace
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          npm install -g @vscode/vsce
+          vsce publish -p $VSCE_PAT
+
+      # Package the extension for release assets
+      - name: Package Extension
+        run: vsce package
+
+      # Upload the .vsix file as a release asset
+      - name: Upload Release Asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ github.event.release.tag_name }} *.vsix

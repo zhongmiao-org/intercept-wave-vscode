@@ -25,7 +25,9 @@
     "charles",
     "nginx"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:interceptWaveView"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -51,10 +53,7 @@
         {
           "id": "intercept-wave",
           "title": "%view.container.title%",
-          "icon": {
-            "light": "resources/icon-light.svg",
-            "dark": "resources/icon-dark.svg"
-          }
+          "icon": "resources/icon-dark.svg"
         }
       ]
     },

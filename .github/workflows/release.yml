@@ -36,13 +36,19 @@ jobs:
       - name: Compile Extension
         run: npm run compile
 
-      # Publish to VS Code Marketplace
-      - name: Publish to VS Code Marketplace
+      # Install vsce and login
+      - name: Login to VS Code Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
           npm install -g @vscode/vsce
-          vsce publish -p $VSCE_PAT
+          vsce login github-ci-publisher -p $VSCE_PAT
+
+      # Publish to VS Code Marketplace
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: vsce publish -p $VSCE_PAT
 
       # Package the extension for release assets
       - name: Package Extension

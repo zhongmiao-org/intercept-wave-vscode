@@ -42,7 +42,15 @@ jobs:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
           npm install -g @vscode/vsce
-          vsce publish -p $VSCE_PAT
+          echo "Checking vsce version..."
+          vsce --version
+          echo "Attempting to publish extension..."
+          echo "Publisher: github-ci-publisher"
+          echo "Package version: $(node -p "require('./package.json').version")"
+          echo "$VSCE_PAT" | vsce publish -p $VSCE_PAT --verbose || {
+            echo "Publish failed, trying alternative method..."
+            vsce publish --pat $VSCE_PAT --verbose
+          }
 
       # Package the extension for release assets
       - name: Package Extension

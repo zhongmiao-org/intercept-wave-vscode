@@ -47,10 +47,8 @@ jobs:
           echo "Attempting to publish extension..."
           echo "Publisher: github-ci-publisher"
           echo "Package version: $(node -p "require('./package.json').version")"
-          echo "$VSCE_PAT" | vsce publish -p $VSCE_PAT --verbose || {
-            echo "Publish failed, trying alternative method..."
-            vsce publish --pat $VSCE_PAT --verbose
-          }
+          echo "Token length: ${#VSCE_PAT}"
+          vsce publish --pat "$VSCE_PAT"
 
       # Package the extension for release assets
       - name: Package Extension

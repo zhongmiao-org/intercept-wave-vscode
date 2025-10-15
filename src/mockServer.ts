@@ -1,6 +1,7 @@
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
+import * as vscode from 'vscode';
 import { ConfigManager } from './configManager';
 
 export interface MockApiConfig {
@@ -26,7 +27,10 @@ export class MockServerManager {
     private server: http.Server | null = null;
     private isRunning: boolean = false;
 
-    constructor(private configManager: ConfigManager) {}
+    constructor(
+        private configManager: ConfigManager,
+        private outputChannel: vscode.OutputChannel
+    ) {}
 
     async start(): Promise<string> {
         if (this.isRunning) {
@@ -43,11 +47,16 @@ export class MockServerManager {
             this.server.listen(config.port, () => {
                 this.isRunning = true;
                 const url = `http://localhost:${config.port}`;
-                console.log(`Mock server started on ${url}`);
+                this.outputChannel.appendLine(`✅ Mock server started on ${url}`);
+                this.outputChannel.appendLine(`📋 Intercept Prefix: ${config.interceptPrefix}`);
+                this.outputChannel.appendLine(`🔗 Base URL: ${config.baseUrl}`);
+                this.outputChannel.appendLine(`📊 Mock APIs: ${config.mockApis.filter(api => api.enabled).length}/${config.mockApis.length} enabled`);
+                this.outputChannel.show(true);
                 resolve(url);
             });
 
             this.server.on('error', (error) => {
+                this.outputChannel.appendLine(`❌ Server error: ${error.message}`);
                 reject(error);
             });
         });
@@ -62,7 +71,7 @@ export class MockServerManager {
             this.server!.close(() => {
                 this.isRunning = false;
                 this.server = null;
-                console.log('Mock server stopped');
+                this.outputChannel.appendLine('🛑 Mock server stopped');
                 resolve();
             });
         });
@@ -80,7 +89,7 @@ export class MockServerManager {
         const requestPath = req.url || '/';
         const method = req.method || 'GET';
 
-        console.log(`Received request: ${method} ${requestPath}`);
+        this.outputChannel.appendLine(`📥 ${method} ${requestPath}`);
 
         // Handle root path - welcome page
         if (requestPath === '/' || requestPath === '') {
@@ -93,12 +102,13 @@ export class MockServerManager {
             this.sendCorsHeaders(res);
             res.writeHead(200);
             res.end();
+            this.outputChannel.appendLine(`   ✓ CORS preflight handled`);
             return;
         }
 
         // Path matching logic
         const matchPath = this.getMatchPath(requestPath, config);
-        console.log(`Match path: ${matchPath} (stripPrefix=${config.stripPrefix}, original=${requestPath})`);
+        this.outputChannel.appendLine(`   🎯 Match path: ${matchPath}`);
 
         // Find matching mock API
         const mockApi = this.findMatchingMockApi(matchPath, method, config);
@@ -184,7 +194,7 @@ export class MockServerManager {
         res.writeHead(mockApi.statusCode);
         res.end(mockApi.mockData);
 
-        console.log(`Responded with mock data for: ${mockApi.path}`);
+        this.outputChannel.appendLine(`   ✅ Mock response [${mockApi.statusCode}] ${mockApi.delay > 0 ? `(delayed ${mockApi.delay}ms)` : ''}`);
     }
 
     private forwardToOriginalServer(
@@ -193,7 +203,7 @@ export class MockServerManager {
         config: MockConfig
     ): void {
         const targetUrl = config.baseUrl + req.url;
-        console.log(`Forwarding request to: ${targetUrl}`);
+        this.outputChannel.appendLine(`   ⏩ Forwarding to: ${targetUrl}`);
 
         try {
             const url = new URL(targetUrl);
@@ -232,18 +242,18 @@ export class MockServerManager {
                 res.writeHead(proxyRes.statusCode || 200);
                 proxyRes.pipe(res);
 
-                console.log(`Forwarded response from original server: ${proxyRes.statusCode}`);
+                this.outputChannel.appendLine(`   ✅ Proxied response [${proxyRes.statusCode}]`);
             });
 
             proxyReq.on('error', error => {
-                console.error('Error forwarding request:', error);
+                this.outputChannel.appendLine(`   ❌ Proxy error: ${error.message}`);
                 this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to reach original server');
             });
 
             // Forward request body
             req.pipe(proxyReq);
         } catch (error: any) {
-            console.error('Error parsing target URL:', error);
+            this.outputChannel.appendLine(`   ❌ URL parse error: ${error.message}`);
             this.sendErrorResponse(res, 500, `Internal Server Error: ${error.message}`);
         }
     }

@@ -2,16 +2,22 @@ import * as vscode from 'vscode';
 import { MockServerManager } from './mockServer';
 import { ConfigManager } from './configManager';
 import { SidebarProvider } from './sidebarProvider';
+import { t } from './i18n';
 
 let mockServerManager: MockServerManager;
 let configManager: ConfigManager;
+let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Intercept Wave extension is now active');
+    // Create output channel for logging
+    outputChannel = vscode.window.createOutputChannel('Intercept Wave');
+    context.subscriptions.push(outputChannel);
+
+    outputChannel.appendLine('Intercept Wave extension is now active');
 
     // Initialize managers
     configManager = new ConfigManager(context);
-    mockServerManager = new MockServerManager(configManager);
+    mockServerManager = new MockServerManager(configManager, outputChannel);
 
     // Register sidebar provider
     const sidebarProvider = new SidebarProvider(context.extensionUri, mockServerManager, configManager);
@@ -24,13 +30,9 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('interceptWave.startServer', async () => {
             try {
                 const url = await mockServerManager.start();
-                vscode.window.showInformationMessage(
-                    `Mock server started successfully! Access URL: ${url}`
-                );
+                vscode.window.showInformationMessage(t('server.started', url));
             } catch (error: any) {
-                vscode.window.showErrorMessage(
-                    `Failed to start mock server: ${error.message}`
-                );
+                vscode.window.showErrorMessage(t('server.startFailed', error.message));
             }
         })
     );
@@ -39,11 +41,9 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('interceptWave.stopServer', async () => {
             try {
                 await mockServerManager.stop();
-                vscode.window.showInformationMessage('Mock server stopped successfully');
+                vscode.window.showInformationMessage(t('server.stopped'));
             } catch (error: any) {
-                vscode.window.showErrorMessage(
-                    `Failed to stop mock server: ${error.message}`
-                );
+                vscode.window.showErrorMessage(t('server.stopFailed', error.message));
             }
         })
     );
@@ -52,7 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('interceptWave.configure', async () => {
             const panel = vscode.window.createWebviewPanel(
                 'interceptWaveConfig',
-                'Intercept Wave Configuration',
+                t('config.title'),
                 vscode.ViewColumn.One,
                 {
                     enableScripts: true
@@ -66,7 +66,7 @@ export function activate(context: vscode.ExtensionContext) {
                     switch (message.command) {
                         case 'save':
                             await configManager.saveConfig(message.config);
-                            vscode.window.showInformationMessage('Configuration saved successfully');
+                            vscode.window.showInformationMessage(t('config.saved'));
                             panel.dispose();
                             break;
                     }

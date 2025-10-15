@@ -7,11 +7,11 @@ import { ConfigManager } from './configManager';
 export interface MockApiConfig {
     path: string;
     enabled: boolean;
-    mockData: string;
+    mockData: string;  // JSON string (compatible with JetBrains plugin)
     method: string;
     statusCode: number;
-    useCookie: boolean;
-    delay: number;
+    useCookie?: boolean;
+    delay?: number;
 }
 
 export interface MockConfig {
@@ -41,7 +41,9 @@ export class MockServerManager {
 
         return new Promise((resolve, reject) => {
             this.server = http.createServer((req, res) => {
-                this.handleRequest(req, res, config);
+                // Read config on each request to support dynamic updates
+                const currentConfig = this.configManager.getConfig();
+                this.handleRequest(req, res, currentConfig);
             });
 
             this.server.listen(config.port, () => {
@@ -137,10 +139,13 @@ export class MockServerManager {
         method: string,
         config: MockConfig
     ): MockApiConfig | undefined {
+        // Strip query parameters from request path for matching
+        const pathWithoutQuery = requestPath.split('?')[0];
+
         return config.mockApis.find(api => {
             return (
                 api.enabled &&
-                api.path === requestPath &&
+                api.path === pathWithoutQuery &&
                 (api.method === 'ALL' || api.method.toUpperCase() === method.toUpperCase())
             );
         });
@@ -176,8 +181,10 @@ export class MockServerManager {
         mockApi: MockApiConfig,
         config: MockConfig
     ): Promise<void> {
+        this.outputChannel.appendLine(`   📝 Mock API found: ${JSON.stringify(mockApi)}`);
+
         // Simulate delay
-        if (mockApi.delay > 0) {
+        if (mockApi.delay && mockApi.delay > 0) {
             await new Promise(resolve => setTimeout(resolve, mockApi.delay));
         }
 
@@ -190,11 +197,15 @@ export class MockServerManager {
             res.setHeader('Set-Cookie', config.globalCookie);
         }
 
+        // mockData is always a string (JetBrains plugin compatible format)
+        const responseData = mockApi.mockData;
+        this.outputChannel.appendLine(`   📤 Response data length: ${responseData.length}`);
+
         // Send response
         res.writeHead(mockApi.statusCode);
-        res.end(mockApi.mockData);
+        res.end(responseData);
 
-        this.outputChannel.appendLine(`   ✅ Mock response [${mockApi.statusCode}] ${mockApi.delay > 0 ? `(delayed ${mockApi.delay}ms)` : ''}`);
+        this.outputChannel.appendLine(`   ✅ Mock response sent [${mockApi.statusCode}] ${mockApi.delay && mockApi.delay > 0 ? `(delayed ${mockApi.delay}ms)` : ''}`);
     }
 
     private forwardToOriginalServer(
@@ -246,7 +257,9 @@ export class MockServerManager {
             });
 
             proxyReq.on('error', error => {
-                this.outputChannel.appendLine(`   ❌ Proxy error: ${error.message}`);
+                this.outputChannel.appendLine(`   ❌ Proxy error: ${error.message || error.toString()}`);
+                this.outputChannel.appendLine(`   ❌ Error details: ${JSON.stringify(error)}`);
+                this.outputChannel.appendLine(`   ❌ Target was: ${targetUrl}`);
                 this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to reach original server');
             });
 

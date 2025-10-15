@@ -12,7 +12,9 @@ const messages: { [locale: string]: Messages } = {
         'server.startFailed': 'Failed to start mock server: {0}',
         'server.stopFailed': 'Failed to stop mock server: {0}',
         'config.saved': 'Configuration saved successfully',
-        'config.title': 'Intercept Wave Configuration'
+        'config.title': 'Intercept Wave Configuration',
+        'noWorkspace.title': 'No Workspace Open',
+        'noWorkspace.message': 'Please open a folder or workspace to use Intercept Wave.'
     },
     'zh-cn': {
         'server.started': 'Mock 服务器启动成功！访问地址: {0}',
@@ -21,7 +23,9 @@ const messages: { [locale: string]: Messages } = {
         'server.startFailed': '启动 Mock 服务器失败: {0}',
         'server.stopFailed': '停止 Mock 服务器失败: {0}',
         'config.saved': '配置保存成功',
-        'config.title': 'Intercept Wave 配置'
+        'config.title': 'Intercept Wave 配置',
+        'noWorkspace.title': '未打开工作区',
+        'noWorkspace.message': '请打开一个文件夹或工作区以使用 Intercept Wave。'
     }
 };
 

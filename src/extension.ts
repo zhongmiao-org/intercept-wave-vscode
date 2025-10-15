@@ -13,17 +13,91 @@ export function activate(context: vscode.ExtensionContext) {
     outputChannel = vscode.window.createOutputChannel('Intercept Wave');
     context.subscriptions.push(outputChannel);
 
-    outputChannel.appendLine('Intercept Wave extension is now active');
+    outputChannel.appendLine('=== Intercept Wave extension is activating ===');
 
-    // Initialize managers
-    configManager = new ConfigManager(context);
-    mockServerManager = new MockServerManager(configManager, outputChannel);
+    // Check if workspace folder exists
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+        outputChannel.appendLine('⚠ No workspace folder found. Extension requires a workspace to activate.');
+        outputChannel.appendLine('=== Activation skipped ===');
 
-    // Register sidebar provider
-    const sidebarProvider = new SidebarProvider(context.extensionUri, mockServerManager, configManager);
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider('interceptWaveView', sidebarProvider)
-    );
+        // Register a placeholder view provider that shows a message
+        const emptyProvider: vscode.WebviewViewProvider = {
+            resolveWebviewView(webviewView: vscode.WebviewView) {
+                outputChannel.appendLine('[EmptyProvider] resolveWebviewView called');
+
+                const title = t('noWorkspace.title');
+                const message = t('noWorkspace.message');
+
+                webviewView.webview.options = {
+                    enableScripts: true
+                };
+                webviewView.webview.html = `
+                    <!DOCTYPE html>
+                    <html lang="en">
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>Intercept Wave</title>
+                        <style>
+                            body {
+                                padding: 20px;
+                                font-family: var(--vscode-font-family);
+                                color: var(--vscode-foreground);
+                            }
+                            h3 {
+                                color: var(--vscode-foreground);
+                                margin-top: 0;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h3>${title}</h3>
+                        <p>${message}</p>
+                    </body>
+                    </html>
+                `;
+
+                outputChannel.appendLine('[EmptyProvider] HTML set successfully');
+            }
+        };
+
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider('interceptWaveView', emptyProvider)
+        );
+        outputChannel.appendLine('✓ Empty provider registered for interceptWaveView');
+        outputChannel.show(true);
+        return;
+    }
+
+    try {
+        // Initialize managers
+        configManager = new ConfigManager(context);
+        outputChannel.appendLine('✓ ConfigManager initialized');
+
+        mockServerManager = new MockServerManager(configManager, outputChannel);
+        outputChannel.appendLine('✓ MockServerManager initialized');
+
+        // Register sidebar provider
+        const sidebarProvider = new SidebarProvider(context.extensionUri, mockServerManager, configManager);
+        outputChannel.appendLine('✓ SidebarProvider created');
+
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider('interceptWaveView', sidebarProvider, {
+                webviewOptions: {
+                    retainContextWhenHidden: true
+                }
+            })
+        );
+        outputChannel.appendLine('✓ WebviewViewProvider registered for: interceptWaveView');
+        outputChannel.appendLine('=== Activation completed successfully ===');
+        outputChannel.show(true);
+    } catch (error: any) {
+        outputChannel.appendLine(`✗ Activation error: ${error.message}`);
+        outputChannel.appendLine(`Stack: ${error.stack}`);
+        outputChannel.show(true);
+        vscode.window.showErrorMessage(`Intercept Wave activation failed: ${error.message}`);
+        throw error;
+    }
 
     // Register commands
     context.subscriptions.push(

@@ -6,3 +6,12 @@ dist/
 .DS_Store
 .vscode
 .intercept-wave
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Test artifacts
+.test-config/
+src/test/**/.test-config/

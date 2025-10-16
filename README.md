@@ -1,4 +1,18 @@
-# Intercept Wave for VSCode
+<div align="center">
+  <img src="resources/logo.png" alt="Intercept Wave Logo" width="128" height="128">
+
+  # Intercept Wave for VSCode
+
+  [![Version](https://img.shields.io/visual-studio-marketplace/v/Ark65.intercept-wave?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+  [![Installs](https://img.shields.io/visual-studio-marketplace/i/Ark65.intercept-wave?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+  [![Downloads](https://img.shields.io/visual-studio-marketplace/d/Ark65.intercept-wave?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+  [![Rating](https://img.shields.io/visual-studio-marketplace/r/Ark65.intercept-wave?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+  [![Test](https://github.com/zhongmiao-org/intercept-wave-vscode/workflows/Test/badge.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml)
+  [![codecov](https://codecov.io/gh/zhongmiao-org/intercept-wave-vscode/branch/main/graph/badge.svg)](https://codecov.io/gh/zhongmiao-org/intercept-wave-vscode)
+  [![License](https://img.shields.io/github/license/zhongmiao-org/intercept-wave-vscode?style=flat-square)](https://github.com/zhongmiao-org/intercept-wave-vscode/blob/main/LICENSE)
+
+  English | [简体中文](./README_zh.md)
+</div>
 
 A powerful VSCode extension that combines the proxy and interception capabilities similar to **Nginx** and **Charles**, designed specifically for local development environments. It intelligently intercepts HTTP requests, either returning custom mock data or acting as a proxy server to forward real requests to the original server with full HTTP headers.
 
@@ -23,7 +37,7 @@ A powerful VSCode extension that combines the proxy and interception capabilitie
 
 1. Open VSCode
 2. Press `Ctrl+P` / `Cmd+P` to open Quick Open
-3. Type `ext install zhongmiao.intercept-wave`
+3. Type `ext install Ark65.intercept-wave`
 4. Press Enter
 
 Or install from the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`).
@@ -206,4 +220,4 @@ If you have any questions or suggestions, feel free to submit an [Issue](https:/
 
 ## License
 
-MIT License
+MIT License - see the [LICENSE](LICENSE) file for details

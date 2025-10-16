@@ -1,0 +1,15 @@
+{
+  "all": true,
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "src/test/**",
+    "**/*.d.ts",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
+  "reporter": ["text", "lcov", "json-summary", "cobertura"],
+  "lines": 80,
+  "functions": 80,
+  "branches": 80,
+  "statements": 80
+}

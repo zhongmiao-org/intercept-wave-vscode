@@ -2,6 +2,31 @@
 
 All notable changes to the "intercept-wave" extension will be documented in this file.
 
+## [1.0.5] - 2025-01-16
+
+### Added
+- ✅ Unit testing infrastructure with Mocha, Chai, and Sinon
+- 📊 Code coverage reporting with c8 (targeting 80% coverage)
+- 🤖 GitHub Actions CI workflow for automated testing
+  - Multi-platform testing (Ubuntu, macOS, Windows)
+  - Multi-version Node.js testing (18.x, 20.x)
+  - Automated linting and test execution
+- 📈 Automatic code coverage reports on Pull Requests
+  - Coverage metrics (Lines, Branches, Functions, Statements)
+  - Coverage change detection compared to base branch
+  - Visual indicators (✅ Good ≥80%, ⚠️ Fair 60-79%, ❌ Poor <60%)
+- 🔗 Codecov integration for coverage tracking (using GitHub App)
+- 🎖️ Test and Coverage badges in README
+- 📚 Comprehensive test suite for ConfigManager and i18n modules (25 test cases)
+- 📖 Testing documentation (CONTRIBUTING.md, TEST_SETUP_SUMMARY.md)
+- 🌏 Chinese and English README with language switcher
+
+### Improved
+- 📝 Updated README with VS Code marketplace badges
+- 🎨 Enhanced README with logo and professional layout
+- 🔧 Better TypeScript configuration for testing
+- 🚀 Automated changelog extraction for release drafts
+
 ## [1.0.4]
 
 ### Added

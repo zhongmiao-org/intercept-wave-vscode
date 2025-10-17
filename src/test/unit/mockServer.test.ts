@@ -152,6 +152,218 @@ describe('MockServerManager', () => {
             expect(response.statusCode).to.equal(200);
         });
 
+        it('should handle mock response with delay', async () => {
+            const config = {
+                ...defaultConfig,
+                mockApis: [{
+                    path: '/delayed',
+                    enabled: true,
+                    mockData: '{"result": "delayed"}',
+                    method: 'GET',
+                    statusCode: 200,
+                    delay: 100
+                }]
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(config);
+
+            await mockServerManager.start();
+
+            const startTime = Date.now();
+            const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+                const req = http.get('http://localhost:9999/delayed', (res) => {
+                    resolve(res);
+                });
+                req.on('error', reject);
+            });
+            const endTime = Date.now();
+
+            expect(response.statusCode).to.equal(200);
+            expect(endTime - startTime).to.be.at.least(100);
+        });
+
+        it('should handle mock response with cookie', async () => {
+            const config = {
+                ...defaultConfig,
+                globalCookie: 'session=abc123',
+                mockApis: [{
+                    path: '/with-cookie',
+                    enabled: true,
+                    mockData: '{"result": "with cookie"}',
+                    method: 'GET',
+                    statusCode: 200,
+                    useCookie: true
+                }]
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(config);
+
+            await mockServerManager.start();
+
+            const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+                const req = http.get('http://localhost:9999/with-cookie', (res) => {
+                    resolve(res);
+                });
+                req.on('error', reject);
+            });
+
+            expect(response.statusCode).to.equal(200);
+            expect(response.headers['set-cookie']).to.include('session=abc123');
+        });
+
+        it('should handle path with query parameters', async () => {
+            const config = {
+                ...defaultConfig,
+                mockApis: [{
+                    path: '/users',
+                    enabled: true,
+                    mockData: '{"users": []}',
+                    method: 'GET',
+                    statusCode: 200
+                }]
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(config);
+
+            await mockServerManager.start();
+
+            const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+                const req = http.get('http://localhost:9999/users?page=1&limit=10', (res) => {
+                    resolve(res);
+                });
+                req.on('error', reject);
+            });
+
+            expect(response.statusCode).to.equal(200);
+        });
+
+        it('should strip prefix when matching paths', async () => {
+            const config = {
+                ...defaultConfig,
+                stripPrefix: true,
+                interceptPrefix: '/api',
+                mockApis: [{
+                    path: '/test',
+                    enabled: true,
+                    mockData: '{"result": "stripped"}',
+                    method: 'GET',
+                    statusCode: 200
+                }]
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(config);
+
+            await mockServerManager.start();
+
+            const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+                const req = http.get('http://localhost:9999/api/test', (res) => {
+                    resolve(res);
+                });
+                req.on('error', reject);
+            });
+
+            expect(response.statusCode).to.equal(200);
+        });
+
+        it('should handle POST requests', async () => {
+            const config = {
+                ...defaultConfig,
+                mockApis: [{
+                    path: '/create',
+                    enabled: true,
+                    mockData: '{"id": 123}',
+                    method: 'POST',
+                    statusCode: 201
+                }]
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(config);
+
+            await mockServerManager.start();
+
+            const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+                const req = http.request({
+                    hostname: 'localhost',
+                    port: 9999,
+                    path: '/create',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }, (res) => {
+                    resolve(res);
+                });
+                req.on('error', reject);
+                req.write('{"name": "test"}');
+                req.end();
+            });
+
+            expect(response.statusCode).to.equal(201);
+        });
+
+        it('should handle disabled mock APIs by forwarding', async () => {
+            const config = {
+                ...defaultConfig,
+                baseUrl: 'http://localhost:9998', // Non-existent server
+                mockApis: [{
+                    path: '/disabled',
+                    enabled: false,
+                    mockData: '{"result": "should not return this"}',
+                    method: 'GET',
+                    statusCode: 200
+                }]
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(config);
+
+            await mockServerManager.start();
+
+            // This should attempt to forward and fail (502)
+            const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+                const req = http.get('http://localhost:9999/disabled', (res) => {
+                    resolve(res);
+                });
+                req.on('error', reject);
+            });
+
+            // Should get error response when forwarding fails
+            expect(response.statusCode).to.equal(502);
+        });
+
+        it('should return welcome page with correct data structure', async () => {
+            const config = {
+                ...defaultConfig,
+                mockApis: [
+                    {
+                        path: '/test1',
+                        enabled: true,
+                        mockData: '{}',
+                        method: 'GET',
+                        statusCode: 200
+                    },
+                    {
+                        path: '/test2',
+                        enabled: false,
+                        mockData: '{}',
+                        method: 'POST',
+                        statusCode: 200
+                    }
+                ]
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(config);
+
+            await mockServerManager.start();
+
+            const response = await new Promise<{res: http.IncomingMessage, body: string}>((resolve, reject) => {
+                const req = http.get('http://localhost:9999/', (res) => {
+                    let body = '';
+                    res.on('data', chunk => body += chunk);
+                    res.on('end', () => resolve({ res, body }));
+                });
+                req.on('error', reject);
+            });
+
+            expect(response.res.statusCode).to.equal(200);
+            const data = JSON.parse(response.body);
+            expect(data.status).to.equal('running');
+            expect(data.mockApis.total).to.equal(2);
+            expect(data.mockApis.enabled).to.equal(1);
+        });
+
         it('should handle root path welcome page', async () => {
             await mockServerManager.start();
 
@@ -182,6 +394,27 @@ describe('MockServerManager', () => {
             });
 
             expect(response.statusCode).to.equal(200);
+            expect(response.headers['access-control-allow-origin']).to.equal('*');
+        });
+
+        it('should handle requests to non-existent endpoints by forwarding', async () => {
+            const config = {
+                ...defaultConfig,
+                baseUrl: 'http://localhost:9998' // Non-existent server
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(config);
+
+            await mockServerManager.start();
+
+            const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+                const req = http.get('http://localhost:9999/nonexistent', (res) => {
+                    resolve(res);
+                });
+                req.on('error', reject);
+            });
+
+            // Should get 502 when forwarding fails
+            expect(response.statusCode).to.equal(502);
         });
     });
 });

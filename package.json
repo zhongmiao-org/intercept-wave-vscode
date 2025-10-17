@@ -2,7 +2,7 @@
   "name": "intercept-wave",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "Ark65",
   "icon": "resources/logo.png",
   "repository": {
@@ -96,15 +96,28 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "pretest": "npm run compile",
+    "test": "npm run compile && node ./out/test/runTest.js",
+    "test:unit": "npm run compile && node ./out/test/unit/runner.js",
+    "test:coverage": "c8 npm run test:unit",
+    "test:coverage:ci": "c8 --reporter=lcov --reporter=text --reporter=json-summary npm run test:unit"
   },
   "devDependencies": {
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "^10.0.6",
     "@types/node": "^24.7.2",
+    "@types/sinon": "^17.0.3",
     "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.1",
-    "@typescript-eslint/parser": "^8.46.1",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "@vscode/test-electron": "^2.5.2",
-    "eslint": "^9.37.0",
+    "c8": "^9.1.0",
+    "chai": "^4.4.1",
+    "eslint": "^8.57.0",
+    "mocha": "^10.3.0",
+    "sinon": "^17.0.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
 }

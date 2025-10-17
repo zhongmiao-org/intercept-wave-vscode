@@ -2,6 +2,40 @@
 
 All notable changes to the "intercept-wave" extension will be documented in this file.
 
+## [1.0.5] - 2025-01-17
+
+### Added
+- ✅ Unit testing infrastructure with Mocha and Chai
+- 📊 Code coverage reporting with c8 (targeting 80% coverage)
+- 🤖 GitHub Actions CI workflow for automated testing (PR only)
+  - Multi-platform testing (Ubuntu, macOS, Windows)
+  - Multi-version Node.js testing (18.x, 20.x)
+  - Automated linting and test execution
+- 📈 Automatic code coverage reports on Pull Requests
+  - Coverage metrics (Lines, Branches, Functions, Statements)
+  - Coverage change detection compared to base branch
+  - Visual indicators (✅ Good ≥80%, ⚠️ Fair 60-79%, ❌ Poor <60%)
+- 🔗 Codecov integration for coverage tracking (using GitHub App, no token required)
+- 🎖️ Test and Coverage badges in README
+- 📚 Comprehensive test suite for i18n module (9 test cases)
+- 📖 Testing documentation (CONTRIBUTING.md, TEST_SETUP_SUMMARY.md, RELEASE_PROCESS.md)
+- 🌏 Chinese and English README with language switcher
+
+### Improved
+- 📝 Updated README with VS Code marketplace badges
+- 🎨 Enhanced README with logo and professional layout
+- 🔧 Better TypeScript configuration for testing
+- 🚀 Automated changelog extraction for release drafts
+- ⚡ Tests only run on Pull Requests to save CI resources
+
+### Fixed
+- 🔧 Downgraded ESLint from 9.x to 8.x for compatibility with existing configuration format
+- 🐛 Fixed ESLint errors in sidebarProvider.ts (unused parameters)
+- 🐛 Fixed ESLint prefer-rest-params error in test runner
+- 📊 Fixed c8 coverage configuration to properly track compiled JavaScript files
+- 🔐 Added proper GitHub Actions permissions for PR comment posting
+- ✅ All lint checks and unit tests now passing
+
 ## [1.0.4]
 
 ### Added

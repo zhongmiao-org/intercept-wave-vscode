@@ -13,7 +13,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
-        context: vscode.WebviewViewResolveContext,
+        _context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken
     ) {
         console.log('[SidebarProvider] resolveWebviewView called');
@@ -107,7 +107,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private getHtmlForWebview(webview: vscode.Webview) {
+    private getHtmlForWebview(_webview: vscode.Webview) {
         const config = this.configManager.getConfig();
         const isRunning = this.mockServerManager.getStatus();
 

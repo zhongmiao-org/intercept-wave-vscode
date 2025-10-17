@@ -82,14 +82,40 @@ jobs:
             --jq '.[] | select(.draft == true) | .id' \
             | xargs -I '{}' gh api -X DELETE repos/{owner}/{repo}/releases/{} || true
 
+      # Extract changelog content for this version
+      - name: Extract Changelog
+        id: changelog
+        run: |
+          VERSION="v$(node -p "require('./package.json').version")"
+          VERSION_WITHOUT_V="${VERSION#v}"
+
+          # First try to extract from [Unreleased]
+          CHANGELOG=$(awk '/## \[Unreleased\]/{flag=1; next} /## \[/{flag=0} flag' CHANGELOG.md | sed '/^[[:space:]]*$/d')
+
+          # If Unreleased is empty or doesn't exist, try to extract from version section
+          if [ -z "$CHANGELOG" ]; then
+            echo "No Unreleased content found, trying version section [$VERSION_WITHOUT_V]..."
+            CHANGELOG=$(awk "/## \[$VERSION_WITHOUT_V\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md)
+          fi
+
+          # If still empty, use a default message
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="Release $VERSION"
+          fi
+
+          # Save to file for multi-line content
+          echo "$CHANGELOG" > release_notes.md
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       # Create a new release draft
       - name: Create Release Draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="v$(node -p "require('./package.json').version")"
+          VERSION="${{ steps.changelog.outputs.version }}"
 
           gh release create $VERSION \
             --draft \
             --title "$VERSION" \
-            --notes "Release $VERSION - Please update with changelog before publishing"
+            --notes-file release_notes.md

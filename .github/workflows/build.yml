@@ -36,6 +36,27 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      # Run linter
+      - name: Run Linter
+        run: npm run lint
+
+      # Run unit tests
+      - name: Run Unit Tests
+        run: npm run test:unit
+
+      # Generate coverage report
+      - name: Generate Coverage Report
+        run: npm run test:coverage:ci
+
+      # Upload coverage to Codecov
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
       # Compile TypeScript
       - name: Compile Extension
         run: npm run compile

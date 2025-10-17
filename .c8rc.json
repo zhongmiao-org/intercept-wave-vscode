@@ -4,6 +4,8 @@
   "include": ["out/**/*.js"],
   "exclude": [
     "out/test/**",
+    "out/templates/**",
+    "out/templateLoader.js",
     "**/*.d.ts"
   ],
   "reporter": ["text", "lcov", "json-summary", "cobertura"],

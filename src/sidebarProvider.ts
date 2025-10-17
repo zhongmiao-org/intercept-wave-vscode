@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { MockServerManager } from './mockServer';
 import { ConfigManager } from './configManager';
+import { TemplateLoader } from './templateLoader';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
     constructor(
@@ -107,7 +108,27 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private getHtmlForWebview(_webview: vscode.Webview) {
+    private getHtmlForWebview(_webview: vscode.Webview): string {
+        const config = this.configManager.getConfig();
+        const isRunning = this.mockServerManager.getStatus();
+
+        const template = TemplateLoader.loadTemplate('sidebarView');
+        const replacements = {
+            'STATUS_CLASS': isRunning ? 'running' : 'stopped',
+            'STATUS_TEXT': isRunning ? '● Running' : '○ Stopped',
+            'SERVER_URL': isRunning ? `<div class="url" id="serverUrl">http://localhost:${config.port}</div>` : '',
+            'START_DISABLED': isRunning ? 'disabled' : '',
+            'STOP_DISABLED': !isRunning ? 'disabled' : '',
+            'ENABLED_COUNT': config.mockApis.filter((a: any) => a.enabled).length.toString(),
+            'TOTAL_COUNT': config.mockApis.length.toString(),
+            'MOCK_LIST': this.renderMockList(config.mockApis)
+        };
+
+        return TemplateLoader.replacePlaceholders(template, replacements);
+    }
+
+    // Keep the old implementation as a fallback for tests
+    private getHtmlForWebviewLegacy(_webview: vscode.Webview) {
         const config = this.configManager.getConfig();
         const isRunning = this.mockServerManager.getStatus();
 

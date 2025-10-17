@@ -5,7 +5,7 @@ import * as Module from 'module';
 
 // Mock vscode module before running tests
 const originalRequire = Module.prototype.require;
-(Module.prototype.require as any) = function (this: any, id: string) {
+(Module.prototype.require as any) = function (this: any, id: string, ...args: any[]) {
     if (id === 'vscode') {
         // Return a basic mock of vscode API
         return {
@@ -35,7 +35,7 @@ const originalRequire = Module.prototype.require;
             }
         };
     }
-    return originalRequire.apply(this, arguments as any);
+    return originalRequire.apply(this, [id, ...args]);
 };
 
 function getAllFiles(dirPath: string, extension: string, arrayOfFiles: string[] = []): string[] {

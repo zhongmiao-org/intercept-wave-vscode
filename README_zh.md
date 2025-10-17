@@ -3,13 +3,13 @@
 
   # Intercept Wave for VSCode
 
-  [![Version](https://img.shields.io/visual-studio-marketplace/v/Ark65.intercept-wave?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Installs](https://img.shields.io/visual-studio-marketplace/i/Ark65.intercept-wave?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Downloads](https://img.shields.io/visual-studio-marketplace/d/Ark65.intercept-wave?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Rating](https://img.shields.io/visual-studio-marketplace/r/Ark65.intercept-wave?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Test](https://github.com/zhongmiao-org/intercept-wave-vscode/workflows/Test/badge.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml)
-  [![codecov](https://codecov.io/gh/zhongmiao-org/intercept-wave-vscode/branch/main/graph/badge.svg)](https://codecov.io/gh/zhongmiao-org/intercept-wave-vscode)
-  [![License](https://img.shields.io/github/license/zhongmiao-org/intercept-wave-vscode?style=flat-square)](https://github.com/zhongmiao-org/intercept-wave-vscode/blob/main/LICENSE)
+  [![Version](https://vsmarketplacebadges.dev/version-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+  [![Installs](https://vsmarketplacebadges.dev/installs-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+  [![Downloads](https://vsmarketplacebadges.dev/downloads-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+  [![Rating](https://vsmarketplacebadges.dev/rating-star/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+  [![Test](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml/badge.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml)
+  [![codecov](https://codecov.io/gh/zhongmiao-org/intercept-wave-vscode/branch/main/graph/badge.svg)](https://app.codecov.io/gh/zhongmiao-org/intercept-wave-vscode)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/blob/main/LICENSE)
 
   [English](./README.md) | 简体中文
 </div>

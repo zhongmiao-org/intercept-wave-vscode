@@ -95,7 +95,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./ && npm run copy:templates",
-    "copy:templates": "mkdir -p out/templates && cp -r src/templates/*.html out/templates/",
+    "copy:templates": "node scripts/copy-templates.js",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
     "pretest": "npm run compile",

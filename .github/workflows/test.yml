@@ -1,8 +1,6 @@
 name: Test
 
 on:
-  push:
-    branches: [ main, ark/* ]
   pull_request:
     branches: [ main ]
 

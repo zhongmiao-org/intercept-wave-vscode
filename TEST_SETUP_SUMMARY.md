@@ -43,36 +43,19 @@ Coverage tool configuration:
 
 ### 4. Test Files
 
-#### `src/test/unit/configManager.test.ts`
-Comprehensive test suite for ConfigManager:
-- Constructor tests
-- Config CRUD operations
-- File I/O operations
-- Error handling
-- Default value handling
-- Mock API management
-
-**Coverage**: 13 test cases covering:
-- Configuration initialization
-- Reading/writing config files
-- Adding/removing/updating mock APIs
-- Error scenarios
-- Default config merging
-
 #### `src/test/unit/i18n.test.ts`
 Comprehensive test suite for i18n module:
 - Translation function tests
-- Locale detection
 - Placeholder replacement
-- Fallback behavior
-- Multi-language support
+- Message retrieval
+- Key fallback behavior
 
-**Coverage**: 12 test cases covering:
-- English and Chinese translations
-- Locale variants (zh-CN, zh-TW, etc.)
+**Coverage**: 9 test cases covering:
+- Message translation for current locale
+- Placeholder substitution ({0}, {1}, etc.)
 - Missing translation fallback
-- Placeholder substitution
-- Case-insensitive locale detection
+- Known message keys validation
+- Empty and invalid input handling
 
 ### 5. GitHub Actions CI Workflow
 

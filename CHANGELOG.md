@@ -32,6 +32,8 @@ All notable changes to the "intercept-wave" extension will be documented in this
 - 🔧 Downgraded ESLint from 9.x to 8.x for compatibility with existing configuration format
 - 🐛 Fixed ESLint errors in sidebarProvider.ts (unused parameters)
 - 🐛 Fixed ESLint prefer-rest-params error in test runner
+- 📊 Fixed c8 coverage configuration to properly track compiled JavaScript files
+- 🔐 Added proper GitHub Actions permissions for PR comment posting
 - ✅ All lint checks and unit tests now passing
 
 ## [1.0.4]

@@ -148,7 +148,7 @@ export function deactivate() {
     }
 }
 
-function getConfigurationHtml(config: any): string {
+export function getConfigurationHtml(config: any): string {
     const template = TemplateLoader.loadTemplate('configurationView');
     return TemplateLoader.replacePlaceholders(template, {
         'PORT': (config.port || 8888).toString(),

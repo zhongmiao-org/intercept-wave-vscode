@@ -5,7 +5,8 @@ import * as Module from 'module';
 
 // Mock vscode module before running tests
 const originalRequire = Module.prototype.require;
-(Module.prototype.require as any) = function (this: any, id: string, ...args: any[]) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(Module.prototype.require as any) = function (this: any, id: string) {
     if (id === 'vscode') {
         // Return a basic mock of vscode API
         return {
@@ -35,7 +36,8 @@ const originalRequire = Module.prototype.require;
             }
         };
     }
-    return originalRequire.apply(this, [id, ...args]);
+    // eslint-disable-next-line prefer-rest-params
+    return originalRequire.apply(this, arguments as any);
 };
 
 function getAllFiles(dirPath: string, extension: string, arrayOfFiles: string[] = []): string[] {

@@ -2,7 +2,7 @@
 
 All notable changes to the "intercept-wave" extension will be documented in this file.
 
-## [1.0.5] - 2025-01-16
+## [1.0.5] - 2025-01-17
 
 ### Added
 - ✅ Unit testing infrastructure with Mocha and Chai
@@ -27,6 +27,12 @@ All notable changes to the "intercept-wave" extension will be documented in this
 - 🔧 Better TypeScript configuration for testing
 - 🚀 Automated changelog extraction for release drafts
 - ⚡ Tests only run on Pull Requests to save CI resources
+
+### Fixed
+- 🔧 Downgraded ESLint from 9.x to 8.x for compatibility with existing configuration format
+- 🐛 Fixed ESLint errors in sidebarProvider.ts (unused parameters)
+- 🐛 Fixed ESLint prefer-rest-params error in test runner
+- ✅ All lint checks and unit tests now passing
 
 ## [1.0.4]
 

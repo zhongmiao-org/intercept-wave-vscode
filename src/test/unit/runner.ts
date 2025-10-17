@@ -11,7 +11,11 @@ const originalRequire = Module.prototype.require;
         // Return a basic mock of vscode API
         return {
             workspace: {
-                workspaceFolders: undefined,
+                workspaceFolders: [{
+                    uri: { fsPath: process.cwd(), scheme: 'file', path: process.cwd() },
+                    name: 'test-workspace',
+                    index: 0
+                }],
                 getConfiguration: () => ({
                     get: () => undefined,
                     update: () => Promise.resolve()

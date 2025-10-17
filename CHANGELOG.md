@@ -2,6 +2,12 @@
 
 All notable changes to the "intercept-wave" extension will be documented in this file.
 
+## [Unreleased]
+
+### Improved
+- 🔧 Build workflow now runs tests and uploads coverage to Codecov before creating release drafts
+- 📊 Enhanced badge configuration with vsmarketplacebadges.dev for better reliability
+
 ## [1.0.5] - 2025-01-17
 
 ### Added

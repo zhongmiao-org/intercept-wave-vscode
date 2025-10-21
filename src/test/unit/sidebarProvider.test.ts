@@ -16,7 +16,7 @@ describe('SidebarProvider', () => {
     before(() => {
         // Add vscode.Uri.joinPath if it doesn't exist (for testing environment)
         if (!(vscode.Uri as any).joinPath) {
-            (vscode.Uri as any).joinPath = (...args: any[]) => {
+            (vscode.Uri as any).joinPath = () => {
                 return vscode.Uri.file('/fake/joined/path');
             };
         }

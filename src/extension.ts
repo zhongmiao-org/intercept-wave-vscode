@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { MockServerManager } from './mockServer';
 import { ConfigManager } from './configManager';
 import { SidebarProvider } from './sidebarProvider';
-import { t } from './i18n';
 import { TemplateLoader } from './templateLoader';
 
 let mockServerManager: MockServerManager;
@@ -26,8 +25,8 @@ export function activate(context: vscode.ExtensionContext) {
             resolveWebviewView(webviewView: vscode.WebviewView) {
                 outputChannel.appendLine('[EmptyProvider] resolveWebviewView called');
 
-                const title = t('noWorkspace.title');
-                const message = t('noWorkspace.message');
+                const title = vscode.l10n.t('noWorkspace.title');
+                const message = vscode.l10n.t('noWorkspace.message');
 
                 webviewView.webview.options = {
                     enableScripts: true
@@ -86,9 +85,9 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('interceptWave.startServer', async () => {
             try {
                 const url = await mockServerManager.start();
-                vscode.window.showInformationMessage(t('server.started', url));
+                vscode.window.showInformationMessage(vscode.l10n.t('server.started', url));
             } catch (error: any) {
-                vscode.window.showErrorMessage(t('server.startFailed', error.message));
+                vscode.window.showErrorMessage(vscode.l10n.t('server.startFailed', error.message));
             }
         })
     );
@@ -97,9 +96,9 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('interceptWave.stopServer', async () => {
             try {
                 await mockServerManager.stop();
-                vscode.window.showInformationMessage(t('server.stopped'));
+                vscode.window.showInformationMessage(vscode.l10n.t('server.stopped'));
             } catch (error: any) {
-                vscode.window.showErrorMessage(t('server.stopFailed', error.message));
+                vscode.window.showErrorMessage(vscode.l10n.t('server.stopFailed', error.message));
             }
         })
     );
@@ -108,7 +107,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('interceptWave.configure', async () => {
             const panel = vscode.window.createWebviewPanel(
                 'interceptWaveConfig',
-                t('config.title'),
+                vscode.l10n.t('config.title'),
                 vscode.ViewColumn.One,
                 {
                     enableScripts: true
@@ -122,7 +121,7 @@ export function activate(context: vscode.ExtensionContext) {
                     switch (message.command) {
                         case 'save':
                             await configManager.saveConfig(message.config);
-                            vscode.window.showInformationMessage(t('config.saved'));
+                            vscode.window.showInformationMessage(vscode.l10n.t('config.saved'));
                             panel.dispose();
                             break;
                     }

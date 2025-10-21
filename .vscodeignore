@@ -8,3 +8,4 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 !resources/**
+!l10n/**

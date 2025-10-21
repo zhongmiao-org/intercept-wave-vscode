@@ -1,9 +1,13 @@
 import * as vscode from 'vscode';
-import { MockServerManager } from './mockServer';
+import { MockServerManager, ProxyGroup } from './mockServer';
 import { ConfigManager } from './configManager';
 import { TemplateLoader } from './templateLoader';
+import { v4 as uuidv4 } from 'uuid';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
+    private webviewView?: vscode.WebviewView;
+    private activeGroupId?: string;
+
     constructor(
         private readonly extensionUri: vscode.Uri,
         private mockServerManager: MockServerManager,
@@ -18,6 +22,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         _token: vscode.CancellationToken
     ) {
         console.log('[SidebarProvider] resolveWebviewView called');
+        this.webviewView = webviewView;
 
         try {
             webviewView.webview.options = {
@@ -30,77 +35,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             console.log('[SidebarProvider] Webview HTML set');
 
             webviewView.webview.onDidReceiveMessage(async data => {
-                switch (data.type) {
-                    case 'startServer':
-                        try {
-                            const url = await this.mockServerManager.start();
-                            vscode.window.showInformationMessage(`Server started: ${url}`);
-                            webviewView.webview.postMessage({ type: 'serverStarted', url });
-                        } catch (error: any) {
-                            vscode.window.showErrorMessage(`Failed to start server: ${error.message}`);
-                        }
-                        break;
-                    case 'stopServer':
-                        try {
-                            await this.mockServerManager.stop();
-                            vscode.window.showInformationMessage('Server stopped');
-                            webviewView.webview.postMessage({ type: 'serverStopped' });
-                        } catch (error: any) {
-                            vscode.window.showErrorMessage(`Failed to stop server: ${error.message}`);
-                        }
-                        break;
-                    case 'openConfig':
-                        vscode.commands.executeCommand('interceptWave.configure');
-                        break;
-                    case 'addMock':
-                        try {
-                            await this.configManager.addMockApi(data.data);
-                            const config = this.configManager.getConfig();
-                            webviewView.webview.postMessage({ type: 'mockListUpdated', mocks: config.mockApis });
-                            vscode.window.showInformationMessage('Mock API added successfully');
-                        } catch (error: any) {
-                            vscode.window.showErrorMessage(`Failed to add mock API: ${error.message}`);
-                        }
-                        break;
-                    case 'updateMock':
-                        try {
-                            await this.configManager.updateMockApi(data.index, data.data);
-                            const config = this.configManager.getConfig();
-                            webviewView.webview.postMessage({ type: 'mockListUpdated', mocks: config.mockApis });
-                            vscode.window.showInformationMessage('Mock API updated successfully');
-                        } catch (error: any) {
-                            vscode.window.showErrorMessage(`Failed to update mock API: ${error.message}`);
-                        }
-                        break;
-                    case 'deleteMock':
-                        try {
-                            await this.configManager.removeMockApi(data.index);
-                            const config = this.configManager.getConfig();
-                            webviewView.webview.postMessage({ type: 'mockListUpdated', mocks: config.mockApis });
-                            vscode.window.showInformationMessage('Mock API deleted successfully');
-                        } catch (error: any) {
-                            vscode.window.showErrorMessage(`Failed to delete mock API: ${error.message}`);
-                        }
-                        break;
-                    case 'toggleMock':
-                        try {
-                            const config = this.configManager.getConfig();
-                            config.mockApis[data.index].enabled = !config.mockApis[data.index].enabled;
-                            await this.configManager.saveConfig(config);
-                            webviewView.webview.postMessage({ type: 'mockListUpdated', mocks: config.mockApis });
-                        } catch (error: any) {
-                            vscode.window.showErrorMessage(`Failed to toggle mock API: ${error.message}`);
-                        }
-                        break;
-                    case 'getMock':
-                        try {
-                            const config = this.configManager.getConfig();
-                            webviewView.webview.postMessage({ type: 'editMock', data: config.mockApis[data.index] });
-                        } catch (error: any) {
-                            vscode.window.showErrorMessage(`Failed to get mock API: ${error.message}`);
-                        }
-                        break;
-                }
+                await this.handleMessage(data, webviewView);
             });
         } catch (error: any) {
             console.error('[SidebarProvider] Error in resolveWebviewView:', error);
@@ -108,44 +43,417 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private getHtmlForWebview(_webview: vscode.Webview): string {
+    private async handleMessage(data: any, webviewView: vscode.WebviewView) {
+        try {
+            switch (data.type) {
+                case 'startServer':
+                    await this.handleStartServer(webviewView);
+                    break;
+                case 'stopServer':
+                    await this.handleStopServer(webviewView);
+                    break;
+                case 'startGroup':
+                    await this.handleStartGroup(data.groupId);
+                    break;
+                case 'stopGroup':
+                    await this.handleStopGroup(data.groupId);
+                    break;
+                case 'addGroup':
+                    await this.handleAddGroup(data.data);
+                    break;
+                case 'updateGroup':
+                    await this.handleUpdateGroup(data.groupId, data.data);
+                    break;
+                case 'deleteGroup':
+                    await this.handleDeleteGroup(data.groupId);
+                    break;
+                case 'addMock':
+                    await this.handleAddMock(data.groupId, data.data);
+                    break;
+                case 'updateMock':
+                    await this.handleUpdateMock(data.groupId, data.index, data.data);
+                    break;
+                case 'deleteMock':
+                    await this.handleDeleteMock(data.groupId, data.index);
+                    break;
+                case 'toggleMock':
+                    await this.handleToggleMock(data.groupId, data.index);
+                    break;
+            }
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Error: ${error.message}`);
+        }
+    }
+
+    private async handleStartServer(_: vscode.WebviewView) {
+        try {
+            const url = await this.mockServerManager.start();
+            vscode.window.showInformationMessage(vscode.l10n.t('success.serversStarted', url));
+            this.refreshWebview();
+        } catch (error: any) {
+            vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStart', error.message));
+        }
+    }
+
+    private async handleStopServer(_: vscode.WebviewView) {
+        try {
+            await this.mockServerManager.stop();
+            vscode.window.showInformationMessage(vscode.l10n.t('success.serversStopped'));
+            this.refreshWebview();
+        } catch (error: any) {
+            vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStop', error.message));
+        }
+    }
+
+    private async handleStartGroup(groupId: string) {
+        try {
+            const url = await this.mockServerManager.startGroupById(groupId);
+            vscode.window.showInformationMessage(vscode.l10n.t('success.serversStarted', url));
+            this.refreshWebview();
+        } catch (error: any) {
+            vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStart', error.message));
+        }
+    }
+
+    private async handleStopGroup(groupId: string) {
+        try {
+            // Get group info before stopping
+            const config = this.configManager.getConfig();
+            const group = config.proxyGroups.find(g => g.id === groupId);
+
+            await this.mockServerManager.stopGroupById(groupId);
+
+            if (group) {
+                const serverInfo = `${group.name}(:${group.port})`;
+                vscode.window.showInformationMessage(vscode.l10n.t('success.groupStopped', serverInfo));
+            } else {
+                vscode.window.showInformationMessage(vscode.l10n.t('success.serversStopped'));
+            }
+
+            this.refreshWebview();
+        } catch (error: any) {
+            vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStop', error.message));
+        }
+    }
+
+    private async handleAddGroup(data: any) {
+        // Validate group data
+        const validationError = this.validateGroupData(data);
+        if (validationError) {
+            vscode.window.showErrorMessage(validationError);
+            return;
+        }
+
+        const newGroup: ProxyGroup = {
+            id: uuidv4(),
+            name: data.name,
+            enabled: data.enabled,
+            port: data.port,
+            interceptPrefix: data.interceptPrefix,
+            baseUrl: data.baseUrl,
+            stripPrefix: data.stripPrefix,
+            globalCookie: data.globalCookie,
+            mockApis: []
+        };
+
+        await this.configManager.addProxyGroup(newGroup);
+        this.activeGroupId = newGroup.id;
+        this.refreshWebview();
+
+        // Close form after success
+        if (this.webviewView) {
+            this.webviewView.webview.postMessage({ type: 'closeGroupForm' });
+        }
+
+        vscode.window.showInformationMessage(vscode.l10n.t('success.groupAdded', newGroup.name));
+    }
+
+    private async handleUpdateGroup(groupId: string, data: any) {
+        // Validate group data
+        const validationError = this.validateGroupData(data, groupId);
+        if (validationError) {
+            vscode.window.showErrorMessage(validationError);
+            return;
+        }
+
+        await this.configManager.updateProxyGroup(groupId, data);
+        this.refreshWebview();
+
+        // Close form after success
+        if (this.webviewView) {
+            this.webviewView.webview.postMessage({ type: 'closeGroupForm' });
+        }
+
+        vscode.window.showInformationMessage(vscode.l10n.t('success.groupUpdated'));
+    }
+
+    private async handleDeleteGroup(groupId: string) {
+        const config = this.configManager.getConfig();
+        if (config.proxyGroups.length <= 1) {
+            vscode.window.showWarningMessage(vscode.l10n.t('error.cannotDeleteLastGroup'));
+            return;
+        }
+
+        // Show confirmation dialog
+        const answer = await vscode.window.showWarningMessage(
+            vscode.l10n.t('ui.deleteProxyGroup'),
+            { modal: true },
+            vscode.l10n.t('ui.confirm')
+        );
+
+        if (answer !== vscode.l10n.t('ui.confirm')) {
+            return; // User canceled
+        }
+
+        await this.configManager.removeProxyGroup(groupId);
+
+        // Switch to first group if deleted group was active
+        if (this.activeGroupId === groupId) {
+            const updatedConfig = this.configManager.getConfig();
+            this.activeGroupId = updatedConfig.proxyGroups[0].id;
+        }
+
+        this.refreshWebview();
+        vscode.window.showInformationMessage(vscode.l10n.t('success.groupDeleted'));
+    }
+
+    private async handleAddMock(groupId: string, data: any) {
+        await this.configManager.addMockApi(groupId, data);
+        this.refreshWebview();
+        vscode.window.showInformationMessage(vscode.l10n.t('success.mockAdded'));
+    }
+
+    private async handleUpdateMock(groupId: string, index: number, data: any) {
+        await this.configManager.updateMockApi(groupId, index, data);
+        this.refreshWebview();
+        vscode.window.showInformationMessage(vscode.l10n.t('success.mockUpdated'));
+    }
+
+    private async handleDeleteMock(groupId: string, index: number) {
+        // Show confirmation dialog
+        const answer = await vscode.window.showWarningMessage(
+            vscode.l10n.t('ui.deleteMockApi'),
+            { modal: true },
+            vscode.l10n.t('ui.confirm')
+        );
+
+        if (answer !== vscode.l10n.t('ui.confirm')) {
+            return; // User canceled
+        }
+
+        await this.configManager.removeMockApi(groupId, index);
+        this.refreshWebview();
+        vscode.window.showInformationMessage(vscode.l10n.t('success.mockDeleted'));
+    }
+
+    private async handleToggleMock(groupId: string, index: number) {
+        const config = this.configManager.getConfig();
+        const group = config.proxyGroups.find(g => g.id === groupId);
+        if (group && group.mockApis[index]) {
+            group.mockApis[index].enabled = !group.mockApis[index].enabled;
+            await this.configManager.saveConfig(config);
+            this.refreshWebview();
+        }
+    }
+
+    private refreshWebview() {
+        if (this.webviewView) {
+            const config = this.configManager.getConfig();
+            // Get status for each group
+            const groupStatuses: { [groupId: string]: boolean } = {};
+            config.proxyGroups.forEach(group => {
+                groupStatuses[group.id] = this.mockServerManager.getGroupStatus(group.id);
+            });
+
+            this.webviewView.webview.postMessage({
+                type: 'configUpdated',
+                config,
+                activeGroupId: this.activeGroupId || config.proxyGroups[0]?.id,
+                isRunning: this.mockServerManager.getStatus(),
+                groupStatuses
+            });
+        }
+    }
+
+    private getHtmlForWebview(webview: vscode.Webview): string {
         const config = this.configManager.getConfig();
         const isRunning = this.mockServerManager.getStatus();
 
+        // Set active group ID to first group if not set
+        if (!this.activeGroupId && config.proxyGroups.length > 0) {
+            this.activeGroupId = config.proxyGroups[0].id;
+        }
+
+        // Get URI for vscode-elements
+        const vscodeElementsUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(
+                this.extensionUri,
+                'node_modules',
+                '@vscode-elements',
+                'elements',
+                'dist',
+                'bundled.js'
+            )
+        );
+
+        // Get URI for codicons font (CSS is inlined in HTML with proper font URI)
+        const codiconsFontUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(
+                this.extensionUri,
+                'node_modules',
+                '@vscode',
+                'codicons',
+                'dist',
+                'codicon.ttf'
+            )
+        );
+
+        // Generate nonce for CSP
+        const nonce = this.getNonce();
+
+        // i18n translations using vscode.l10n
+        const i18n = {
+            // Button texts
+            startAll: vscode.l10n.t('ui.startAll'),
+            stopAll: vscode.l10n.t('ui.stopAll'),
+            startServer: vscode.l10n.t('ui.startServer'),
+            stopServer: vscode.l10n.t('ui.stopServer'),
+            settings: vscode.l10n.t('ui.settings'),
+            add: vscode.l10n.t('ui.add'),
+            edit: vscode.l10n.t('ui.edit'),
+            delete: vscode.l10n.t('ui.delete'),
+            enable: vscode.l10n.t('ui.enable'),
+            disable: vscode.l10n.t('ui.disable'),
+            save: vscode.l10n.t('ui.save'),
+            cancel: vscode.l10n.t('ui.cancel'),
+            format: vscode.l10n.t('ui.format'),
+            validate: vscode.l10n.t('ui.validate'),
+
+            // Form labels
+            groupName: vscode.l10n.t('ui.groupName'),
+            enabled: vscode.l10n.t('ui.enabled'),
+            port: vscode.l10n.t('ui.port'),
+            interceptPrefix: vscode.l10n.t('ui.interceptPrefix'),
+            baseUrl: vscode.l10n.t('ui.baseUrl'),
+            stripPrefix: vscode.l10n.t('ui.stripPrefix'),
+            globalCookie: vscode.l10n.t('ui.globalCookie'),
+            method: vscode.l10n.t('ui.method'),
+            path: vscode.l10n.t('ui.path'),
+            statusCode: vscode.l10n.t('ui.statusCode'),
+            responseBody: vscode.l10n.t('ui.responseBody'),
+            delay: vscode.l10n.t('ui.delay'),
+
+            // Titles
+            addProxyGroup: vscode.l10n.t('ui.addProxyGroup'),
+            editProxyGroup: vscode.l10n.t('ui.editProxyGroup'),
+            addMockApi: vscode.l10n.t('ui.addMockApi'),
+            editMockApi: vscode.l10n.t('ui.editMockApi'),
+
+            // Status messages
+            running: vscode.l10n.t('ui.running'),
+            stopped: vscode.l10n.t('ui.stopped'),
+            mockApis: vscode.l10n.t('ui.mockApis'),
+
+            // Empty state messages
+            noMockApis: vscode.l10n.t('ui.noMockApis'),
+            clickAddToCreate: vscode.l10n.t('ui.clickAddToCreate'),
+
+            // Confirmation messages
+            confirmDeleteGroup: vscode.l10n.t('ui.deleteProxyGroup'),
+            confirmDeleteMock: vscode.l10n.t('ui.deleteMockApi'),
+
+            // JSON validation messages
+            jsonFormatSuccess: vscode.l10n.t('ui.jsonFormatted'),
+            jsonValid: vscode.l10n.t('ui.jsonValid'),
+            invalidJson: vscode.l10n.t('ui.jsonInvalid'),
+
+            // Placeholders
+            groupNamePlaceholder: vscode.l10n.t('ui.groupNamePlaceholder'),
+            baseUrlPlaceholder: vscode.l10n.t('ui.baseUrlPlaceholder'),
+            pathPlaceholder: vscode.l10n.t('ui.pathPlaceholder'),
+            responsePlaceholder: vscode.l10n.t('ui.responsePlaceholder'),
+            globalCookiePlaceholder: vscode.l10n.t('ui.globalCookiePlaceholder')
+        };
+
+        // Get status for each group
+        const groupStatuses: { [groupId: string]: boolean } = {};
+        config.proxyGroups.forEach(group => {
+            groupStatuses[group.id] = this.mockServerManager.getGroupStatus(group.id);
+        });
+
         const template = TemplateLoader.loadTemplate('sidebarView');
         const replacements = {
-            'STATUS_CLASS': isRunning ? 'running' : 'stopped',
-            'STATUS_TEXT': isRunning ? '● Running' : '○ Stopped',
-            'SERVER_URL': isRunning ? `<div class="url" id="serverUrl">http://localhost:${config.port}</div>` : '',
-            'START_DISABLED': isRunning ? 'disabled' : '',
-            'STOP_DISABLED': !isRunning ? 'disabled' : '',
-            'ENABLED_COUNT': config.mockApis.filter((a: any) => a.enabled).length.toString(),
-            'TOTAL_COUNT': config.mockApis.length.toString(),
-            'MOCK_LIST': this.renderMockList(config.mockApis)
+            'CONFIG_JSON': JSON.stringify(config),
+            'ACTIVE_GROUP_ID': this.activeGroupId || '',
+            'IS_RUNNING': isRunning.toString(),
+            'GROUP_STATUSES_JSON': JSON.stringify(groupStatuses),
+            'I18N_JSON': JSON.stringify(i18n),
+            'VSCODE_ELEMENTS_URI': vscodeElementsUri.toString(),
+            'CODICONS_FONT_URI': codiconsFontUri.toString(),
+            'NONCE': nonce,
+
+            // Static placeholders for HTML
+            'I18N_START_ALL': i18n.startAll,
+            'I18N_STOP_ALL': i18n.stopAll,
+            'I18N_ADD_PROXY_GROUP': i18n.addProxyGroup,
+            'I18N_GROUP_NAME': i18n.groupName,
+            'I18N_GROUP_NAME_PLACEHOLDER': i18n.groupNamePlaceholder,
+            'I18N_ENABLED': i18n.enabled,
+            'I18N_PORT': i18n.port,
+            'I18N_INTERCEPT_PREFIX': i18n.interceptPrefix,
+            'I18N_BASE_URL': i18n.baseUrl,
+            'I18N_BASE_URL_PLACEHOLDER': i18n.baseUrlPlaceholder,
+            'I18N_STRIP_PREFIX': i18n.stripPrefix,
+            'I18N_GLOBAL_COOKIE': i18n.globalCookie,
+            'I18N_GLOBAL_COOKIE_PLACEHOLDER': i18n.globalCookiePlaceholder,
+            'I18N_SAVE': i18n.save,
+            'I18N_CANCEL': i18n.cancel,
+            'I18N_ADD_MOCK_API': i18n.addMockApi,
+            'I18N_METHOD': i18n.method,
+            'I18N_PATH': i18n.path,
+            'I18N_PATH_PLACEHOLDER': i18n.pathPlaceholder,
+            'I18N_STATUS_CODE': i18n.statusCode,
+            'I18N_RESPONSE_BODY': i18n.responseBody,
+            'I18N_RESPONSE_PLACEHOLDER': i18n.responsePlaceholder,
+            'I18N_FORMAT': i18n.format,
+            'I18N_VALIDATE': i18n.validate,
+            'I18N_DELAY': i18n.delay
         };
 
         return TemplateLoader.replacePlaceholders(template, replacements);
     }
 
-
-    private renderMockList(mocks: any[]): string {
-        if (!mocks || mocks.length === 0) {
-            return '<div class="empty-state">No mock APIs configured.<br>Click "+ Add" to create one.</div>';
+    private validateGroupData(data: any, editingGroupId?: string): string | null {
+        // Validate name
+        if (!data.name || data.name.trim() === '') {
+            return vscode.l10n.t('error.emptyGroupName');
         }
-        return mocks.map((mock, index) => `
-            <div class="mock-item ${mock.enabled ? '' : 'disabled'}">
-                <div class="mock-item-header">
-                    <div>
-                        <span class="mock-method ${mock.method.toLowerCase()}">${mock.method}</span>
-                        <span class="mock-path">${mock.path}</span>
-                    </div>
-                    <div class="mock-actions">
-                        <button onclick="toggleMock(${index})">${mock.enabled ? 'Disable' : 'Enable'}</button>
-                        <button onclick="editMock(${index})">Edit</button>
-                        <button onclick="deleteMock(${index})">Delete</button>
-                    </div>
-                </div>
-            </div>
-        `).join('');
+
+        // Validate port
+        const port = parseInt(data.port);
+        if (isNaN(port) || port < 1024 || port > 65535) {
+            return vscode.l10n.t('error.invalidPort');
+        }
+
+        // Check for port conflicts
+        const config = this.configManager.getConfig();
+        const conflictingGroup = config.proxyGroups.find(g =>
+            g.port === port && g.id !== editingGroupId
+        );
+
+        if (conflictingGroup) {
+            return vscode.l10n.t('error.portInUse', port.toString(), conflictingGroup.name);
+        }
+
+        return null;
+    }
+
+    private getNonce() {
+        let text = '';
+        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 32; i++) {
+            text += possible.charAt(Math.floor(Math.random() * possible.length));
+        }
+        return text;
     }
 }

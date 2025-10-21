@@ -2,7 +2,7 @@
   "name": "intercept-wave",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.0.5",
+  "version": "2.0.0",
   "publisher": "Ark65",
   "icon": "resources/logo.png",
   "repository": {
@@ -10,6 +10,7 @@
     "url": "https://github.com/zhongmiao-org/intercept-wave-vscode.git"
   },
   "license": "MIT",
+  "l10n": "./l10n",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -102,13 +103,15 @@
     "test": "npm run compile && node ./out/test/runTest.js",
     "test:unit": "npm run compile && node ./out/test/unit/runner.js",
     "test:coverage": "c8 npm run test:unit",
-    "test:coverage:ci": "c8 --reporter=lcov --reporter=text --reporter=json-summary npm run test:unit"
+    "test:coverage:ci": "c8 --reporter=lcov --reporter=text --reporter=json-summary npm run test:unit",
+    "build:local": "npm run compile && npx @vscode/vsce package --allow-star-activation --allow-missing-repository"
   },
   "devDependencies": {
     "@types/chai": "^4.3.11",
     "@types/mocha": "^10.0.6",
     "@types/node": "^24.7.2",
     "@types/sinon": "^17.0.3",
+    "@types/uuid": "^10.0.0",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
@@ -120,5 +123,10 @@
     "sinon": "^17.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@vscode-elements/elements": "^2.3.1",
+    "@vscode/codicons": "^0.0.41",
+    "uuid": "^13.0.0"
   }
 }

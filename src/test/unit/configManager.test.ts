@@ -78,16 +78,21 @@ describe('ConfigManager', () => {
         it('should return default config for new installation', () => {
             const config = configManager.getConfig();
 
-            expect(config.port).to.equal(8888);
-            expect(config.interceptPrefix).to.equal('/api');
-            expect(config.baseUrl).to.equal('http://localhost:8080');
-            expect(config.stripPrefix).to.be.true;
-            expect(config.globalCookie).to.equal('');
-            expect(Array.isArray(config.mockApis)).to.be.true;
-            expect(config.mockApis.length).to.equal(0);
+            expect(config.version).to.equal('2.0');
+            expect(Array.isArray(config.proxyGroups)).to.be.true;
+            expect(config.proxyGroups.length).to.equal(1);
+
+            const defaultGroup = config.proxyGroups[0];
+            expect(defaultGroup.port).to.equal(8888);
+            expect(defaultGroup.interceptPrefix).to.equal('/api');
+            expect(defaultGroup.baseUrl).to.equal('http://localhost:8080');
+            expect(defaultGroup.stripPrefix).to.be.true;
+            expect(defaultGroup.globalCookie).to.equal('');
+            expect(Array.isArray(defaultGroup.mockApis)).to.be.true;
+            expect(defaultGroup.mockApis.length).to.equal(0);
         });
 
-        it('should read and merge existing config with defaults', () => {
+        it('should read and merge existing config with defaults (migration from legacy)', () => {
             const partialConfig = {
                 port: 9999,
                 interceptPrefix: '/custom'
@@ -97,13 +102,17 @@ describe('ConfigManager', () => {
 
             const config = configManager.getConfig();
 
-            expect(config.port).to.equal(9999);
-            expect(config.interceptPrefix).to.equal('/custom');
-            expect(config.baseUrl).to.equal('http://localhost:8080');
-            expect(config.stripPrefix).to.be.true;
+            // Should migrate to v2.0 format
+            expect(config.version).to.equal('2.0');
+            expect(Array.isArray(config.proxyGroups)).to.be.true;
+            expect(config.proxyGroups.length).to.equal(1);
+            expect(config.proxyGroups[0].port).to.equal(9999);
+            expect(config.proxyGroups[0].interceptPrefix).to.equal('/custom');
+            expect(config.proxyGroups[0].baseUrl).to.equal('http://localhost:8080');
+            expect(config.proxyGroups[0].stripPrefix).to.be.true;
         });
 
-        it('should ensure mockApis is an array even if config has invalid value', () => {
+        it('should ensure mockApis is an array even if config has invalid value (legacy migration)', () => {
             const invalidConfig = {
                 port: 8888,
                 mockApis: null as any
@@ -113,8 +122,11 @@ describe('ConfigManager', () => {
 
             const config = configManager.getConfig();
 
-            expect(Array.isArray(config.mockApis)).to.be.true;
-            expect(config.mockApis.length).to.equal(0);
+            // Should migrate and fix invalid mockApis
+            expect(config.version).to.equal('2.0');
+            expect(Array.isArray(config.proxyGroups)).to.be.true;
+            expect(Array.isArray(config.proxyGroups[0].mockApis)).to.be.true;
+            expect(config.proxyGroups[0].mockApis.length).to.equal(0);
         });
 
         it('should return default config if config file has invalid JSON', () => {
@@ -122,8 +134,10 @@ describe('ConfigManager', () => {
 
             const config = configManager.getConfig();
 
-            expect(config.port).to.equal(8888);
-            expect(config.interceptPrefix).to.equal('/api');
+            expect(config.version).to.equal('2.0');
+            expect(Array.isArray(config.proxyGroups)).to.be.true;
+            expect(config.proxyGroups[0].port).to.equal(8888);
+            expect(config.proxyGroups[0].interceptPrefix).to.equal('/api');
         });
 
         it('should return default config if config file does not exist', () => {
@@ -133,20 +147,28 @@ describe('ConfigManager', () => {
 
             const config = configManager.getConfig();
 
-            expect(config.port).to.equal(8888);
-            expect(Array.isArray(config.mockApis)).to.be.true;
+            expect(config.version).to.equal('2.0');
+            expect(Array.isArray(config.proxyGroups)).to.be.true;
+            expect(config.proxyGroups[0].port).to.equal(8888);
+            expect(Array.isArray(config.proxyGroups[0].mockApis)).to.be.true;
         });
     });
 
     describe('saveConfig', () => {
         it('should save config to file', async () => {
             const testConfig = {
-                port: 7777,
-                interceptPrefix: '/test',
-                baseUrl: 'http://test.com',
-                stripPrefix: false,
-                globalCookie: 'test-cookie',
-                mockApis: []
+                version: '2.0',
+                proxyGroups: [{
+                    id: 'test-id',
+                    name: 'Test Group',
+                    port: 7777,
+                    interceptPrefix: '/test',
+                    baseUrl: 'http://test.com',
+                    stripPrefix: false,
+                    globalCookie: 'test-cookie',
+                    enabled: true,
+                    mockApis: []
+                }]
             };
 
             await configManager.saveConfig(testConfig);
@@ -159,12 +181,18 @@ describe('ConfigManager', () => {
 
         it('should format JSON with proper indentation', async () => {
             const testConfig = {
-                port: 8888,
-                interceptPrefix: '/api',
-                baseUrl: 'http://localhost:8080',
-                stripPrefix: true,
-                globalCookie: '',
-                mockApis: []
+                version: '2.0',
+                proxyGroups: [{
+                    id: 'test-id',
+                    name: 'Test Group',
+                    port: 8888,
+                    interceptPrefix: '/api',
+                    baseUrl: 'http://localhost:8080',
+                    stripPrefix: true,
+                    globalCookie: '',
+                    enabled: true,
+                    mockApis: []
+                }]
             };
 
             await configManager.saveConfig(testConfig);
@@ -179,6 +207,9 @@ describe('ConfigManager', () => {
 
     describe('addMockApi', () => {
         it('should add new mock API to config', async () => {
+            const config = configManager.getConfig();
+            const groupId = config.proxyGroups[0].id;
+
             const mockApi = {
                 path: '/user',
                 method: 'GET',
@@ -188,15 +219,18 @@ describe('ConfigManager', () => {
                 delay: 0
             };
 
-            await configManager.addMockApi(mockApi);
+            await configManager.addMockApi(groupId, mockApi);
 
-            const config = configManager.getConfig();
+            const updatedConfig = configManager.getConfig();
 
-            expect(config.mockApis.length).to.equal(1);
-            expect(config.mockApis[0]).to.deep.equal(mockApi);
+            expect(updatedConfig.proxyGroups[0].mockApis.length).to.equal(1);
+            expect(updatedConfig.proxyGroups[0].mockApis[0]).to.deep.equal(mockApi);
         });
 
         it('should append multiple mock APIs', async () => {
+            const config = configManager.getConfig();
+            const groupId = config.proxyGroups[0].id;
+
             const mockApi1 = {
                 path: '/user',
                 method: 'GET',
@@ -215,19 +249,22 @@ describe('ConfigManager', () => {
                 delay: 0
             };
 
-            await configManager.addMockApi(mockApi1);
-            await configManager.addMockApi(mockApi2);
+            await configManager.addMockApi(groupId, mockApi1);
+            await configManager.addMockApi(groupId, mockApi2);
 
-            const config = configManager.getConfig();
+            const updatedConfig = configManager.getConfig();
 
-            expect(config.mockApis.length).to.equal(2);
-            expect(config.mockApis[0].path).to.equal('/user');
-            expect(config.mockApis[1].path).to.equal('/posts');
+            expect(updatedConfig.proxyGroups[0].mockApis.length).to.equal(2);
+            expect(updatedConfig.proxyGroups[0].mockApis[0].path).to.equal('/user');
+            expect(updatedConfig.proxyGroups[0].mockApis[1].path).to.equal('/posts');
         });
     });
 
     describe('removeMockApi', () => {
         it('should remove mock API at specified index', async () => {
+            const config = configManager.getConfig();
+            const groupId = config.proxyGroups[0].id;
+
             const mockApi1 = {
                 path: '/user',
                 method: 'GET',
@@ -246,27 +283,33 @@ describe('ConfigManager', () => {
                 delay: 0
             };
 
-            await configManager.addMockApi(mockApi1);
-            await configManager.addMockApi(mockApi2);
-            await configManager.removeMockApi(0);
+            await configManager.addMockApi(groupId, mockApi1);
+            await configManager.addMockApi(groupId, mockApi2);
+            await configManager.removeMockApi(groupId, 0);
 
-            const config = configManager.getConfig();
+            const updatedConfig = configManager.getConfig();
 
-            expect(config.mockApis.length).to.equal(1);
-            expect(config.mockApis[0].path).to.equal('/posts');
+            expect(updatedConfig.proxyGroups[0].mockApis.length).to.equal(1);
+            expect(updatedConfig.proxyGroups[0].mockApis[0].path).to.equal('/posts');
         });
 
         it('should handle removing from empty array gracefully', async () => {
-            await configManager.removeMockApi(0);
-
             const config = configManager.getConfig();
+            const groupId = config.proxyGroups[0].id;
 
-            expect(config.mockApis.length).to.equal(0);
+            await configManager.removeMockApi(groupId, 0);
+
+            const updatedConfig = configManager.getConfig();
+
+            expect(updatedConfig.proxyGroups[0].mockApis.length).to.equal(0);
         });
     });
 
     describe('updateMockApi', () => {
         it('should update mock API at specified index', async () => {
+            const config = configManager.getConfig();
+            const groupId = config.proxyGroups[0].id;
+
             const mockApi = {
                 path: '/user',
                 method: 'GET',
@@ -285,16 +328,19 @@ describe('ConfigManager', () => {
                 delay: 100
             };
 
-            await configManager.addMockApi(mockApi);
-            await configManager.updateMockApi(0, updatedMockApi);
+            await configManager.addMockApi(groupId, mockApi);
+            await configManager.updateMockApi(groupId, 0, updatedMockApi);
 
-            const config = configManager.getConfig();
+            const updatedConfig = configManager.getConfig();
 
-            expect(config.mockApis.length).to.equal(1);
-            expect(config.mockApis[0]).to.deep.equal(updatedMockApi);
+            expect(updatedConfig.proxyGroups[0].mockApis.length).to.equal(1);
+            expect(updatedConfig.proxyGroups[0].mockApis[0]).to.deep.equal(updatedMockApi);
         });
 
         it('should update correct API when multiple exist', async () => {
+            const config = configManager.getConfig();
+            const groupId = config.proxyGroups[0].id;
+
             const mockApi1 = {
                 path: '/user',
                 method: 'GET',
@@ -322,16 +368,16 @@ describe('ConfigManager', () => {
                 delay: 50
             };
 
-            await configManager.addMockApi(mockApi1);
-            await configManager.addMockApi(mockApi2);
-            await configManager.updateMockApi(1, updatedMockApi);
+            await configManager.addMockApi(groupId, mockApi1);
+            await configManager.addMockApi(groupId, mockApi2);
+            await configManager.updateMockApi(groupId, 1, updatedMockApi);
 
-            const config = configManager.getConfig();
+            const updatedConfig = configManager.getConfig();
 
-            expect(config.mockApis.length).to.equal(2);
-            expect(config.mockApis[0].path).to.equal('/user');
-            expect(config.mockApis[0].method).to.equal('GET');
-            expect(config.mockApis[1]).to.deep.equal(updatedMockApi);
+            expect(updatedConfig.proxyGroups[0].mockApis.length).to.equal(2);
+            expect(updatedConfig.proxyGroups[0].mockApis[0].path).to.equal('/user');
+            expect(updatedConfig.proxyGroups[0].mockApis[0].method).to.equal('GET');
+            expect(updatedConfig.proxyGroups[0].mockApis[1]).to.deep.equal(updatedMockApi);
         });
     });
 });

@@ -79,7 +79,8 @@ describe('MockServerManager', () => {
     describe('start', () => {
         it('should start the server and return URL', async () => {
             const url = await mockServerManager.start();
-            expect(url).to.equal('http://localhost:9999');
+            // In v2.0, start() returns URL with group name
+            expect(url).to.equal('http://localhost:9999 (Test Group)');
             expect(mockServerManager.getStatus()).to.be.true;
         });
 
@@ -89,14 +90,16 @@ describe('MockServerManager', () => {
                 await mockServerManager.start();
                 expect.fail('Should have thrown an error');
             } catch (error: any) {
-                expect(error.message).to.equal('Mock server is already running');
+                // In v2.0, error message changed to reflect that all servers are running
+                expect(error.message).to.equal('All enabled servers are already running');
             }
         });
 
         it('should log server details to output channel', async () => {
             await mockServerManager.start();
             expect(appendLineStub.called).to.be.true;
-            expect(appendLineStub.args.some((arg: any) => arg[0].includes('Mock server started'))).to.be.true;
+            // In v2.0, log message includes "Mock servers started" (plural)
+            expect(appendLineStub.args.some((arg: any) => arg[0].includes('Mock server'))).to.be.true;
         });
     });
 

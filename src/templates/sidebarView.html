@@ -3,13 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://*.vscode-cdn.net; font-src https://*.vscode-cdn.net; script-src 'nonce-{{NONCE}}';">
     <title>Intercept Wave</title>
+    <!-- Inline codicon styles with proper font URI - required id for vscode-icon component -->
+    <style id="vscode-codicon-stylesheet">
+        @font-face {
+            font-family: "codicon";
+            font-display: block;
+            src: url("{{CODICONS_FONT_URI}}") format("truetype");
+        }
+
+        .codicon[class*='codicon-'] {
+            font: normal normal normal 16px/1 codicon;
+            display: inline-block;
+            text-decoration: none;
+            text-rendering: auto;
+            text-align: center;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+        }
+    </style>
     <style>
         body {
-            padding: 10px;
+            padding: 0;
+            margin: 0;
             font-family: var(--vscode-font-family);
             font-size: var(--vscode-font-size);
             color: var(--vscode-foreground);
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        /* Global Controls */
+        .global-controls {
+            display: flex;
+            gap: 8px;
+            padding: 8px;
+            background: var(--vscode-editor-background);
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+        .global-controls vscode-button {
+            flex: 1;
+        }
+        /* Tab System */
+        .tabs-container {
+            flex-shrink: 0;
+            background: var(--vscode-editor-background);
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding: 8px 8px 0 8px;
+            display: flex;
+            align-items: center;
+            overflow-x: auto;
+            gap: 4px;
+        }
+        .tab {
+            padding: 6px 12px;
+            font-size: 11px;
+            background: var(--vscode-tab-inactiveBackground);
+            color: var(--vscode-tab-inactiveForeground);
+            border:  1px solid var(--vscode-panel-border);
+            border-bottom: none;
+            border-radius: 3px 3px 0 0;
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .tab.active {
+            background: var(--vscode-tab-activeBackground);
+            color: var(--vscode-tab-activeForeground);
+            border-bottom: 2px solid var(--vscode-focusBorder);
+        }
+        .tab.disabled {
+            opacity: 0.5;
+        }
+        .tab-close {
+            margin-left: 4px;
+            padding: 0 4px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+        }
+        .tab-close:hover {
+            color: var(--vscode-errorForeground);
+        }
+        .tab-add {
+            padding: 4px 8px;
+            font-size: 16px;
+            line-height: 1;
+            background: transparent;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 3px;
+            cursor: pointer;
+            color: var(--vscode-foreground);
+            margin-left: 4px;
+        }
+        .tab-add:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+        /* Content Area */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
         }
         .header {
             margin-bottom: 15px;
@@ -33,30 +136,11 @@
             font-size: 11px;
             margin-top: 5px;
         }
-        button {
-            width: 100%;
-            padding: 8px;
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
             margin-bottom: 8px;
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            cursor: pointer;
-            border-radius: 3px;
-            font-size: 12px;
-        }
-        button:hover {
-            background: var(--vscode-button-hoverBackground);
-        }
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        button.secondary {
-            background: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
-        }
-        button.secondary:hover {
-            background: var(--vscode-button-secondaryHoverBackground);
         }
         .section {
             margin-top: 20px;
@@ -70,12 +154,6 @@
         .section-header h3 {
             margin: 0;
             font-size: 13px;
-        }
-        .add-btn {
-            padding: 4px 8px;
-            font-size: 11px;
-            width: auto;
-            margin: 0;
         }
         .mock-list {
             max-height: 400px;
@@ -119,12 +197,6 @@
             display: flex;
             gap: 5px;
         }
-        .mock-actions button {
-            width: auto;
-            padding: 2px 8px;
-            margin: 0;
-            font-size: 10px;
-        }
         .empty-state {
             text-align: center;
             padding: 20px;
@@ -149,135 +221,449 @@
         .form-group {
             margin-bottom: 12px;
         }
-        .form-group label {
-            display: block;
-            margin-bottom: 4px;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 6px;
-            background: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
-            border: 1px solid var(--vscode-input-border);
-            border-radius: 2px;
-            font-size: 12px;
-            box-sizing: border-box;
-        }
-        .form-group textarea {
-            min-height: 80px;
-            font-family: monospace;
-        }
         .form-actions {
             display: flex;
             gap: 8px;
             margin-top: 15px;
         }
-        .form-actions button {
+        .config-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .config-row .form-group {
             flex: 1;
+            margin-bottom: 0;
+        }
+        vscode-textfield, vscode-textarea {
+            width: 100%;
+        }
+        .json-buttons {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+        .json-message {
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        .json-error {
+            color: #f44336;
+        }
+        .json-success {
+            color: #4caf50;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h2 style="margin: 0 0 10px 0; font-size: 14px;">Intercept Wave</h2>
-        <div class="status {{STATUS_CLASS}}" id="status">
-            {{STATUS_TEXT}}
+    <div class="container">
+        <!-- Global Controls -->
+        <div class="global-controls">
+            <vscode-button id="startAllBtn">
+                <vscode-icon name="play-circle" slot="start"></vscode-icon>
+                {{I18N_START_ALL}}
+            </vscode-button>
+            <vscode-button id="stopAllBtn">
+                <vscode-icon name="stop-circle" slot="start"></vscode-icon>
+                {{I18N_STOP_ALL}}
+            </vscode-button>
         </div>
-        {{SERVER_URL}}
+
+        <!-- Tabs -->
+        <div class="tabs-container" id="tabsContainer">
+            <!-- Tabs will be dynamically generated -->
+        </div>
+
+        <!-- Content -->
+        <div class="content" id="content">
+            <!-- Content will be dynamically generated -->
+        </div>
     </div>
 
-    <button id="startBtn" {{START_DISABLED}}>Start Server</button>
-    <button id="stopBtn" {{STOP_DISABLED}}>Stop Server</button>
-    <button id="configBtn" class="secondary">Settings</button>
-
-    <div class="section">
-        <div class="section-header">
-            <h3>Mock APIs ({{ENABLED_COUNT}}/{{TOTAL_COUNT}})</h3>
-            <button class="add-btn" id="addMockBtn">+ Add</button>
+    <!-- Group Settings Form -->
+    <div class="form-overlay" id="groupForm">
+        <h3 style="margin-top: 0; font-size: 13px;" id="groupFormTitle">{{I18N_ADD_PROXY_GROUP}}</h3>
+        <div class="form-group">
+            <vscode-textfield id="groupName" placeholder="{{I18N_GROUP_NAME_PLACEHOLDER}}">{{I18N_GROUP_NAME}}</vscode-textfield>
         </div>
-        <div class="mock-list" id="mockList">
-            {{MOCK_LIST}}
+        <div class="form-group">
+            <vscode-checkbox id="groupEnabled">{{I18N_ENABLED}}</vscode-checkbox>
+        </div>
+        <div class="config-row">
+            <div class="form-group">
+                <vscode-textfield id="groupPort" type="number" value="8888">{{I18N_PORT}}</vscode-textfield>
+            </div>
+            <div class="form-group">
+                <vscode-textfield id="groupPrefix" value="/api">{{I18N_INTERCEPT_PREFIX}}</vscode-textfield>
+            </div>
+        </div>
+        <div class="form-group">
+            <vscode-textfield id="groupBaseUrl" placeholder="{{I18N_BASE_URL_PLACEHOLDER}}">{{I18N_BASE_URL}}</vscode-textfield>
+        </div>
+        <div class="form-group">
+            <vscode-checkbox id="groupStripPrefix">{{I18N_STRIP_PREFIX}}</vscode-checkbox>
+        </div>
+        <div class="form-group">
+            <vscode-textfield id="groupCookie" placeholder="{{I18N_GLOBAL_COOKIE_PLACEHOLDER}}">{{I18N_GLOBAL_COOKIE}}</vscode-textfield>
+        </div>
+        <div class="form-actions">
+            <vscode-button id="saveGroupBtn">{{I18N_SAVE}}</vscode-button>
+            <vscode-button id="cancelGroupBtn" secondary>{{I18N_CANCEL}}</vscode-button>
         </div>
     </div>
 
     <!-- Mock API Form -->
     <div class="form-overlay" id="mockForm">
-        <h3 style="margin-top: 0; font-size: 13px;" id="formTitle">Add Mock API</h3>
+        <h3 style="margin-top: 0; font-size: 13px;" id="mockFormTitle">{{I18N_ADD_MOCK_API}}</h3>
         <div class="form-group">
-            <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" id="mockEnabled" checked style="margin-right: 8px; width: auto; cursor: pointer;">
-                <span>Enabled</span>
-            </label>
+            <vscode-checkbox id="mockEnabled">{{I18N_ENABLED}}</vscode-checkbox>
         </div>
         <div class="form-group">
-            <label>Method</label>
-            <select id="mockMethod">
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-                <option value="PUT">PUT</option>
-                <option value="DELETE">DELETE</option>
-                <option value="PATCH">PATCH</option>
-            </select>
+            <vscode-single-select id="mockMethod">
+                <vscode-option value="GET">GET</vscode-option>
+                <vscode-option value="POST">POST</vscode-option>
+                <vscode-option value="PUT">PUT</vscode-option>
+                <vscode-option value="DELETE">DELETE</vscode-option>
+                <vscode-option value="PATCH">PATCH</vscode-option>
+            </vscode-single-select>
         </div>
         <div class="form-group">
-            <label>Path (e.g., /api/users or /api/users/:id)</label>
-            <input type="text" id="mockPath" placeholder="/api/users">
+            <vscode-textfield id="mockPath" placeholder="{{I18N_PATH_PLACEHOLDER}}">{{I18N_PATH}}</vscode-textfield>
         </div>
         <div class="form-group">
-            <label>Status Code</label>
-            <input type="number" id="mockStatus" value="200">
+            <vscode-textfield id="mockStatus" type="number" value="200">{{I18N_STATUS_CODE}}</vscode-textfield>
         </div>
         <div class="form-group">
-            <label style="margin-bottom: 8px;">
-                Response Body (JSON)
-                <span style="float: right; font-weight: normal;">
-                    <button type="button" id="formatJsonBtn" style="width: auto; padding: 2px 8px; margin: 0 5px 0 0; font-size: 11px;">Format</button>
-                    <button type="button" id="validateJsonBtn" style="width: auto; padding: 2px 8px; margin: 0; font-size: 11px;">Validate</button>
-                </span>
-            </label>
-            <textarea id="mockResponse" placeholder='{"message": "Success"}'></textarea>
-            <div id="jsonError" style="display: none; color: #f44336; font-size: 11px; margin-top: 4px;"></div>
-            <div id="jsonSuccess" style="display: none; color: #4caf50; font-size: 11px; margin-top: 4px;"></div>
+            <label style="display: block; font-size: 11px; font-weight: bold; margin-bottom: 8px;">{{I18N_RESPONSE_BODY}}</label>
+            <div class="json-buttons">
+                <vscode-button id="formatJsonBtn" secondary>{{I18N_FORMAT}}</vscode-button>
+                <vscode-button id="validateJsonBtn" secondary>{{I18N_VALIDATE}}</vscode-button>
+            </div>
+            <vscode-textarea id="mockResponse" rows="10" placeholder='{{I18N_RESPONSE_PLACEHOLDER}}'></vscode-textarea>
+            <div id="jsonError" class="json-message json-error" style="display: none;"></div>
+            <div id="jsonSuccess" class="json-message json-success" style="display: none;"></div>
         </div>
         <div class="form-group">
-            <label>Delay (ms)</label>
-            <input type="number" id="mockDelay" value="0">
+            <vscode-textfield id="mockDelay" type="number" value="0">{{I18N_DELAY}}</vscode-textfield>
         </div>
         <div class="form-actions">
-            <button id="saveBtn">Save</button>
-            <button id="cancelBtn" class="secondary">Cancel</button>
+            <vscode-button id="saveMockBtn">{{I18N_SAVE}}</vscode-button>
+            <vscode-button id="cancelMockBtn" secondary>{{I18N_CANCEL}}</vscode-button>
         </div>
     </div>
 
-    <script>
+    <script type="module" nonce="{{NONCE}}" src="{{VSCODE_ELEMENTS_URI}}"></script>
+    <script nonce="{{NONCE}}">
         const vscode = acquireVsCodeApi();
-        let editingIndex = -1;
+        let config = {{CONFIG_JSON}};
+        let activeGroupId = '{{ACTIVE_GROUP_ID}}';
+        let editingMockIndex = -1;
+        let editingGroupId = null;
+        const i18n = {{I18N_JSON}};
+        let groupStatuses = {{GROUP_STATUSES_JSON}}; // Track running status for each group
 
-        document.getElementById('startBtn').addEventListener('click', () => {
-            vscode.postMessage({ type: 'startServer' });
+        // Initialize
+        initializeGlobalControls();
+        renderTabs();
+        renderContent();
+
+        // Initialize global control buttons
+        function initializeGlobalControls() {
+            const startAllBtn = document.getElementById('startAllBtn');
+            const stopAllBtn = document.getElementById('stopAllBtn');
+
+            // Check if any servers are running vs all servers running
+            const anyRunning = config.proxyGroups.some(g => groupStatuses[g.id]);
+            const allRunning = config.proxyGroups.every(g => groupStatuses[g.id]);
+
+            if (startAllBtn) {
+                // Start All disabled only when ALL groups are running
+                startAllBtn.disabled = allRunning;
+                startAllBtn.addEventListener('click', () => vscode.postMessage({ type: 'startServer' }));
+            }
+            if (stopAllBtn) {
+                // Stop All disabled only when NO groups are running
+                stopAllBtn.disabled = !anyRunning;
+                stopAllBtn.addEventListener('click', () => vscode.postMessage({ type: 'stopServer' }));
+            }
+        }
+
+        // Tab Management
+        function renderTabs() {
+            const container = document.getElementById('tabsContainer');
+            const tabs = config.proxyGroups.map(group => `
+                <div class="tab ${group.id === activeGroupId ? 'active' : ''} ${!group.enabled ? 'disabled' : ''}"
+                     data-group-id="${group.id}"
+                     data-action="switch-tab">
+                    <span>${group.name}(:${group.port})</span>
+                    ${config.proxyGroups.length > 1 ? `<span class="tab-close" data-group-id="${group.id}" data-action="delete-group">×</span>` : ''}
+                </div>
+            `).join('');
+            container.innerHTML = tabs + '<button class="tab-add" data-action="add-group">+</button>';
+
+            // Attach event listeners using event delegation
+            container.addEventListener('click', handleTabContainerClick);
+            container.addEventListener('contextmenu', handleTabContextMenu);
+        }
+
+        function handleTabContainerClick(e) {
+            const target = e.target.closest('[data-action]');
+            if (!target) return;
+
+            const action = target.dataset.action;
+            const groupId = target.dataset.groupId;
+
+            switch (action) {
+                case 'switch-tab':
+                    switchTab(groupId);
+                    break;
+                case 'delete-group':
+                    e.stopPropagation();
+                    deleteGroup(groupId);
+                    break;
+                case 'add-group':
+                    addGroup();
+                    break;
+            }
+        }
+
+        function handleTabContextMenu(e) {
+            const tab = e.target.closest('.tab[data-group-id]');
+            if (tab) {
+                e.preventDefault();
+                showGroupContextMenu(e, tab.dataset.groupId);
+            }
+        }
+
+        function switchTab(groupId) {
+            activeGroupId = groupId;
+            renderTabs();
+            renderContent();
+        }
+
+        function addGroup() {
+            editingGroupId = null;
+            document.getElementById('groupFormTitle').textContent = i18n.addProxyGroup;
+            clearGroupForm();
+            document.getElementById('groupForm').classList.add('show');
+        }
+
+        function editGroup(groupId) {
+            const group = config.proxyGroups.find(g => g.id === groupId);
+            if (!group) return;
+
+            editingGroupId = groupId;
+            document.getElementById('groupFormTitle').textContent = i18n.editProxyGroup;
+            document.getElementById('groupName').value = group.name;
+            document.getElementById('groupEnabled').checked = group.enabled;
+            document.getElementById('groupPort').value = group.port;
+            document.getElementById('groupPrefix').value = group.interceptPrefix;
+            document.getElementById('groupBaseUrl').value = group.baseUrl;
+            document.getElementById('groupStripPrefix').checked = group.stripPrefix;
+            document.getElementById('groupCookie').value = group.globalCookie;
+            document.getElementById('groupForm').classList.add('show');
+        }
+
+        function deleteGroup(groupId) {
+            // Send delete request to backend, confirmation will be handled there
+            vscode.postMessage({ type: 'deleteGroup', groupId });
+        }
+
+        function showGroupContextMenu(event, groupId) {
+            event.preventDefault();
+            editGroup(groupId);
+        }
+
+        // Content Rendering
+        function renderContent() {
+            const group = config.proxyGroups.find(g => g.id === activeGroupId);
+            if (!group) return;
+
+            // Check if THIS specific group is running
+            const isGroupRunning = groupStatuses[activeGroupId] || false;
+
+            const content = `
+                <div class="header">
+                    <h2 style="margin: 0 0 10px 0; font-size: 14px;">${group.name}</h2>
+                    <div class="status ${isGroupRunning && group.enabled ? 'running' : 'stopped'}" id="status">
+                        ${isGroupRunning && group.enabled ? i18n.running : i18n.stopped}
+                    </div>
+                    ${isGroupRunning && group.enabled ? `<div class="url">http://localhost:${group.port}</div>` : ''}
+                </div>
+
+                <div class="button-group">
+                    <vscode-button id="startBtn" ${isGroupRunning ? 'disabled' : ''}>
+                        <vscode-icon name="play" slot="start"></vscode-icon>
+                        ${i18n.startServer}
+                    </vscode-button>
+                    <vscode-button id="stopBtn" ${!isGroupRunning ? 'disabled' : ''}>
+                        <vscode-icon name="debug-stop" slot="start"></vscode-icon>
+                        ${i18n.stopServer}
+                    </vscode-button>
+                    <vscode-button id="configBtn" secondary>
+                        <vscode-icon name="settings-gear" slot="start"></vscode-icon>
+                        ${i18n.settings}
+                    </vscode-button>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h3>${i18n.mockApis} (${group.mockApis.filter(a => a.enabled).length}/${group.mockApis.length})</h3>
+                        <vscode-button id="addMockBtn">
+                            <vscode-icon name="add" slot="start"></vscode-icon>
+                            ${i18n.add}
+                        </vscode-button>
+                    </div>
+                    <div class="mock-list" id="mockList">
+                        ${renderMockList(group.mockApis)}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('content').innerHTML = content;
+            attachEventListeners();
+        }
+
+        function renderMockList(mocks) {
+            if (!mocks || mocks.length === 0) {
+                return `<div class="empty-state">${i18n.noMockApis}<br>${i18n.clickAddToCreate}</div>`;
+            }
+            const mockList = mocks.map((mock, index) => `
+                <div class="mock-item ${mock.enabled ? '' : 'disabled'}">
+                    <div class="mock-item-header">
+                        <div>
+                            <span class="mock-method ${mock.method.toLowerCase()}">${mock.method}</span>
+                            <span class="mock-path">${mock.path}</span>
+                        </div>
+                        <div class="mock-actions">
+                            <vscode-button data-index="${index}" data-action="toggle-mock" appearance="secondary">${mock.enabled ? i18n.disable : i18n.enable}</vscode-button>
+                            <vscode-button data-index="${index}" data-action="edit-mock" appearance="secondary">${i18n.edit}</vscode-button>
+                            <vscode-button data-index="${index}" data-action="delete-mock" appearance="secondary">${i18n.delete}</vscode-button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add event delegation after rendering
+            setTimeout(() => {
+                const mockListContainer = document.getElementById('mockList');
+                if (mockListContainer) {
+                    mockListContainer.addEventListener('click', handleMockListClick);
+                }
+            }, 0);
+
+            return mockList;
+        }
+
+        function handleMockListClick(e) {
+            const button = e.target.closest('vscode-button[data-action]');
+            if (!button) return;
+
+            const action = button.dataset.action;
+            const index = parseInt(button.dataset.index);
+
+            switch (action) {
+                case 'toggle-mock':
+                    toggleMock(index);
+                    break;
+                case 'edit-mock':
+                    editMock(index);
+                    break;
+                case 'delete-mock':
+                    deleteMock(index);
+                    break;
+            }
+        }
+
+        // Event Listeners
+        function attachEventListeners() {
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const configBtn = document.getElementById('configBtn');
+            const addMockBtn = document.getElementById('addMockBtn');
+
+           // Send groupId to start/stop THIS specific group
+            if (startBtn) startBtn.addEventListener('click', () => vscode.postMessage({ type: 'startGroup', groupId: activeGroupId }));
+            if (stopBtn) stopBtn.addEventListener('click', () => vscode.postMessage({ type: 'stopGroup', groupId: activeGroupId }));
+            if (configBtn) configBtn.addEventListener('click', () => editGroup(activeGroupId));
+            if (addMockBtn) addMockBtn.addEventListener('click', addMock);
+        }
+
+        // Group Form Handlers
+        document.getElementById('saveGroupBtn').addEventListener('click', () => {
+            const groupData = {
+                name: document.getElementById('groupName').value.trim(),
+                enabled: document.getElementById('groupEnabled').checked,
+                port: parseInt(document.getElementById('groupPort').value),
+                interceptPrefix: document.getElementById('groupPrefix').value.trim(),
+                baseUrl: document.getElementById('groupBaseUrl').value.trim(),
+                stripPrefix: document.getElementById('groupStripPrefix').checked,
+                globalCookie: document.getElementById('groupCookie').value
+            };
+
+            // Validation - send to backend for proper error messages via i18n
+            vscode.postMessage({
+                type: editingGroupId ? 'updateGroup' : 'addGroup',
+                groupId: editingGroupId,
+                data: groupData
+            });
+
+            // Don't close form here - wait for success/error from backend
         });
 
-        document.getElementById('stopBtn').addEventListener('click', () => {
-            vscode.postMessage({ type: 'stopServer' });
+        document.getElementById('cancelGroupBtn').addEventListener('click', () => {
+            document.getElementById('groupForm').classList.remove('show');
         });
 
-        document.getElementById('configBtn').addEventListener('click', () => {
-            vscode.postMessage({ type: 'openConfig' });
-        });
+        function clearGroupForm() {
+            document.getElementById('groupName').value = '';
+            document.getElementById('groupEnabled').checked = true;
+            document.getElementById('groupPort').value = '8888';
+            document.getElementById('groupPrefix').value = '/api';
+            document.getElementById('groupBaseUrl').value = 'http://localhost:8080';
+            document.getElementById('groupStripPrefix').checked = true;
+            document.getElementById('groupCookie').value = '';
+        }
 
-        document.getElementById('addMockBtn').addEventListener('click', () => {
-            editingIndex = -1;
-            document.getElementById('formTitle').textContent = 'Add Mock API';
-            clearForm();
+        // Mock Form Handlers
+        function addMock() {
+            editingMockIndex = -1;
+            document.getElementById('mockFormTitle').textContent = i18n.addMockApi;
+            clearMockForm();
             document.getElementById('mockForm').classList.add('show');
-        });
+        }
 
-        document.getElementById('saveBtn').addEventListener('click', () => {
-            const mockApi = {
+        function editMock(index) {
+            editingMockIndex = index;
+            const group = config.proxyGroups.find(g => g.id === activeGroupId);
+            const mock = group.mockApis[index];
+
+            document.getElementById('mockFormTitle').textContent = i18n.editMockApi;
+            document.getElementById('mockEnabled').checked = mock.enabled;
+            document.getElementById('mockMethod').value = mock.method;
+            document.getElementById('mockPath').value = mock.path;
+            document.getElementById('mockStatus').value = mock.statusCode;
+            try {
+                const parsed = JSON.parse(mock.mockData);
+                document.getElementById('mockResponse').value = JSON.stringify(parsed, null, 2);
+            } catch (e) {
+                document.getElementById('mockResponse').value = mock.mockData;
+            }
+            document.getElementById('mockDelay').value = mock.delay || 0;
+            document.getElementById('mockForm').classList.add('show');
+        }
+
+        function toggleMock(index) {
+            vscode.postMessage({ type: 'toggleMock', groupId: activeGroupId, index });
+        }
+
+        function deleteMock(index) {
+            // Send delete request to backend, confirmation will be handled there
+            vscode.postMessage({ type: 'deleteMock', groupId: activeGroupId, index });
+        }
+
+        document.getElementById('saveMockBtn').addEventListener('click', () => {
+            const mockData = {
                 enabled: document.getElementById('mockEnabled').checked,
                 method: document.getElementById('mockMethod').value,
                 path: document.getElementById('mockPath').value,
@@ -287,18 +673,28 @@
                 delay: parseInt(document.getElementById('mockDelay').value)
             };
 
-            if (editingIndex >= 0) {
-                vscode.postMessage({ type: 'updateMock', index: editingIndex, data: mockApi });
+            if (editingMockIndex >= 0) {
+                vscode.postMessage({ type: 'updateMock', groupId: activeGroupId, index: editingMockIndex, data: mockData });
             } else {
-                vscode.postMessage({ type: 'addMock', data: mockApi });
+                vscode.postMessage({ type: 'addMock', groupId: activeGroupId, data: mockData });
             }
             document.getElementById('mockForm').classList.remove('show');
         });
 
-        document.getElementById('cancelBtn').addEventListener('click', () => {
+        document.getElementById('cancelMockBtn').addEventListener('click', () => {
             document.getElementById('mockForm').classList.remove('show');
         });
 
+        function clearMockForm() {
+            document.getElementById('mockEnabled').checked = true;
+            document.getElementById('mockMethod').value = 'GET';
+            document.getElementById('mockPath').value = '';
+            document.getElementById('mockStatus').value = '200';
+            document.getElementById('mockResponse').value = '';
+            document.getElementById('mockDelay').value = '0';
+        }
+
+        // JSON Utilities
         document.getElementById('formatJsonBtn').addEventListener('click', () => {
             const textarea = document.getElementById('mockResponse');
             const errorDiv = document.getElementById('jsonError');
@@ -308,12 +704,12 @@
                 const parsed = JSON.parse(textarea.value);
                 textarea.value = JSON.stringify(parsed, null, 2);
                 errorDiv.style.display = 'none';
-                successDiv.textContent = '✓ JSON formatted successfully';
+                successDiv.textContent = `✓ ${i18n.jsonFormatSuccess}`;
                 successDiv.style.display = 'block';
                 setTimeout(() => { successDiv.style.display = 'none'; }, 3000);
             } catch (e) {
                 successDiv.style.display = 'none';
-                errorDiv.textContent = '✗ Invalid JSON: ' + e.message;
+                errorDiv.textContent = `✗ ${i18n.invalidJson.replace('{0}', e.message)}`;
                 errorDiv.style.display = 'block';
             }
         });
@@ -326,136 +722,52 @@
             try {
                 JSON.parse(textarea.value);
                 errorDiv.style.display = 'none';
-                successDiv.textContent = '✓ JSON is valid';
+                successDiv.textContent = `✓ ${i18n.jsonValid}`;
                 successDiv.style.display = 'block';
                 setTimeout(() => { successDiv.style.display = 'none'; }, 3000);
             } catch (e) {
                 successDiv.style.display = 'none';
-                errorDiv.textContent = '✗ Invalid JSON: ' + e.message;
+                errorDiv.textContent = `✗ ${i18n.invalidJson.replace('{0}', e.message)}`;
                 errorDiv.style.display = 'block';
             }
         });
 
+        // Message Handler
         window.addEventListener('message', event => {
             const message = event.data;
             switch (message.type) {
-                case 'serverStarted':
-                    updateServerStatus(true, message.url);
+                case 'configUpdated':
+                    config = message.config;
+                    if (message.activeGroupId) {
+                        activeGroupId = message.activeGroupId;
+                    }
+
+                    // Update group statuses
+                    if (message.groupStatuses) {
+                        groupStatuses = message.groupStatuses;
+                    }
+
+                    // Check if all servers are running vs any servers running
+                    const anyRunning = config.proxyGroups.some(g => groupStatuses[g.id]);
+                    const allRunning = config.proxyGroups.every(g => groupStatuses[g.id]);
+
+                    // Update global button states
+                    const startAllBtn = document.getElementById('startAllBtn');
+                    const stopAllBtn = document.getElementById('stopAllBtn');
+                    // Start All disabled only when ALL groups are running
+                    if (startAllBtn) startAllBtn.disabled = allRunning;
+                    // Stop All disabled only when NO groups are running
+                    if (stopAllBtn) stopAllBtn.disabled = !anyRunning;
+
+                    renderTabs();
+                    renderContent();
                     break;
-                case 'serverStopped':
-                    updateServerStatus(false);
-                    break;
-                case 'mockListUpdated':
-                    updateMockList(message.mocks);
+                case 'closeGroupForm':
+                    // Close form only on success
+                    document.getElementById('groupForm').classList.remove('show');
                     break;
             }
         });
-
-        function updateServerStatus(running, url) {
-            const statusEl = document.getElementById('status');
-            const startBtn = document.getElementById('startBtn');
-            const stopBtn = document.getElementById('stopBtn');
-
-            if (running) {
-                statusEl.textContent = '● Running';
-                statusEl.className = 'status running';
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-                if (url) {
-                    statusEl.insertAdjacentHTML('afterend', `<div class="url" id="serverUrl">${url}</div>`);
-                }
-            } else {
-                statusEl.textContent = '○ Stopped';
-                statusEl.className = 'status stopped';
-                startBtn.disabled = false;
-                stopBtn.disabled = true;
-                const urlEl = document.getElementById('serverUrl');
-                if (urlEl) urlEl.remove();
-            }
-        }
-
-        function updateMockList(mocks) {
-            const listEl = document.getElementById('mockList');
-            listEl.innerHTML = renderMockList(mocks);
-            attachMockListeners();
-        }
-
-        function renderMockList(mocks) {
-            if (!mocks || mocks.length === 0) {
-                return '<div class="empty-state">No mock APIs configured.<br>Click "+ Add" to create one.</div>';
-            }
-            return mocks.map((mock, index) => `
-                <div class="mock-item ${mock.enabled ? '' : 'disabled'}">
-                    <div class="mock-item-header">
-                        <div>
-                            <span class="mock-method ${mock.method.toLowerCase()}">${mock.method}</span>
-                            <span class="mock-path">${mock.path}</span>
-                        </div>
-                        <div class="mock-actions">
-                            <button onclick="toggleMock(${index})">${mock.enabled ? 'Disable' : 'Enable'}</button>
-                            <button onclick="editMock(${index})">Edit</button>
-                            <button onclick="deleteMock(${index})">Delete</button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function toggleMock(index) {
-            vscode.postMessage({ type: 'toggleMock', index });
-        }
-
-        window.editMock = function(index) {
-            editingIndex = index;
-            vscode.postMessage({ type: 'getMock', index });
-        };
-
-        window.deleteMock = function(index) {
-            if (confirm('Delete this mock API?')) {
-                vscode.postMessage({ type: 'deleteMock', index });
-            }
-        };
-
-        window.addEventListener('message', event => {
-            const message = event.data;
-            if (message.type === 'editMock') {
-                const mock = message.data;
-                document.getElementById('formTitle').textContent = 'Edit Mock API';
-                document.getElementById('mockEnabled').checked = mock.enabled;
-                document.getElementById('mockMethod').value = mock.method;
-                document.getElementById('mockPath').value = mock.path;
-                document.getElementById('mockStatus').value = mock.statusCode;
-                try {
-                    const parsed = JSON.parse(mock.mockData);
-                    document.getElementById('mockResponse').value = JSON.stringify(parsed, null, 2);
-                } catch (e) {
-                    document.getElementById('mockResponse').value = mock.mockData;
-                }
-                document.getElementById('mockDelay').value = mock.delay || 0;
-                document.getElementById('mockForm').classList.add('show');
-            }
-        });
-
-        function clearForm() {
-            document.getElementById('mockEnabled').checked = true;
-            document.getElementById('mockMethod').value = 'GET';
-            document.getElementById('mockPath').value = '';
-            document.getElementById('mockStatus').value = '200';
-            document.getElementById('mockResponse').value = '';
-            document.getElementById('mockDelay').value = '0';
-        }
-
-        function parseJSON(str) {
-            try {
-                return JSON.parse(str);
-            } catch (e) {
-                return str;
-            }
-        }
-
-        function attachMockListeners() {
-            // Listeners are attached via onclick attributes
-        }
     </script>
 </body>
 </html>

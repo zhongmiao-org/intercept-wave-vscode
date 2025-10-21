@@ -13,12 +13,18 @@ describe('MockServerManager', () => {
     let appendLineStub: sinon.SinonStub;
 
     const defaultConfig: MockConfig = {
-        port: 9999,
-        interceptPrefix: '/api',
-        baseUrl: 'http://localhost:8080',
-        stripPrefix: true,
-        globalCookie: '',
-        mockApis: []
+        version: '2.0',
+        proxyGroups: [{
+            id: 'test-group-id',
+            name: 'Test Group',
+            port: 9999,
+            interceptPrefix: '/api',
+            baseUrl: 'http://localhost:8080',
+            stripPrefix: true,
+            globalCookie: '',
+            enabled: true,
+            mockApis: []
+        }]
     };
 
     beforeEach(() => {
@@ -73,7 +79,8 @@ describe('MockServerManager', () => {
     describe('start', () => {
         it('should start the server and return URL', async () => {
             const url = await mockServerManager.start();
-            expect(url).to.equal('http://localhost:9999');
+            // In v2.0, start() returns URL with group name
+            expect(url).to.equal('http://localhost:9999 (Test Group)');
             expect(mockServerManager.getStatus()).to.be.true;
         });
 
@@ -83,14 +90,16 @@ describe('MockServerManager', () => {
                 await mockServerManager.start();
                 expect.fail('Should have thrown an error');
             } catch (error: any) {
-                expect(error.message).to.equal('Mock server is already running');
+                // In v2.0, error message changed to reflect that all servers are running
+                expect(error.message).to.equal('All enabled servers are already running');
             }
         });
 
         it('should log server details to output channel', async () => {
             await mockServerManager.start();
             expect(appendLineStub.called).to.be.true;
-            expect(appendLineStub.args.some((arg: any) => arg[0].includes('Mock server started'))).to.be.true;
+            // In v2.0, log message includes "Mock servers started" (plural)
+            expect(appendLineStub.args.some((arg: any) => arg[0].includes('Mock server'))).to.be.true;
         });
     });
 
@@ -130,12 +139,15 @@ describe('MockServerManager', () => {
         it('should handle GET requests', async () => {
             const config = {
                 ...defaultConfig,
-                mockApis: [{
-                    path: '/test',
-                    enabled: true,
-                    mockData: '{"result": "success"}',
-                    method: 'GET',
-                    statusCode: 200
+                proxyGroups: [{
+                    ...defaultConfig.proxyGroups[0],
+                    mockApis: [{
+                        path: '/test',
+                        enabled: true,
+                        mockData: '{"result": "success"}',
+                        method: 'GET',
+                        statusCode: 200
+                    }]
                 }]
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
@@ -155,13 +167,16 @@ describe('MockServerManager', () => {
         it('should handle mock response with delay', async () => {
             const config = {
                 ...defaultConfig,
-                mockApis: [{
-                    path: '/delayed',
-                    enabled: true,
-                    mockData: '{"result": "delayed"}',
-                    method: 'GET',
-                    statusCode: 200,
-                    delay: 100
+                proxyGroups: [{
+                    ...defaultConfig.proxyGroups[0],
+                    mockApis: [{
+                        path: '/delayed',
+                        enabled: true,
+                        mockData: '{"result": "delayed"}',
+                        method: 'GET',
+                        statusCode: 200,
+                        delay: 100
+                    }]
                 }]
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
@@ -184,14 +199,17 @@ describe('MockServerManager', () => {
         it('should handle mock response with cookie', async () => {
             const config = {
                 ...defaultConfig,
-                globalCookie: 'session=abc123',
-                mockApis: [{
-                    path: '/with-cookie',
-                    enabled: true,
-                    mockData: '{"result": "with cookie"}',
-                    method: 'GET',
-                    statusCode: 200,
-                    useCookie: true
+                proxyGroups: [{
+                    ...defaultConfig.proxyGroups[0],
+                    globalCookie: 'session=abc123',
+                    mockApis: [{
+                        path: '/with-cookie',
+                        enabled: true,
+                        mockData: '{"result": "with cookie"}',
+                        method: 'GET',
+                        statusCode: 200,
+                        useCookie: true
+                    }]
                 }]
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
@@ -212,12 +230,15 @@ describe('MockServerManager', () => {
         it('should handle path with query parameters', async () => {
             const config = {
                 ...defaultConfig,
-                mockApis: [{
-                    path: '/users',
-                    enabled: true,
-                    mockData: '{"users": []}',
-                    method: 'GET',
-                    statusCode: 200
+                proxyGroups: [{
+                    ...defaultConfig.proxyGroups[0],
+                    mockApis: [{
+                        path: '/users',
+                        enabled: true,
+                        mockData: '{"users": []}',
+                        method: 'GET',
+                        statusCode: 200
+                    }]
                 }]
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
@@ -237,14 +258,17 @@ describe('MockServerManager', () => {
         it('should strip prefix when matching paths', async () => {
             const config = {
                 ...defaultConfig,
-                stripPrefix: true,
-                interceptPrefix: '/api',
-                mockApis: [{
-                    path: '/test',
-                    enabled: true,
-                    mockData: '{"result": "stripped"}',
-                    method: 'GET',
-                    statusCode: 200
+                proxyGroups: [{
+                    ...defaultConfig.proxyGroups[0],
+                    stripPrefix: true,
+                    interceptPrefix: '/api',
+                    mockApis: [{
+                        path: '/test',
+                        enabled: true,
+                        mockData: '{"result": "stripped"}',
+                        method: 'GET',
+                        statusCode: 200
+                    }]
                 }]
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
@@ -264,12 +288,15 @@ describe('MockServerManager', () => {
         it('should handle POST requests', async () => {
             const config = {
                 ...defaultConfig,
-                mockApis: [{
-                    path: '/create',
-                    enabled: true,
-                    mockData: '{"id": 123}',
-                    method: 'POST',
-                    statusCode: 201
+                proxyGroups: [{
+                    ...defaultConfig.proxyGroups[0],
+                    mockApis: [{
+                        path: '/create',
+                        enabled: true,
+                        mockData: '{"id": 123}',
+                        method: 'POST',
+                        statusCode: 201
+                    }]
                 }]
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
@@ -299,13 +326,16 @@ describe('MockServerManager', () => {
         it('should handle disabled mock APIs by forwarding', async () => {
             const config = {
                 ...defaultConfig,
-                baseUrl: 'http://localhost:9998', // Non-existent server
-                mockApis: [{
-                    path: '/disabled',
-                    enabled: false,
-                    mockData: '{"result": "should not return this"}',
-                    method: 'GET',
-                    statusCode: 200
+                proxyGroups: [{
+                    ...defaultConfig.proxyGroups[0],
+                    baseUrl: 'http://localhost:9998', // Non-existent server
+                    mockApis: [{
+                        path: '/disabled',
+                        enabled: false,
+                        mockData: '{"result": "should not return this"}',
+                        method: 'GET',
+                        statusCode: 200
+                    }]
                 }]
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
@@ -327,22 +357,25 @@ describe('MockServerManager', () => {
         it('should return welcome page with correct data structure', async () => {
             const config = {
                 ...defaultConfig,
-                mockApis: [
-                    {
-                        path: '/test1',
-                        enabled: true,
-                        mockData: '{}',
-                        method: 'GET',
-                        statusCode: 200
-                    },
-                    {
-                        path: '/test2',
-                        enabled: false,
-                        mockData: '{}',
-                        method: 'POST',
-                        statusCode: 200
-                    }
-                ]
+                proxyGroups: [{
+                    ...defaultConfig.proxyGroups[0],
+                    mockApis: [
+                        {
+                            path: '/test1',
+                            enabled: true,
+                            mockData: '{}',
+                            method: 'GET',
+                            statusCode: 200
+                        },
+                        {
+                            path: '/test2',
+                            enabled: false,
+                            mockData: '{}',
+                            method: 'POST',
+                            statusCode: 200
+                        }
+                    ]
+                }]
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 
@@ -400,7 +433,10 @@ describe('MockServerManager', () => {
         it('should handle requests to non-existent endpoints by forwarding', async () => {
             const config = {
                 ...defaultConfig,
-                baseUrl: 'http://localhost:9998' // Non-existent server
+                proxyGroups: [{
+                    ...defaultConfig.proxyGroups[0],
+                    baseUrl: 'http://localhost:9998' // Non-existent server
+                }]
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 

@@ -4,9 +4,81 @@ All notable changes to the "intercept-wave" extension will be documented in this
 
 ## [Unreleased]
 
-### Improved
-- 🔧 Build workflow now runs tests and uploads coverage to Codecov before creating release drafts
-- 📊 Enhanced badge configuration with vsmarketplacebadges.dev for better reliability
+## [2.0.0] - 2025-01-18
+
+### 🎉 Major Features
+
+#### Multi-Service Proxy Support
+- ✨ **Tab-based UI**: Organize multiple proxy configurations in separate tabs
+- 🚀 **Multiple Proxy Groups**: Configure and manage multiple services simultaneously
+- 🎯 **Individual Port Management**: Each proxy group can run on its own port
+- ⚙️ **Per-Group Settings**: Customize port, intercept prefix, base URL, and more for each service
+- 🔄 **Easy Switching**: Quickly switch between different proxy configurations via tabs
+
+#### Enhanced User Interface
+- 📑 **Tab System**: Visual tabs at the top showing all configured proxy groups
+- ➕ **Quick Add**: Add new proxy groups with the "+" button
+- ✏️ **Inline Editing**: Right-click or use Settings button to edit group configurations
+- 🗑️ **Group Management**: Delete groups (except the last one) directly from tabs
+- 🔘 **Enable/Disable Toggle**: Control which groups are active via checkbox in settings
+
+#### Configuration Migration
+- 🔄 **Automatic Migration**: Existing configurations (v1.x) automatically migrate to v2.0 format
+- 📁 **Backward Compatible**: Legacy config files seamlessly convert to new `proxyGroups` structure
+- 💾 **Preserved Data**: All existing mock APIs and settings are retained during migration
+- 🆔 **UUID-based Groups**: Each proxy group gets a unique identifier for reliable management
+
+### Technical Improvements
+- 📦 **New Config Structure**: Configuration now uses `version` and `proxyGroups` array
+- 🏗️ **Enhanced Architecture**: Refactored server manager to support multiple simultaneous servers
+- 🎨 **Modernized UI**: Complete UI overhaul with tabbed interface design
+- 🔧 **Improved State Management**: Better handling of active group selection and updates
+- 📝 **TypeScript Enhancements**: Added ProxyGroup interface and updated type definitions
+
+### Dependencies
+- ➕ Added `uuid` (^13.0.0) for generating unique group identifiers
+- ➕ Added `@types/uuid` (^10.0.0) for TypeScript support
+
+### Developer Experience
+- 🧪 **Test Configuration**: Updated tsconfig to exclude test files from compilation
+- 🔨 **Build Process**: Maintained compatibility with existing build scripts
+- 📚 **Code Organization**: Improved separation of concerns in sidebar and config management
+
+### Breaking Changes
+- ⚠️ **Config Format**: Configuration file structure has changed from flat to nested `proxyGroups`
+- ⚠️ **API Changes**: ConfigManager methods now require `groupId` parameter for mock API operations
+- ⚠️ **Type Updates**: MockConfig interface now includes `version` and `proxyGroups` fields
+
+### Migration Guide
+Existing users will have their configurations automatically migrated on first load after updating to v2.0.0. The old single-proxy configuration will become a new proxy group named "默认配置" (Default Configuration).
+
+**Before (v1.x)**:
+```json
+{
+  "port": 8888,
+  "interceptPrefix": "/api",
+  "baseUrl": "http://localhost:8080",
+  "mockApis": [...]
+}
+```
+
+**After (v2.0)**:
+```json
+{
+  "version": "2.0",
+  "proxyGroups": [
+    {
+      "id": "uuid-here",
+      "name": "默认配置",
+      "port": 8888,
+      "interceptPrefix": "/api",
+      "baseUrl": "http://localhost:8080",
+      "enabled": true,
+      "mockApis": [...]
+    }
+  ]
+}
+```
 
 ## [1.0.5] - 2025-01-17
 

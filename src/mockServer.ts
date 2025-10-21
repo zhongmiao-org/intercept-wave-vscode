@@ -14,17 +14,32 @@ export interface MockApiConfig {
     delay?: number;
 }
 
-export interface MockConfig {
+export interface ProxyGroup {
+    id: string;
+    name: string;
     port: number;
     interceptPrefix: string;
     baseUrl: string;
     stripPrefix: boolean;
     globalCookie: string;
+    enabled: boolean;
     mockApis: MockApiConfig[];
 }
 
+export interface MockConfig {
+    version: string;
+    proxyGroups: ProxyGroup[];
+    // Legacy fields for backward compatibility
+    port?: number;
+    interceptPrefix?: string;
+    baseUrl?: string;
+    stripPrefix?: boolean;
+    globalCookie?: string;
+    mockApis?: MockApiConfig[];
+}
+
 export class MockServerManager {
-    private server: http.Server | null = null;
+    private servers: Map<string, http.Server> = new Map(); // groupId -> server
     private isRunning: boolean = false;
 
     constructor(
@@ -33,69 +48,164 @@ export class MockServerManager {
     ) {}
 
     async start(): Promise<string> {
-        if (this.isRunning) {
-            throw new Error('Mock server is already running');
+        const config = this.configManager.getConfig();
+        const enabledGroups = config.proxyGroups.filter(g => g.enabled);
+
+        if (enabledGroups.length === 0) {
+            throw new Error('No enabled proxy groups found');
         }
 
-        const config = this.configManager.getConfig();
+        // Filter out groups that are already running
+        const groupsToStart = enabledGroups.filter(g => !this.servers.has(g.id));
 
+        if (groupsToStart.length === 0) {
+            throw new Error('All enabled servers are already running');
+        }
+
+        const startPromises = groupsToStart.map(group => this.startGroup(group));
+        await Promise.all(startPromises);
+
+        // Update isRunning flag
+        this.isRunning = true;
+
+        const urls = groupsToStart.map(g => `http://localhost:${g.port} (${g.name})`).join(', ');
+        this.outputChannel.appendLine(`✅ Mock servers started: ${urls}`);
+        this.outputChannel.show(true);
+
+        return urls;
+    }
+
+    private async startGroup(group: ProxyGroup): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.server = http.createServer((req, res) => {
+            const server = http.createServer((req, res) => {
                 // Read config on each request to support dynamic updates
                 const currentConfig = this.configManager.getConfig();
-                this.handleRequest(req, res, currentConfig);
+                const currentGroup = currentConfig.proxyGroups.find(g => g.id === group.id);
+                if (currentGroup && currentGroup.enabled) {
+                    this.handleRequest(req, res, currentGroup);
+                } else {
+                    this.sendErrorResponse(res, 503, 'Proxy group is disabled');
+                }
             });
 
-            this.server.listen(config.port, () => {
-                this.isRunning = true;
-                const url = `http://localhost:${config.port}`;
-                this.outputChannel.appendLine(`✅ Mock server started on ${url}`);
-                this.outputChannel.appendLine(`📋 Intercept Prefix: ${config.interceptPrefix}`);
-                this.outputChannel.appendLine(`🔗 Base URL: ${config.baseUrl}`);
-                this.outputChannel.appendLine(`📊 Mock APIs: ${config.mockApis.filter(api => api.enabled).length}/${config.mockApis.length} enabled`);
-                this.outputChannel.show(true);
-                resolve(url);
+            server.listen(group.port, () => {
+                this.servers.set(group.id, server);
+                this.outputChannel.appendLine(`✅ [${group.name}] started on http://localhost:${group.port}`);
+                this.outputChannel.appendLine(`   📋 Intercept Prefix: ${group.interceptPrefix}`);
+                this.outputChannel.appendLine(`   🔗 Base URL: ${group.baseUrl}`);
+                this.outputChannel.appendLine(`   📊 Mock APIs: ${group.mockApis.filter(api => api.enabled).length}/${group.mockApis.length} enabled`);
+                resolve();
             });
 
-            this.server.on('error', (error) => {
-                this.outputChannel.appendLine(`❌ Server error: ${error.message}`);
+            server.on('error', (error: any) => {
+                this.outputChannel.appendLine(`❌ [${group.name}] Server error: ${error.message}`);
                 reject(error);
             });
         });
     }
 
     async stop(): Promise<void> {
-        if (!this.isRunning || !this.server) {
+        // Check if there are any servers running
+        if (this.servers.size === 0) {
             return;
         }
 
-        return new Promise((resolve) => {
-            this.server!.close(() => {
-                this.isRunning = false;
-                this.server = null;
-                this.outputChannel.appendLine('🛑 Mock server stopped');
-                resolve();
-            });
-        });
+        // Get config to retrieve group names
+        const config = this.configManager.getConfig();
+
+        const stopPromises = Array.from(this.servers.entries()).map(([groupId, server]) =>
+            new Promise<void>((resolve) => {
+                server.close(() => {
+                    // Find group name for logging
+                    const group = config.proxyGroups.find(g => g.id === groupId);
+                    const groupInfo = group ? `${group.name}(:${group.port})` : groupId;
+                    this.outputChannel.appendLine(`🛑 Server stopped for group: ${groupInfo}`);
+                    resolve();
+                });
+            })
+        );
+
+        await Promise.all(stopPromises);
+        this.servers.clear();
+        this.isRunning = false;
+        this.outputChannel.appendLine('🛑 All mock servers stopped');
     }
 
     getStatus(): boolean {
         return this.isRunning;
     }
 
+    getGroupStatus(groupId: string): boolean {
+        return this.servers.has(groupId);
+    }
+
+    async startGroupById(groupId: string): Promise<string> {
+        const config = this.configManager.getConfig();
+        const group = config.proxyGroups.find(g => g.id === groupId);
+
+        if (!group) {
+            throw new Error(`Group not found: ${groupId}`);
+        }
+
+        if (!group.enabled) {
+            throw new Error(`Group is disabled: ${group.name}`);
+        }
+
+        if (this.servers.has(groupId)) {
+            throw new Error(`Server for group "${group.name}" is already running`);
+        }
+
+        await this.startGroup(group);
+
+        // Update isRunning flag when any server is running
+        this.isRunning = true;
+
+        const url = `http://localhost:${group.port} (${group.name})`;
+        this.outputChannel.appendLine(`✅ Mock server started: ${url}`);
+        this.outputChannel.show(true);
+
+        return url;
+    }
+
+    async stopGroupById(groupId: string): Promise<void> {
+        const server = this.servers.get(groupId);
+        if (!server) {
+            return;
+        }
+
+        // Get config to retrieve group name
+        const config = this.configManager.getConfig();
+        const group = config.proxyGroups.find(g => g.id === groupId);
+
+        await new Promise<void>((resolve) => {
+            server.close(() => {
+                const groupInfo = group ? `${group.name}(:${group.port})` : groupId;
+                this.outputChannel.appendLine(`🛑 Server stopped for group: ${groupInfo}`);
+                resolve();
+            });
+        });
+
+        this.servers.delete(groupId);
+
+        // Update isRunning status
+        if (this.servers.size === 0) {
+            this.isRunning = false;
+        }
+    }
+
     private handleRequest(
         req: http.IncomingMessage,
         res: http.ServerResponse,
-        config: MockConfig
+        group: ProxyGroup
     ): void {
         const requestPath = req.url || '/';
         const method = req.method || 'GET';
 
-        this.outputChannel.appendLine(`📥 ${method} ${requestPath}`);
+        this.outputChannel.appendLine(`📥 [${group.name}] ${method} ${requestPath}`);
 
         // Handle root path - welcome page
         if (requestPath === '/' || requestPath === '') {
-            this.handleWelcomePage(res, config);
+            this.handleWelcomePage(res, group);
             return;
         }
 
@@ -109,25 +219,25 @@ export class MockServerManager {
         }
 
         // Path matching logic
-        const matchPath = this.getMatchPath(requestPath, config);
+        const matchPath = this.getMatchPath(requestPath, group);
         this.outputChannel.appendLine(`   🎯 Match path: ${matchPath}`);
 
         // Find matching mock API
-        const mockApi = this.findMatchingMockApi(matchPath, method, config);
+        const mockApi = this.findMatchingMockApi(matchPath, method, group);
 
         if (mockApi && mockApi.enabled) {
             // Use mock data
-            this.handleMockResponse(res, mockApi, config);
+            this.handleMockResponse(res, mockApi, group);
         } else {
             // Forward to original server
-            this.forwardToOriginalServer(req, res, config);
+            this.forwardToOriginalServer(req, res, group);
         }
     }
 
-    private getMatchPath(requestPath: string, config: MockConfig): string {
-        if (config.stripPrefix && config.interceptPrefix) {
-            if (requestPath.startsWith(config.interceptPrefix)) {
-                const stripped = requestPath.substring(config.interceptPrefix.length);
+    private getMatchPath(requestPath: string, group: ProxyGroup): string {
+        if (group.stripPrefix && group.interceptPrefix) {
+            if (requestPath.startsWith(group.interceptPrefix)) {
+                const stripped = requestPath.substring(group.interceptPrefix.length);
                 return stripped || '/';
             }
         }
@@ -137,12 +247,12 @@ export class MockServerManager {
     private findMatchingMockApi(
         requestPath: string,
         method: string,
-        config: MockConfig
+        group: ProxyGroup
     ): MockApiConfig | undefined {
         // Strip query parameters from request path for matching
         const pathWithoutQuery = requestPath.split('?')[0];
 
-        return config.mockApis.find(api => {
+        return group.mockApis.find(api => {
             return (
                 api.enabled &&
                 api.path === pathWithoutQuery &&
@@ -151,20 +261,21 @@ export class MockServerManager {
         });
     }
 
-    private handleWelcomePage(res: http.ServerResponse, config: MockConfig): void {
+    private handleWelcomePage(res: http.ServerResponse, group: ProxyGroup): void {
         const welcomeData = {
             status: 'running',
             message: 'Intercept Wave Mock Server is running',
-            server: {
-                port: config.port,
-                baseUrl: config.baseUrl,
-                interceptPrefix: config.interceptPrefix
+            group: {
+                name: group.name,
+                port: group.port,
+                baseUrl: group.baseUrl,
+                interceptPrefix: group.interceptPrefix
             },
             mockApis: {
-                total: config.mockApis.length,
-                enabled: config.mockApis.filter(api => api.enabled).length
+                total: group.mockApis.length,
+                enabled: group.mockApis.filter(api => api.enabled).length
             },
-            apis: config.mockApis.map(api => ({
+            apis: group.mockApis.map(api => ({
                 path: api.path,
                 method: api.method,
                 enabled: api.enabled
@@ -179,7 +290,7 @@ export class MockServerManager {
     private async handleMockResponse(
         res: http.ServerResponse,
         mockApi: MockApiConfig,
-        config: MockConfig
+        group: ProxyGroup
     ): Promise<void> {
         this.outputChannel.appendLine(`   📝 Mock API found: ${JSON.stringify(mockApi)}`);
 
@@ -193,8 +304,8 @@ export class MockServerManager {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
         // Set cookie if enabled
-        if (mockApi.useCookie && config.globalCookie) {
-            res.setHeader('Set-Cookie', config.globalCookie);
+        if (mockApi.useCookie && group.globalCookie) {
+            res.setHeader('Set-Cookie', group.globalCookie);
         }
 
         // mockData is always a string (JetBrains plugin compatible format)
@@ -211,9 +322,9 @@ export class MockServerManager {
     private forwardToOriginalServer(
         req: http.IncomingMessage,
         res: http.ServerResponse,
-        config: MockConfig
+        group: ProxyGroup
     ): void {
-        const targetUrl = config.baseUrl + req.url;
+        const targetUrl = group.baseUrl + req.url;
         this.outputChannel.appendLine(`   ⏩ Forwarding to: ${targetUrl}`);
 
         try {

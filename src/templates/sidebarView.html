@@ -437,6 +437,8 @@
 
         function switchTab(groupId) {
             activeGroupId = groupId;
+            // Notify backend to update activeGroupId
+            vscode.postMessage({ type: 'setActiveGroup', groupId });
             renderTabs();
             renderContent();
         }

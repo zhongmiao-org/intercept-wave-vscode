@@ -44,6 +44,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     private async handleMessage(data: any, webviewView: vscode.WebviewView) {
         try {
             switch (data.type) {
+                case 'setActiveGroup':
+                    this.activeGroupId = data.groupId;
+                    break;
                 case 'startServer':
                     await this.handleStartServer(webviewView);
                     break;

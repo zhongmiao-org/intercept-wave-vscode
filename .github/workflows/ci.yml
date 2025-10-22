@@ -275,11 +275,6 @@ jobs:
 
                   echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-            - name: Download extension package
-              uses: actions/download-artifact@v4
-              with:
-                  name: vscode-extension
-
             - name: Create release draft
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -289,5 +284,4 @@ jobs:
                   gh release create $VERSION \
                     --draft \
                     --title "$VERSION" \
-                    --notes-file release_notes.md \
-                    *.vsix
+                    --notes-file release_notes.md

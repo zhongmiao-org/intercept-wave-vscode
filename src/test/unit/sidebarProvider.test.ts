@@ -1,11 +1,11 @@
 import { describe, it, beforeEach, before, afterEach } from 'mocha';
 import { expect, use } from 'chai';
 import * as sinon from 'sinon';
+import sinonChai from 'sinon-chai';
 import * as vscode from 'vscode';
 import { SidebarProvider } from '../../providers';
 import { MockServerManager, ConfigManager } from '../../common';
 
-const sinonChai = require('sinon-chai');
 use(sinonChai);
 
 describe('SidebarProvider', () => {

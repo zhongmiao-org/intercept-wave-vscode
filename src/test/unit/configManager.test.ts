@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { ConfigManager } from '../../configManager';
+import { ConfigManager } from '../../common';
 
 describe('ConfigManager', () => {
     let configManager: ConfigManager;

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { MockConfig, ProxyGroup } from './mockServer';
+import { MockConfig, ProxyGroup } from '../server';
 import { v4 as uuidv4 } from 'uuid';
 
 export class ConfigManager {

@@ -2,7 +2,7 @@ import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
 import * as vscode from 'vscode';
-import { ConfigManager } from './configManager';
+import { ConfigManager } from '../config';
 
 export interface MockApiConfig {
     path: string;

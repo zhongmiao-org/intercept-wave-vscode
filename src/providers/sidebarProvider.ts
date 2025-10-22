@@ -1,7 +1,5 @@
 import * as vscode from 'vscode';
-import { MockServerManager, ProxyGroup } from './mockServer';
-import { ConfigManager } from './configManager';
-import { TemplateLoader } from './templateLoader';
+import { MockServerManager, ProxyGroup,ConfigManager,TemplateLoader } from '../common';
 import { v4 as uuidv4 } from 'uuid';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {

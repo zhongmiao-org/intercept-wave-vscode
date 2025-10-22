@@ -37,6 +37,10 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit
 
+      - name: Run integration tests
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
+        run: xvfb-run -a npm run test:integration
+
       - name: Generate coverage report
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
         run: npm run test:coverage:ci

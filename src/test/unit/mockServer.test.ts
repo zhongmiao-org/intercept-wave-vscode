@@ -2,8 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect } from 'chai';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
-import { MockServerManager, MockConfig } from '../../mockServer';
-import { ConfigManager } from '../../configManager';
+import { MockServerManager, MockConfig,ConfigManager } from '../../common';
 import * as http from 'http';
 
 describe('MockServerManager', () => {

@@ -1,9 +1,6 @@
 import * as vscode from 'vscode';
-import { MockServerManager } from './mockServer';
-import { ConfigManager } from './configManager';
-import { SidebarProvider } from './sidebarProvider';
-import { TemplateLoader } from './templateLoader';
-
+import { MockServerManager,ConfigManager,TemplateLoader } from './common';
+import { SidebarProvider } from './providers';
 let mockServerManager: MockServerManager;
 let configManager: ConfigManager;
 let outputChannel: vscode.OutputChannel;

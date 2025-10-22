@@ -1,0 +1,25 @@
+# Dependencies
+node_modules
+package-lock.json
+
+# Build output
+out
+dist
+*.vsix
+
+# Test coverage
+coverage
+.nyc_output
+
+# VSCode test files
+.vscode-test
+
+# Templates (HTML files with placeholders)
+src/templates/**/*.html
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,10 +1,18 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
+import * as extension from '../../extension';
 
-describe('Extension Helper Functions', () => {
-    // Note: Extension helper functions have been refactored in v2.0
-    // Most functionality is now in SidebarProvider
-    it('should have no legacy helper functions', () => {
-        expect(true).to.be.true;
+describe('Extension', () => {
+    // Note: Extension activation tests require VSCode extension host environment
+    // These are covered by integration tests instead
+
+    describe('module structure', () => {
+        it('should export activate function', () => {
+            expect(extension.activate).to.be.a('function');
+        });
+
+        it('should export deactivate function', () => {
+            expect(extension.deactivate).to.be.a('function');
+        });
     });
 });

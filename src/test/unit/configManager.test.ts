@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { ConfigManager } from '../../configManager';
+import { ConfigManager } from '../../common';
 
 describe('ConfigManager', () => {
     let configManager: ConfigManager;
@@ -33,9 +33,12 @@ describe('ConfigManager', () => {
             workspaceState: {} as any,
             extensionUri: vscode.Uri.file(workspaceFolder.uri.fsPath),
             environmentVariableCollection: {} as any,
-            asAbsolutePath: (relativePath: string) => path.join(workspaceFolder.uri.fsPath, relativePath),
+            asAbsolutePath: (relativePath: string) =>
+                path.join(workspaceFolder.uri.fsPath, relativePath),
             storageUri: vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, 'storage')),
-            globalStorageUri: vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, 'globalStorage')),
+            globalStorageUri: vscode.Uri.file(
+                path.join(workspaceFolder.uri.fsPath, 'globalStorage')
+            ),
             logUri: vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, 'logs')),
             extensionMode: 3,
             storagePath: path.join(workspaceFolder.uri.fsPath, 'storage'),
@@ -43,7 +46,7 @@ describe('ConfigManager', () => {
             logPath: path.join(workspaceFolder.uri.fsPath, 'logs'),
             secrets: {} as any,
             extension: {} as any,
-            languageModelAccessInformation: {} as any
+            languageModelAccessInformation: {} as any,
         };
 
         // Create ConfigManager instance - this will create the config directory and file
@@ -95,7 +98,7 @@ describe('ConfigManager', () => {
         it('should read and merge existing config with defaults (migration from legacy)', () => {
             const partialConfig = {
                 port: 9999,
-                interceptPrefix: '/custom'
+                interceptPrefix: '/custom',
             };
 
             fs.writeFileSync(configPath, JSON.stringify(partialConfig, null, 2), 'utf-8');
@@ -115,7 +118,7 @@ describe('ConfigManager', () => {
         it('should ensure mockApis is an array even if config has invalid value (legacy migration)', () => {
             const invalidConfig = {
                 port: 8888,
-                mockApis: null as any
+                mockApis: null as any,
             };
 
             fs.writeFileSync(configPath, JSON.stringify(invalidConfig, null, 2), 'utf-8');
@@ -158,17 +161,19 @@ describe('ConfigManager', () => {
         it('should save config to file', async () => {
             const testConfig = {
                 version: '2.0',
-                proxyGroups: [{
-                    id: 'test-id',
-                    name: 'Test Group',
-                    port: 7777,
-                    interceptPrefix: '/test',
-                    baseUrl: 'http://test.com',
-                    stripPrefix: false,
-                    globalCookie: 'test-cookie',
-                    enabled: true,
-                    mockApis: []
-                }]
+                proxyGroups: [
+                    {
+                        id: 'test-id',
+                        name: 'Test Group',
+                        port: 7777,
+                        interceptPrefix: '/test',
+                        baseUrl: 'http://test.com',
+                        stripPrefix: false,
+                        globalCookie: 'test-cookie',
+                        enabled: true,
+                        mockApis: [],
+                    },
+                ],
             };
 
             await configManager.saveConfig(testConfig);
@@ -182,17 +187,19 @@ describe('ConfigManager', () => {
         it('should format JSON with proper indentation', async () => {
             const testConfig = {
                 version: '2.0',
-                proxyGroups: [{
-                    id: 'test-id',
-                    name: 'Test Group',
-                    port: 8888,
-                    interceptPrefix: '/api',
-                    baseUrl: 'http://localhost:8080',
-                    stripPrefix: true,
-                    globalCookie: '',
-                    enabled: true,
-                    mockApis: []
-                }]
+                proxyGroups: [
+                    {
+                        id: 'test-id',
+                        name: 'Test Group',
+                        port: 8888,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: true,
+                        mockApis: [],
+                    },
+                ],
             };
 
             await configManager.saveConfig(testConfig);
@@ -216,7 +223,7 @@ describe('ConfigManager', () => {
                 enabled: true,
                 mockData: '{"id": 1}',
                 statusCode: 200,
-                delay: 0
+                delay: 0,
             };
 
             await configManager.addMockApi(groupId, mockApi);
@@ -237,7 +244,7 @@ describe('ConfigManager', () => {
                 enabled: true,
                 mockData: '{"id": 1}',
                 statusCode: 200,
-                delay: 0
+                delay: 0,
             };
 
             const mockApi2 = {
@@ -246,7 +253,7 @@ describe('ConfigManager', () => {
                 enabled: true,
                 mockData: '[]',
                 statusCode: 200,
-                delay: 0
+                delay: 0,
             };
 
             await configManager.addMockApi(groupId, mockApi1);
@@ -271,7 +278,7 @@ describe('ConfigManager', () => {
                 enabled: true,
                 mockData: '{}',
                 statusCode: 200,
-                delay: 0
+                delay: 0,
             };
 
             const mockApi2 = {
@@ -280,7 +287,7 @@ describe('ConfigManager', () => {
                 enabled: true,
                 mockData: '[]',
                 statusCode: 200,
-                delay: 0
+                delay: 0,
             };
 
             await configManager.addMockApi(groupId, mockApi1);
@@ -316,7 +323,7 @@ describe('ConfigManager', () => {
                 enabled: true,
                 mockData: '{}',
                 statusCode: 200,
-                delay: 0
+                delay: 0,
             };
 
             const updatedMockApi = {
@@ -325,7 +332,7 @@ describe('ConfigManager', () => {
                 enabled: false,
                 mockData: '{"updated": true}',
                 statusCode: 201,
-                delay: 100
+                delay: 100,
             };
 
             await configManager.addMockApi(groupId, mockApi);
@@ -347,7 +354,7 @@ describe('ConfigManager', () => {
                 enabled: true,
                 mockData: '{}',
                 statusCode: 200,
-                delay: 0
+                delay: 0,
             };
 
             const mockApi2 = {
@@ -356,7 +363,7 @@ describe('ConfigManager', () => {
                 enabled: true,
                 mockData: '[]',
                 statusCode: 200,
-                delay: 0
+                delay: 0,
             };
 
             const updatedMockApi = {
@@ -365,7 +372,7 @@ describe('ConfigManager', () => {
                 enabled: false,
                 mockData: '[{"id": 1}]',
                 statusCode: 201,
-                delay: 50
+                delay: 50,
             };
 
             await configManager.addMockApi(groupId, mockApi1);

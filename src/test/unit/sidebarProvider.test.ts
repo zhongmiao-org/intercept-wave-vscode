@@ -1,70 +1,83 @@
-import { describe, it, beforeEach, before } from 'mocha';
-import { expect } from 'chai';
+import { describe, it, beforeEach, before, afterEach } from 'mocha';
+import { expect, use } from 'chai';
 import * as sinon from 'sinon';
+import sinonChai from 'sinon-chai';
 import * as vscode from 'vscode';
-import { SidebarProvider } from '../../sidebarProvider';
-import { MockServerManager } from '../../mockServer';
-import { ConfigManager } from '../../configManager';
+import { SidebarProvider } from '../../providers';
+import { MockServerManager, ConfigManager } from '../../common';
+
+use(sinonChai);
 
 describe('SidebarProvider', () => {
     let sidebarProvider: SidebarProvider;
     let mockServerManager: MockServerManager;
     let configManager: ConfigManager;
     let extensionUri: vscode.Uri;
-    let mockWebview: any;
+    let sandbox: sinon.SinonSandbox;
 
     before(() => {
-        // Add vscode.Uri.joinPath if it doesn't exist (for testing environment)
+        // Mock vscode.Uri.joinPath for testing environment
         if (!(vscode.Uri as any).joinPath) {
-            (vscode.Uri as any).joinPath = () => {
+            (vscode.Uri as any).joinPath = (..._: any[]) => {
                 return vscode.Uri.file('/fake/joined/path');
             };
+        }
+
+        // Mock vscode.l10n for tests
+        if (!vscode.l10n) {
+            (vscode as any).l10n = {
+                t: (key: string, ..._: any[]) => key,
+            };
+        } else if (!(vscode.l10n as any).t) {
+            (vscode.l10n as any).t = (key: string, ..._: any[]) => key;
         }
     });
 
     beforeEach(() => {
-        // Create mock extension URI
+        sandbox = sinon.createSandbox();
         extensionUri = vscode.Uri.file('/fake/path');
 
-        // Create mock webview with asWebviewUri method
-        mockWebview = {
-            asWebviewUri: (uri: vscode.Uri) => uri,
-            options: {},
-            postMessage: sinon.stub()
-        };
-
-        // Create mock config manager with v2.0 structure (proxyGroups)
         configManager = {
-            getConfig: sinon.stub().returns({
+            getConfig: sandbox.stub().returns({
                 version: '2.0',
-                proxyGroups: [{
-                    id: 'test-group-id',
-                    name: 'Test Group',
-                    port: 8888,
-                    interceptPrefix: '/api',
-                    baseUrl: 'http://localhost:8080',
-                    stripPrefix: true,
-                    globalCookie: '',
-                    enabled: true,
-                    mockApis: []
-                }]
+                proxyGroups: [
+                    {
+                        id: 'test-group-id',
+                        name: 'Test Group',
+                        port: 8888,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: true,
+                        mockApis: [],
+                    },
+                ],
             }),
-            saveConfig: sinon.stub(),
-            addMockApi: sinon.stub(),
-            removeMockApi: sinon.stub(),
-            updateMockApi: sinon.stub(),
-            getConfigPath: sinon.stub()
+            saveConfig: sandbox.stub().resolves(),
+            addMockApi: sandbox.stub().resolves(),
+            removeMockApi: sandbox.stub().resolves(),
+            updateMockApi: sandbox.stub().resolves(),
+            addProxyGroup: sandbox.stub().resolves(),
+            removeProxyGroup: sandbox.stub().resolves(),
+            updateProxyGroup: sandbox.stub().resolves(),
+            getConfigPath: sandbox.stub().returns('/fake/config/path'),
         } as any;
 
-        // Create mock server manager
         mockServerManager = {
-            start: sinon.stub().resolves('http://localhost:8888'),
-            stop: sinon.stub().resolves(),
-            getStatus: sinon.stub().returns(false),
-            getGroupStatus: sinon.stub().returns(false)
+            start: sandbox.stub().resolves('http://localhost:8888 (Test Group)'),
+            stop: sandbox.stub().resolves(),
+            startGroupById: sandbox.stub().resolves('http://localhost:8888 (Test Group)'),
+            stopGroupById: sandbox.stub().resolves(),
+            getStatus: sandbox.stub().returns(false),
+            getGroupStatus: sandbox.stub().returns(false),
         } as any;
 
         sidebarProvider = new SidebarProvider(extensionUri, mockServerManager, configManager);
+    });
+
+    afterEach(() => {
+        sandbox.restore();
     });
 
     describe('constructor', () => {
@@ -73,61 +86,25 @@ describe('SidebarProvider', () => {
         });
     });
 
-    // Note: getHtmlForWebview tests require full VSCode API mocking
-    // Skipping these tests in unit test environment
-    describe.skip('getHtmlForWebview (requires full VSCode API)', () => {
-        it('should generate HTML with server stopped state', () => {
-            (mockServerManager.getStatus as sinon.SinonStub).returns(false);
-
-            const html = (sidebarProvider as any).getHtmlForWebview(mockWebview);
-            expect(html).to.be.a('string');
-            expect(html).to.include('<!DOCTYPE html>');
+    describe('getNonce', () => {
+        it('should generate a 32-character nonce', () => {
+            const nonce = (sidebarProvider as any).getNonce();
+            expect(nonce).to.be.a('string');
+            expect(nonce.length).to.equal(32);
         });
 
-        it('should generate HTML with server running state', () => {
-            (mockServerManager.getStatus as sinon.SinonStub).returns(true);
-            (mockServerManager.getGroupStatus as sinon.SinonStub).returns(true);
-
-            const html = (sidebarProvider as any).getHtmlForWebview(mockWebview);
-            expect(html).to.be.a('string');
-            expect(html).to.include('Test Group');
-            expect(html).to.include('8888');
+        it('should generate different nonces on each call', () => {
+            const nonce1 = (sidebarProvider as any).getNonce();
+            const nonce2 = (sidebarProvider as any).getNonce();
+            expect(nonce1).to.not.equal(nonce2);
         });
 
-        it('should include mock API count in HTML', () => {
-            (configManager.getConfig as sinon.SinonStub).returns({
-                version: '2.0',
-                proxyGroups: [{
-                    id: 'test-group-id',
-                    name: 'Test Group',
-                    port: 8888,
-                    interceptPrefix: '/api',
-                    baseUrl: 'http://localhost:8080',
-                    stripPrefix: true,
-                    globalCookie: '',
-                    enabled: true,
-                    mockApis: [
-                        { path: '/test1', method: 'GET', enabled: true, mockData: '{}', statusCode: 200 },
-                        { path: '/test2', method: 'POST', enabled: false, mockData: '{}', statusCode: 200 }
-                    ]
-                }]
-            });
-
-            const html = (sidebarProvider as any).getHtmlForWebview(mockWebview);
-            expect(html).to.include('Test Group');
-        });
-
-        it('should return valid HTML string', () => {
-            const html = (sidebarProvider as any).getHtmlForWebview(mockWebview);
-            expect(html).to.be.a('string');
-            expect(html).to.include('<!DOCTYPE html>');
-            expect(html).to.include('</html>');
-        });
-
-        it('should include CORS-compatible scripts', () => {
-            const html = (sidebarProvider as any).getHtmlForWebview(mockWebview);
-            expect(html).to.include('acquireVsCodeApi');
-            expect(html).to.include('postMessage');
+        it('should only contain alphanumeric characters', () => {
+            const nonce = (sidebarProvider as any).getNonce();
+            expect(nonce).to.match(/^[A-Za-z0-9]+$/);
         });
     });
+
+    // Note: resolveWebviewView and message handler tests are in integration tests
+    // because they require a real VS Code webview environment
 });

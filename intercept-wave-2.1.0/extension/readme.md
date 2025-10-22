@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="resources/logo.png" alt="Intercept Wave Logo" width="128" height="128">
+  <img src="https://github.com/zhongmiao-org/intercept-wave-vscode/raw/HEAD/resources/logo.png" alt="Intercept Wave Logo" width="128" height="128">
 
 # Intercept Wave for VSCode
 
@@ -11,7 +11,7 @@
 [![codecov](https://codecov.io/gh/zhongmiao-org/intercept-wave-vscode/branch/main/graph/badge.svg)](https://app.codecov.io/gh/zhongmiao-org/intercept-wave-vscode)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/blob/main/LICENSE)
 
-English | [简体中文](./README_zh.md)
+English | [简体中文](https://github.com/zhongmiao-org/intercept-wave-vscode/blob/HEAD/README_zh.md)
 
 </div>
 
@@ -403,4 +403,4 @@ If you have any questions or suggestions, feel free to submit an [Issue](https:/
 
 ## License
 
-MIT License - see the [LICENSE](LICENSE) file for details
+MIT License - see the [LICENSE](https://github.com/zhongmiao-org/intercept-wave-vscode/blob/HEAD/LICENSE) file for details

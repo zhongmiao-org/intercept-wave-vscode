@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { MockConfig, ProxyGroup } from './mockServer';
+import { MockConfig, ProxyGroup } from '../server';
 import { v4 as uuidv4 } from 'uuid';
 
 export class ConfigManager {
@@ -91,12 +91,12 @@ export class ConfigManager {
             stripPrefix: oldConfig.stripPrefix !== undefined ? oldConfig.stripPrefix : true,
             globalCookie: oldConfig.globalCookie || '',
             enabled: true,
-            mockApis: Array.isArray(oldConfig.mockApis) ? oldConfig.mockApis : []
+            mockApis: Array.isArray(oldConfig.mockApis) ? oldConfig.mockApis : [],
         };
 
         return {
             version: '2.0',
-            proxyGroups: [defaultGroup]
+            proxyGroups: [defaultGroup],
         };
     }
 
@@ -110,12 +110,12 @@ export class ConfigManager {
             stripPrefix: true,
             globalCookie: '',
             enabled: true,
-            mockApis: []
+            mockApis: [],
         };
 
         return {
             version: '2.0',
-            proxyGroups: [defaultGroup]
+            proxyGroups: [defaultGroup],
         };
     }
 

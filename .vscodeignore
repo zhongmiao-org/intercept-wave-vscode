@@ -1,11 +1,51 @@
+# ============================================
+# Bundle Mode: Use esbuild to create single dist/extension.js
+# Webview dependencies copied to dist/webview/
+# ============================================
+
+# Exclude source files
+src/**
+out/**
+node_modules/**
+
+# Exclude development files
 .vscode/**
 .vscode-test/**
-src/**
-.gitignore
-.yarnrc
+.idea/**
+scripts/**
+.github/**
+
+# Exclude test files
+coverage/**
+.nyc_output/**
+.c8rc.json
+.mocharc.json
+
+# Exclude build and config files
+tsconfig.json
+.eslintrc.json
+.prettierrc.json
+.prettierignore
+.codecov.yml
+esbuild.js
 vsc-extension-quickstart.md
-**/tsconfig.json
-**/*.map
+.yarnrc
+
+# Exclude Git files
+.git
+.gitignore
+.gitattributes
+
+# Exclude all TypeScript and source maps
 **/*.ts
-!resources/**
-!l10n/**
+**/*.map
+
+# Exclude all markdown except root README.md
+**/*.md
+!README.md
+
+# Exclude test files
+**/*.test.js
+**/*.spec.js
+**/test/**
+**/tests/**

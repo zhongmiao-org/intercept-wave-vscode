@@ -2,12 +2,12 @@ import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
 import * as vscode from 'vscode';
-import { ConfigManager } from './configManager';
+import { ConfigManager } from '../config';
 
 export interface MockApiConfig {
     path: string;
     enabled: boolean;
-    mockData: string;  // JSON string (compatible with JetBrains plugin)
+    mockData: string; // JSON string (compatible with JetBrains plugin)
     method: string;
     statusCode: number;
     useCookie?: boolean;
@@ -90,10 +90,14 @@ export class MockServerManager {
 
             server.listen(group.port, () => {
                 this.servers.set(group.id, server);
-                this.outputChannel.appendLine(`✅ [${group.name}] started on http://localhost:${group.port}`);
+                this.outputChannel.appendLine(
+                    `✅ [${group.name}] started on http://localhost:${group.port}`
+                );
                 this.outputChannel.appendLine(`   📋 Intercept Prefix: ${group.interceptPrefix}`);
                 this.outputChannel.appendLine(`   🔗 Base URL: ${group.baseUrl}`);
-                this.outputChannel.appendLine(`   📊 Mock APIs: ${group.mockApis.filter(api => api.enabled).length}/${group.mockApis.length} enabled`);
+                this.outputChannel.appendLine(
+                    `   📊 Mock APIs: ${group.mockApis.filter(api => api.enabled).length}/${group.mockApis.length} enabled`
+                );
                 resolve();
             });
 
@@ -113,16 +117,17 @@ export class MockServerManager {
         // Get config to retrieve group names
         const config = this.configManager.getConfig();
 
-        const stopPromises = Array.from(this.servers.entries()).map(([groupId, server]) =>
-            new Promise<void>((resolve) => {
-                server.close(() => {
-                    // Find group name for logging
-                    const group = config.proxyGroups.find(g => g.id === groupId);
-                    const groupInfo = group ? `${group.name}(:${group.port})` : groupId;
-                    this.outputChannel.appendLine(`🛑 Server stopped for group: ${groupInfo}`);
-                    resolve();
-                });
-            })
+        const stopPromises = Array.from(this.servers.entries()).map(
+            ([groupId, server]) =>
+                new Promise<void>(resolve => {
+                    server.close(() => {
+                        // Find group name for logging
+                        const group = config.proxyGroups.find(g => g.id === groupId);
+                        const groupInfo = group ? `${group.name}(:${group.port})` : groupId;
+                        this.outputChannel.appendLine(`🛑 Server stopped for group: ${groupInfo}`);
+                        resolve();
+                    });
+                })
         );
 
         await Promise.all(stopPromises);
@@ -177,7 +182,7 @@ export class MockServerManager {
         const config = this.configManager.getConfig();
         const group = config.proxyGroups.find(g => g.id === groupId);
 
-        await new Promise<void>((resolve) => {
+        await new Promise<void>(resolve => {
             server.close(() => {
                 const groupInfo = group ? `${group.name}(:${group.port})` : groupId;
                 this.outputChannel.appendLine(`🛑 Server stopped for group: ${groupInfo}`);
@@ -269,17 +274,17 @@ export class MockServerManager {
                 name: group.name,
                 port: group.port,
                 baseUrl: group.baseUrl,
-                interceptPrefix: group.interceptPrefix
+                interceptPrefix: group.interceptPrefix,
             },
             mockApis: {
                 total: group.mockApis.length,
-                enabled: group.mockApis.filter(api => api.enabled).length
+                enabled: group.mockApis.filter(api => api.enabled).length,
             },
             apis: group.mockApis.map(api => ({
                 path: api.path,
                 method: api.method,
-                enabled: api.enabled
-            }))
+                enabled: api.enabled,
+            })),
         };
 
         this.sendCorsHeaders(res);
@@ -316,7 +321,9 @@ export class MockServerManager {
         res.writeHead(mockApi.statusCode);
         res.end(responseData);
 
-        this.outputChannel.appendLine(`   ✅ Mock response sent [${mockApi.statusCode}] ${mockApi.delay && mockApi.delay > 0 ? `(delayed ${mockApi.delay}ms)` : ''}`);
+        this.outputChannel.appendLine(
+            `   ✅ Mock response sent [${mockApi.statusCode}] ${mockApi.delay && mockApi.delay > 0 ? `(delayed ${mockApi.delay}ms)` : ''}`
+        );
     }
 
     private forwardToOriginalServer(
@@ -340,7 +347,7 @@ export class MockServerManager {
                 headers: headers,
                 hostname: url.hostname,
                 port: url.port || (isHttps ? 443 : 80),
-                path: url.pathname + url.search
+                path: url.pathname + url.search,
             };
 
             const proxyReq = httpModule.request(options, proxyRes => {
@@ -368,7 +375,9 @@ export class MockServerManager {
             });
 
             proxyReq.on('error', error => {
-                this.outputChannel.appendLine(`   ❌ Proxy error: ${error.message || error.toString()}`);
+                this.outputChannel.appendLine(
+                    `   ❌ Proxy error: ${error.message || error.toString()}`
+                );
                 this.outputChannel.appendLine(`   ❌ Error details: ${JSON.stringify(error)}`);
                 this.outputChannel.appendLine(`   ❌ Target was: ${targetUrl}`);
                 this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to reach original server');

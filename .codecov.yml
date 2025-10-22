@@ -1,0 +1,26 @@
+# Codecov configuration
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: auto
+        threshold: 1%
+
+ignore:
+  - "src/extension.ts"                       # VSCode extension entry point - requires integration tests
+  - "src/providers/**"                       # VSCode providers - require real VSCode environment
+  - "src/test/**"                            # Test files
+  - "scripts/**"                             # Build scripts
+  - "**/*.test.ts"                           # Test files
+  - "**/*.spec.ts"                           # Test files
+
+comment:
+  layout: "header, diff, flags, components"
+  behavior: default
+  require_changes: false

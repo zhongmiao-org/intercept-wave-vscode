@@ -29,7 +29,7 @@
     "activationEvents": [
         "onStartupFinished"
     ],
-    "main": "./out/extension.js",
+    "main": "./dist/extension.js",
     "contributes": {
         "commands": [
             {
@@ -94,10 +94,13 @@
         }
     },
     "scripts": {
-        "vscode:prepublish": "npm run compile",
+        "vscode:prepublish": "npm run package",
         "compile": "tsc -p ./ && npm run copy:templates",
         "copy:templates": "node scripts/copy-templates.js",
         "watch": "tsc -watch -p ./",
+        "package": "npm run copy:templates && node esbuild.js --production",
+        "compile:watch": "tsc -watch -p ./",
+        "package:watch": "npm run copy:templates && node esbuild.js --watch",
         "lint": "eslint src --ext ts",
         "format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.js\" \"*.json\" \"*.md\"",
         "format:check": "prettier --check \"src/**/*.ts\" \"scripts/**/*.js\" \"*.json\" \"*.md\"",
@@ -107,7 +110,7 @@
         "test:integration": "npm run compile && node ./out/test/integration/runTest.js",
         "test:coverage": "c8 npm run test:unit",
         "test:coverage:ci": "c8 --reporter=lcov --reporter=text --reporter=json-summary npm run test:unit",
-        "build:local": "npm run compile && npx @vscode/vsce package --allow-star-activation --allow-missing-repository"
+        "build:local": "npm run package && npx @vscode/vsce package --allow-star-activation --allow-missing-repository"
     },
     "devDependencies": {
         "@types/chai": "^4.3.20",
@@ -123,6 +126,7 @@
         "@vscode/test-electron": "^2.5.2",
         "c8": "^9.1.0",
         "chai": "^4.5.0",
+        "esbuild": "^0.25.11",
         "eslint": "^8.57.0",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-prettier": "^5.5.4",

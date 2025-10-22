@@ -95,13 +95,17 @@ All notable changes to the "intercept-wave" extension will be documented in this
     - **Full Testing on Main Branch**: Push to main runs complete multi-platform test suite before creating release
     - **Artifact Management**: Extension package (.vsix) available for download in PRs (30 days retention)
 - 🐛 **Extension Activation Fix**: Commands now properly register in integration test environment
-- 📦 **Package Optimization**: Drastically improved `.vscodeignore` to minimize extension size
-    - **Optimized Strategy**: Exclude all `node_modules`, then explicitly include only runtime dependencies
-    - **Runtime Dependencies Only**: Only includes `@vscode-elements/elements`, `@vscode/codicons`, and `uuid`
-    - **Excluded Files**: Test files (`out/test/**`), IDE configs (`.idea/**`), CI files (`.github/**`)
-    - **Excluded Build Artifacts**: Source maps (`**/*.map`), TypeScript sources (`**/*.ts`), dev configs
-    - **Size Reduction**: Reduced from 1,087 files (1.35MB) to 247 files (513KB) - 77% reduction
-    - **Performance**: Package now contains only 219 JavaScript files vs 533 previously
+- 📦 **Package Optimization with esbuild**: Revolutionary size reduction using module bundling
+    - **Bundling Strategy**: Implemented esbuild to create single `dist/extension.js` file
+    - **Zero Dependencies**: Completely eliminated `node_modules` from package (bundled into single file)
+    - **Dramatic Size Reduction**: Reduced from 1,087 files (1.35MB) to **11 files (32KB)** - **98% reduction!**
+    - **Performance**: Single 21KB bundled JavaScript file vs 533 separate JS files previously
+    - **Build System**:
+        - Added `esbuild.js` configuration for production bundling
+        - Updated `package.json` main entry to `./dist/extension.js`
+        - New scripts: `npm run package` (production build), `npm run package:watch` (watch mode)
+    - **Optimized `.vscodeignore`**: Simplified to exclude all source files, node_modules, and build artifacts
+    - **CI/CD Integration**: Updated GitHub Actions workflow to use bundled build
     - Added `.gitattributes` for consistent line endings across platforms (LF on all platforms)
 
 ## [2.0.0]

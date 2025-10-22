@@ -30,8 +30,8 @@ jobs:
             - name: Install dependencies
               run: npm ci
 
-            - name: Compile extension
-              run: npm run compile
+            - name: Build extension (esbuild bundle)
+              run: npm run package
 
             - name: Package extension
               run: |

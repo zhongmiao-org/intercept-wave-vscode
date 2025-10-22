@@ -98,14 +98,16 @@ All notable changes to the "intercept-wave" extension will be documented in this
 - 📦 **Package Optimization with esbuild**: Revolutionary size reduction using module bundling
     - **Bundling Strategy**: Implemented esbuild to create single `dist/extension.js` file
     - **Zero Dependencies**: Completely eliminated `node_modules` from package (bundled into single file)
-    - **Dramatic Size Reduction**: Reduced from 1,087 files (1.35MB) to **11 files (32KB)** - **98% reduction!**
+    - **Dramatic Size Reduction**: Reduced from 1,087 files (1.35MB) to **13 files (65KB)** - **98% reduction!**
     - **Performance**: Single 21KB bundled JavaScript file vs 533 separate JS files previously
     - **Build System**:
         - Added `esbuild.js` configuration for production bundling
         - Updated `package.json` main entry to `./dist/extension.js`
         - New scripts: `npm run package` (production build), `npm run package:watch` (watch mode)
+        - Updated `copy-templates.js` to copy templates to both `out/` (for tests) and `dist/` (for bundled extension)
     - **Optimized `.vscodeignore`**: Simplified to exclude all source files, node_modules, and build artifacts
     - **CI/CD Integration**: Updated GitHub Actions workflow to use bundled build
+    - **Test Compatibility**: Integration tests now run both `compile` and `package` to ensure dist/extension.js exists
     - Added `.gitattributes` for consistent line endings across platforms (LF on all platforms)
 
 ## [2.0.0]

@@ -107,7 +107,7 @@
         "pretest": "npm run compile",
         "test": "npm run test:unit && npm run test:integration",
         "test:unit": "npm run compile && node ./out/test/unit/runner.js",
-        "test:integration": "npm run compile && npm run package && node ./out/test/integration/runTest.js",
+        "test:integration": "npm run compile && node ./out/test/integration/runTest.js",
         "test:coverage": "c8 npm run test:unit",
         "test:coverage:ci": "c8 --reporter=lcov --reporter=text --reporter=json-summary npm run test:unit",
         "build:local": "npm run package && npx @vscode/vsce package --allow-star-activation --allow-missing-repository"

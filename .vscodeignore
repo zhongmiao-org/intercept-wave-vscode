@@ -1,3 +1,7 @@
+# ============================================
+# Step 1: Exclude everything we don't need
+# ============================================
+
 # Development files
 .vscode/**
 .vscode-test/**
@@ -12,58 +16,72 @@ coverage/**
 .nyc_output/**
 .c8rc.json
 .mocharc.json
-**/*.test.js
-**/*.spec.js
 
-# Source files (only include compiled output)
-**/*.ts
-!out/**/*.ts
-**/*.map
+# Build and config files
+tsconfig.json
+.eslintrc.json
+.prettierrc.json
+.prettierignore
+.codecov.yml
+vsc-extension-quickstart.md
+.yarnrc
 
 # Git files
 .git
 .gitignore
 .gitattributes
 
-# CI/CD
-.github/**
-.codecov.yml
+# All node_modules (we'll include specific ones back later)
+node_modules/**
 
-# Documentation
-*.md
-!README.md
-CHANGELOG.md
-CONTRIBUTING.md
-RELEASE_PROCESS.md
-TEST_SETUP_SUMMARY.md
-README_zh.md
+# ============================================
+# Step 2: Include only what we need
+# ============================================
 
-# Dependencies (devDependencies)
-node_modules/**/@types/**
-node_modules/**/test/**
-node_modules/**/tests/**
-node_modules/**/*.test.js
-node_modules/**/*.spec.js
-node_modules/**/*.md
-node_modules/**/README*
-node_modules/**/CHANGELOG*
-node_modules/**/LICENSE*
-node_modules/**/.bin/**
+# Include only compiled JavaScript output (no TypeScript, no source maps)
+!out/*.js
+!out/common/**/*.js
+!out/providers/**/*.js
+!out/templates/**/*.html
 
-# Build files
-tsconfig.json
-.eslintrc.json
-.prettierrc.json
-.prettierignore
-vsc-extension-quickstart.md
-.yarnrc
+# Include runtime dependencies (from package.json dependencies only)
+!node_modules/@vscode-elements/elements/package.json
+!node_modules/@vscode-elements/elements/dist/**/*.js
+!node_modules/@vscode-elements/elements/*.json
 
-# Keep only necessary files
-!out/**/*.js
+!node_modules/@vscode/codicons/package.json
+!node_modules/@vscode/codicons/dist/**
+
+!node_modules/uuid/package.json
+!node_modules/uuid/dist/**
+
+# Include resources and localization
 !resources/**
 !l10n/**
+
+# Include essential files
 !package.json
 !package.nls.json
 !package.nls.zh-cn.json
 !README.md
 !LICENSE
+
+# ============================================
+# Step 3: Exclude patterns even in included paths
+# ============================================
+
+# Exclude all TypeScript source files
+**/*.ts
+
+# Exclude all source maps
+**/*.map
+
+# Exclude all markdown (except README.md at root)
+**/*.md
+!README.md
+
+# Exclude test files anywhere
+**/*.test.js
+**/*.spec.js
+**/test/**
+**/tests/**

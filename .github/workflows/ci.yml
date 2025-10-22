@@ -1,0 +1,294 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    # Multi-platform testing (runs on PRs and pushes to main)
+    test:
+        name: Test (${{ matrix.os }}, Node ${{ matrix.node-version }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+                node-version: [18.x, 20.x]
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Run linter
+              run: npm run lint
+
+            - name: Run unit tests
+              run: npm run test:unit
+
+            - name: Run integration tests
+              if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
+              run: xvfb-run -a npm run test:integration
+
+            - name: Generate coverage report
+              if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
+              run: npm run test:coverage:ci
+
+            - name: Upload coverage to Codecov
+              if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
+              uses: codecov/codecov-action@v5
+              with:
+                  token: ${{ secrets.CODECOV_TOKEN }}
+                  files: ./coverage/lcov.info
+                  flags: unittests
+                  name: codecov-umbrella
+                  fail_ci_if_error: false
+
+    # Coverage report comment (only on PRs)
+    coverage-report:
+        name: Coverage Report
+        if: github.event_name == 'pull_request'
+        needs: test
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: write
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20.x'
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Generate coverage report
+              run: npm run test:coverage:ci
+
+            - name: Generate Coverage Badge
+              run: |
+                  COVERAGE=$(node -p "
+                    const fs = require('fs');
+                    const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+                    summary.total.lines.pct.toFixed(2);
+                  ")
+                  echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
+
+            - name: Comment coverage on PR
+              uses: actions/github-script@v7
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  script: |
+                      const fs = require('fs');
+
+                      // Read coverage summary
+                      const coverageSummary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+                      const total = coverageSummary.total;
+
+                      // Calculate coverage percentages
+                      const lineCoverage = total.lines.pct;
+                      const branchCoverage = total.branches.pct;
+                      const functionCoverage = total.functions.pct;
+                      const statementCoverage = total.statements.pct;
+
+                      // Get previous coverage (from base branch)
+                      let previousCoverage = null;
+                      try {
+                        // Try to get coverage from base branch
+                        const { data: baseContent } = await github.rest.repos.getContent({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          path: 'coverage/coverage-summary.json',
+                          ref: context.payload.pull_request.base.ref
+                        });
+                        const baseData = Buffer.from(baseContent.content, 'base64').toString('utf8');
+                        previousCoverage = JSON.parse(baseData).total;
+                      } catch (error) {
+                        console.log('Could not fetch base coverage:', error.message);
+                      }
+
+                      // Calculate diff
+                      const getDiff = (current, previous) => {
+                        if (!previous) return null;
+                        const diff = current - previous;
+                        const sign = diff > 0 ? '+' : '';
+                        const emoji = diff > 0 ? '📈' : diff < 0 ? '📉' : '➡️';
+                        return `${emoji} ${sign}${diff.toFixed(2)}%`;
+                      };
+
+                      // Create comment body
+                      let commentBody = '## 📊 Code Coverage Report\n\n';
+                      commentBody += '| Metric | Coverage | ';
+                      if (previousCoverage) {
+                        commentBody += 'Change |\n|--------|----------|--------|\n';
+                      } else {
+                        commentBody += '\n|--------|----------|\n';
+                      }
+
+                      const metrics = [
+                        { name: 'Lines', current: lineCoverage, previous: previousCoverage?.lines.pct },
+                        { name: 'Branches', current: branchCoverage, previous: previousCoverage?.branches.pct },
+                        { name: 'Functions', current: functionCoverage, previous: previousCoverage?.functions.pct },
+                        { name: 'Statements', current: statementCoverage, previous: previousCoverage?.statements.pct }
+                      ];
+
+                      metrics.forEach(metric => {
+                        const emoji = metric.current >= 80 ? '✅' : metric.current >= 60 ? '⚠️' : '❌';
+                        commentBody += `| ${emoji} ${metric.name} | ${metric.current.toFixed(2)}% |`;
+                        if (previousCoverage) {
+                          const diff = getDiff(metric.current, metric.previous);
+                          commentBody += ` ${diff || 'N/A'} |\n`;
+                        } else {
+                          commentBody += '\n';
+                        }
+                      });
+
+                      commentBody += '\n### Coverage Thresholds\n';
+                      commentBody += '- ✅ Good: ≥ 80%\n';
+                      commentBody += '- ⚠️ Fair: 60-79%\n';
+                      commentBody += '- ❌ Poor: < 60%\n';
+
+                      // Add summary
+                      if (previousCoverage) {
+                        const totalDiff = lineCoverage - previousCoverage.lines.pct;
+                        if (totalDiff > 0) {
+                          commentBody += `\n🎉 **Great job!** Coverage increased by ${totalDiff.toFixed(2)}%\n`;
+                        } else if (totalDiff < 0) {
+                          commentBody += `\n⚠️ **Warning:** Coverage decreased by ${Math.abs(totalDiff).toFixed(2)}%\n`;
+                        } else {
+                          commentBody += `\n✨ Coverage remained stable\n`;
+                        }
+                      }
+
+                      // Post comment
+                      await github.rest.issues.createComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: context.payload.pull_request.number,
+                        body: commentBody
+                      });
+
+    # Build and package (only on push to main)
+    build:
+        name: Build & Package
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        needs: test
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20.x'
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Compile extension
+              run: npm run compile
+
+            - name: Package extension
+              run: |
+                  npm install -g @vscode/vsce
+                  vsce package
+
+            - name: Upload extension package
+              uses: actions/upload-artifact@v4
+              with:
+                  name: vscode-extension
+                  path: '*.vsix'
+                  retention-days: 7
+
+    # Create draft release (only on push to main)
+    release-draft:
+        name: Create Release Draft
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        needs: build
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20.x'
+
+            - name: Remove old release drafts
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  gh api repos/{owner}/{repo}/releases \
+                    --jq '.[] | select(.draft == true) | .id' \
+                    | xargs -I '{}' gh api -X DELETE repos/{owner}/{repo}/releases/{} || true
+
+            - name: Extract changelog
+              id: changelog
+              run: |
+                  VERSION="v$(node -p "require('./package.json').version")"
+                  VERSION_WITHOUT_V="${VERSION#v}"
+
+                  # First try to extract from [Unreleased]
+                  CHANGELOG=$(awk '/## \[Unreleased\]/{flag=1; next} /## \[/{flag=0} flag' CHANGELOG.md | sed '/^[[:space:]]*$/d')
+
+                  # If Unreleased is empty or doesn't exist, try to extract from version section
+                  if [ -z "$CHANGELOG" ]; then
+                    echo "No Unreleased content found, trying version section [$VERSION_WITHOUT_V]..."
+                    CHANGELOG=$(awk "/## \[$VERSION_WITHOUT_V\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md)
+                  fi
+
+                  # If still empty, use a default message
+                  if [ -z "$CHANGELOG" ]; then
+                    CHANGELOG="Release $VERSION"
+                  fi
+
+                  # Save to file for multi-line content
+                  echo "$CHANGELOG" > release_notes.md
+
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+            - name: Download extension package
+              uses: actions/download-artifact@v4
+              with:
+                  name: vscode-extension
+
+            - name: Create release draft
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  VERSION="${{ steps.changelog.outputs.version }}"
+
+                  gh release create $VERSION \
+                    --draft \
+                    --title "$VERSION" \
+                    --notes-file release_notes.md \
+                    *.vsix

@@ -78,10 +78,15 @@ All notable changes to the "intercept-wave" extension will be documented in this
 - 🧹 **Code Cleanup**: Removed legacy v1.x methods and tests
 - 🎯 **TypeScript**: Better type safety with separated concerns
 - 🔍 **Linting**: ESLint now integrated with Prettier for consistent style
-- ⚡ **CI Improvements**:
-    - Separate unit and integration test jobs
-    - Coverage reporting only on unit tests
-    - Integration tests run on Ubuntu only (with xvfb)
+- ⚡ **CI/CD Pipeline Refactoring**: Unified workflow for better visibility
+    - **Unified CI Workflow**: Merged `build.yml` and `test.yml` into single `ci.yml`
+    - **Clear Pipeline Stages**:
+        - PR: Multi-platform testing (Ubuntu, macOS, Windows) × Multi-version (Node 18, 20)
+        - PR: Coverage report with comparison to base branch
+        - Push to main: Build → Package → Create Draft Release
+    - **Better Resource Management**: Tests run in parallel, build only after all tests pass
+    - **Artifact Management**: Extension package uploaded and attached to draft releases
+- 🐛 **Extension Activation Fix**: Commands now properly register in integration test environment
 
 ## [2.0.0]
 

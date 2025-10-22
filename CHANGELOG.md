@@ -4,7 +4,7 @@ All notable changes to the "intercept-wave" extension will be documented in this
 
 ## [Unreleased]
 
-## [2.0.0] - 2025-01-18
+## [2.0.0]
 
 ### 🎉 Major Features
 

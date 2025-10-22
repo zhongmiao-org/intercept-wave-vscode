@@ -103,34 +103,6 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand('interceptWave.configure', async () => {
-            const panel = vscode.window.createWebviewPanel(
-                'interceptWaveConfig',
-                vscode.l10n.t('config.title'),
-                vscode.ViewColumn.One,
-                {
-                    enableScripts: true
-                }
-            );
-
-            panel.webview.html = getConfigurationHtml(configManager.getConfig());
-
-            panel.webview.onDidReceiveMessage(
-                async message => {
-                    switch (message.command) {
-                        case 'save':
-                            await configManager.saveConfig(message.config);
-                            vscode.window.showInformationMessage(vscode.l10n.t('config.saved'));
-                            panel.dispose();
-                            break;
-                    }
-                },
-                undefined,
-                context.subscriptions
-            );
-        })
-    );
 
     context.subscriptions.push(
         vscode.commands.registerCommand('interceptWave.openConfig', async () => {
@@ -145,16 +117,4 @@ export function deactivate() {
     if (mockServerManager) {
         mockServerManager.stop();
     }
-}
-
-export function getConfigurationHtml(config: any): string {
-    const template = TemplateLoader.loadTemplate('configurationView');
-    return TemplateLoader.replacePlaceholders(template, {
-        'PORT': (config.port || 8888).toString(),
-        'INTERCEPT_PREFIX': config.interceptPrefix || '/api',
-        'BASE_URL': config.baseUrl || 'http://localhost:8080',
-        'STRIP_PREFIX_CHECKED': config.stripPrefix ? 'checked' : '',
-        'GLOBAL_COOKIE': config.globalCookie || '',
-        'MOCK_APIS_JSON': JSON.stringify(config.mockApis || [])
-    });
 }

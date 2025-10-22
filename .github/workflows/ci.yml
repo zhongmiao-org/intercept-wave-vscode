@@ -12,9 +12,43 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
-    # Multi-platform testing (runs on PRs and pushes to main)
+    # Build and package extension (runs first, on all events)
+    build:
+        name: Build & Package
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20.x'
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Compile extension
+              run: npm run compile
+
+            - name: Package extension
+              run: |
+                  npm install -g @vscode/vsce
+                  vsce package
+
+            - name: Upload extension package
+              uses: actions/upload-artifact@v4
+              with:
+                  name: vscode-extension
+                  path: '*.vsix'
+                  retention-days: 30
+
+    # Multi-platform testing (runs after build succeeds)
     test:
         name: Test (${{ matrix.os }}, Node ${{ matrix.node-version }})
+        needs: build
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
@@ -189,41 +223,6 @@ jobs:
                         issue_number: context.payload.pull_request.number,
                         body: commentBody
                       });
-
-    # Build and package (only on push to main)
-    build:
-        name: Build & Package
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        needs: test
-        runs-on: ubuntu-latest
-
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: '20.x'
-                  cache: 'npm'
-
-            - name: Install dependencies
-              run: npm ci
-
-            - name: Compile extension
-              run: npm run compile
-
-            - name: Package extension
-              run: |
-                  npm install -g @vscode/vsce
-                  vsce package
-
-            - name: Upload extension package
-              uses: actions/upload-artifact@v4
-              with:
-                  name: vscode-extension
-                  path: '*.vsix'
-                  retention-days: 7
 
     # Create draft release (only on push to main)
     release-draft:

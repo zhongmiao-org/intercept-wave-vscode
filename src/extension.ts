@@ -73,6 +73,43 @@ export function activate(context: vscode.ExtensionContext) {
             })
         );
         outputChannel.appendLine('✓ WebviewViewProvider registered for: interceptWaveView');
+
+        // Register commands
+        context.subscriptions.push(
+            vscode.commands.registerCommand('interceptWave.startServer', async () => {
+                try {
+                    const url = await mockServerManager.start();
+                    vscode.window.showInformationMessage(vscode.l10n.t('server.started', url));
+                } catch (error: any) {
+                    vscode.window.showErrorMessage(
+                        vscode.l10n.t('server.startFailed', error.message)
+                    );
+                }
+            })
+        );
+
+        context.subscriptions.push(
+            vscode.commands.registerCommand('interceptWave.stopServer', async () => {
+                try {
+                    await mockServerManager.stop();
+                    vscode.window.showInformationMessage(vscode.l10n.t('server.stopped'));
+                } catch (error: any) {
+                    vscode.window.showErrorMessage(
+                        vscode.l10n.t('server.stopFailed', error.message)
+                    );
+                }
+            })
+        );
+
+        context.subscriptions.push(
+            vscode.commands.registerCommand('interceptWave.openConfig', async () => {
+                const configPath = configManager.getConfigPath();
+                const doc = await vscode.workspace.openTextDocument(configPath);
+                await vscode.window.showTextDocument(doc);
+            })
+        );
+
+        outputChannel.appendLine('✓ Commands registered');
         outputChannel.appendLine('=== Activation completed successfully ===');
         outputChannel.show(true);
     } catch (error: any) {
@@ -82,37 +119,6 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage(`Intercept Wave activation failed: ${error.message}`);
         throw error;
     }
-
-    // Register commands
-    context.subscriptions.push(
-        vscode.commands.registerCommand('interceptWave.startServer', async () => {
-            try {
-                const url = await mockServerManager.start();
-                vscode.window.showInformationMessage(vscode.l10n.t('server.started', url));
-            } catch (error: any) {
-                vscode.window.showErrorMessage(vscode.l10n.t('server.startFailed', error.message));
-            }
-        })
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand('interceptWave.stopServer', async () => {
-            try {
-                await mockServerManager.stop();
-                vscode.window.showInformationMessage(vscode.l10n.t('server.stopped'));
-            } catch (error: any) {
-                vscode.window.showErrorMessage(vscode.l10n.t('server.stopFailed', error.message));
-            }
-        })
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand('interceptWave.openConfig', async () => {
-            const configPath = configManager.getConfigPath();
-            const doc = await vscode.workspace.openTextDocument(configPath);
-            await vscode.window.showTextDocument(doc);
-        })
-    );
 }
 
 export function deactivate() {

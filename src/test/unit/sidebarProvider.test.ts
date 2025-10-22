@@ -1,12 +1,12 @@
 import { describe, it, beforeEach, before, afterEach } from 'mocha';
 import { expect, use } from 'chai';
 import * as sinon from 'sinon';
-import sinonChai from 'sinon-chai';
 import * as vscode from 'vscode';
 import { SidebarProvider } from '../../sidebarProvider';
 import { MockServerManager } from '../../mockServer';
 import { ConfigManager } from '../../configManager';
 
+const sinonChai = require('sinon-chai');
 use(sinonChai);
 
 describe('SidebarProvider', () => {
@@ -25,6 +25,20 @@ describe('SidebarProvider', () => {
                 return vscode.Uri.file('/fake/joined/path');
             };
         }
+
+        // Mock vscode.l10n for tests
+        if (!vscode.l10n) {
+            (vscode as any).l10n = {
+                t: (key: string, ...args: any[]) => {
+                    // Return a simple string for testing
+                    return key;
+                }
+            };
+        } else if (!(vscode.l10n as any).t) {
+            (vscode.l10n as any).t = (key: string, ...args: any[]) => {
+                return key;
+            };
+        }
     });
 
     beforeEach(() => {
@@ -37,8 +51,9 @@ describe('SidebarProvider', () => {
         mockWebview = {
             asWebviewUri: (uri: vscode.Uri) => uri,
             options: {},
+            html: '',
             postMessage: sandbox.stub(),
-            onDidReceiveMessage: sandbox.stub()
+            onDidReceiveMessage: sandbox.stub().returns({ dispose: sandbox.stub() })
         };
 
         // Create mock webview view

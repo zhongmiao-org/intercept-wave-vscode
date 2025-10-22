@@ -18,10 +18,15 @@ All notable changes to the "intercept-wave" extension will be documented in this
     - Separate test runners for unit and integration tests
     - Updated CI to run both test types appropriately
     - Integration tests only run on Ubuntu with xvfb (headless mode)
+    - Integration tests now run with temporary workspace to properly test command registration
 - 📦 **Dependency Fixes**:
     - Downgraded `uuid` from v13 to v9.0.1 (CommonJS compatibility)
     - Downgraded `chai` from v5 to v4.5.0 (CommonJS compatibility)
     - Ensures tests pass on Node 18.x and 20.x
+- 📊 **Codecov Configuration**: Ignore VSCode-specific files that require integration tests
+    - Excluded `src/extension.ts` and `src/providers/**` from coverage reports
+    - Focus coverage metrics on testable business logic (common modules)
+    - More accurate coverage representation for unit-testable code
 
 ### 🏗️ Code Organization
 

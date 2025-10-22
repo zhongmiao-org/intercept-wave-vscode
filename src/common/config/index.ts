@@ -1,1 +1,1 @@
-export * from './configManager'
+export * from './configManager';

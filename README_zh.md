@@ -1,17 +1,18 @@
 <div align="center">
   <img src="resources/logo.png" alt="Intercept Wave Logo" width="128" height="128">
 
-  # Intercept Wave for VSCode
+# Intercept Wave for VSCode
 
-  [![Version](https://vsmarketplacebadges.dev/version-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Installs](https://vsmarketplacebadges.dev/installs-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Downloads](https://vsmarketplacebadges.dev/downloads-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Rating](https://vsmarketplacebadges.dev/rating-star/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Test](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml/badge.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml)
-  [![codecov](https://codecov.io/gh/zhongmiao-org/intercept-wave-vscode/branch/main/graph/badge.svg)](https://app.codecov.io/gh/zhongmiao-org/intercept-wave-vscode)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/blob/main/LICENSE)
+[![Version](https://vsmarketplacebadges.dev/version-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+[![Downloads](https://vsmarketplacebadges.dev/downloads-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+[![Rating](https://vsmarketplacebadges.dev/rating-star/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+[![Test](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml/badge.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/zhongmiao-org/intercept-wave-vscode/branch/main/graph/badge.svg)](https://app.codecov.io/gh/zhongmiao-org/intercept-wave-vscode)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/blob/main/LICENSE)
 
-  [English](./README.md) | 简体中文
+[English](./README.md) | 简体中文
+
 </div>
 
 一款功能强大的 VSCode 扩展插件,集成了类似 **Nginx** 和 **Charles** 的代理拦截能力,专为本地开发环境设计。它能智能拦截 HTTP 请求,既可以返回自定义的 Mock 数据,也可以作为代理服务器转发真实请求到原始服务器,完整保留 HTTP 头信息。
@@ -27,12 +28,14 @@
 ## 功能特性
 
 ### 智能拦截与代理
+
 - 🎯 配置拦截前缀(如 `/api`)来精确定位特定请求路径
 - 🔄 **有 Mock 配置时**:返回预设的 Mock 数据,支持离线开发
 - 🌐 **无 Mock 配置时**:作为代理服务器,携带完整 HTTP 头转发请求获取真实数据
 - 🔀 智能路径匹配,支持前缀剥离
 
 ### 开发者友好特性
+
 - 👥 **目标用户**:前端工程师、测试工程师、全栈开发者
 - 🎨 VSCode 内可视化配置界面
 - 💾 配置持久化,工作区级别隔离
@@ -58,22 +61,25 @@
 2. 使用顶部的标签页切换不同的代理配置组
 3. 点击 **+** 按钮添加新的代理组
 4. 右键点击标签页或使用设置按钮可以:
-   - 编辑组名称和配置
-   - 删除代理组(至少保留一个组)
-   - 启用/禁用代理组
+    - 编辑组名称和配置
+    - 删除代理组(至少保留一个组)
+    - 启用/禁用代理组
 
 ### 2. 启动 Mock 服务器
 
 **启动所有已启用的组**:
+
 - 点击"全部启动"按钮同时启动所有已启用的代理组
 - 每个组将在其配置的端口上运行
 
 **启动单个组**:
+
 - 选择所需的组标签页
 - 点击该组内的"启动服务"按钮
 - 仅此特定组将启动
 
 **停止服务器**:
+
 - 点击"全部停止"停止所有正在运行的服务器
 - 或点击特定组内的"停止服务"按钮仅停止该组
 
@@ -82,7 +88,9 @@
 点击"配置"或设置按钮设置每个组:
 
 #### 每组配置
+
 每个代理组都有独立的设置:
+
 - **组名称**:此配置的描述性名称(例如:"用户服务"、"开发环境")
 - **Mock 端口**:此组的 Mock 服务器端口(例如:8888、8889)
 - **拦截前缀**:要拦截的 API 路径前缀(默认:/api)
@@ -92,7 +100,9 @@
 - **启用**:点击"全部启动"时此组是否应该启动
 
 #### Mock API 配置
+
 为每个组添加 Mock API:
+
 - **路径**:例如 `/user`(当 stripPrefix 为 true 时)或 `/api/user`(当为 false 时)
 - **HTTP 方法**:ALL、GET、POST、PUT、DELETE、PATCH
 - **状态码**:HTTP 响应状态码(默认:200)
@@ -108,28 +118,32 @@
 同时 Mock 多个微服务,每个服务运行在独立端口:
 
 **代理组 1 - 用户服务(端口 8888)**:
+
 ```javascript
 // 用户服务的前端代码
 fetch('http://localhost:8888/api/user/info')
-  .then(res => res.json())
-  .then(data => console.log(data));
+    .then(res => res.json())
+    .then(data => console.log(data));
 ```
 
 **配置**:
+
 - 组名称:"用户服务"
 - 端口:8888
 - 拦截前缀:`/api`
 - Mock API:`/user/info` 返回用户数据
 
 **代理组 2 - 订单服务(端口 8889)**:
+
 ```javascript
 // 订单服务的前端代码
 fetch('http://localhost:8889/order-api/orders')
-  .then(res => res.json())
-  .then(data => console.log(data));
+    .then(res => res.json())
+    .then(data => console.log(data));
 ```
 
 **配置**:
+
 - 组名称:"订单服务"
 - 端口:8889
 - 拦截前缀:`/order-api`
@@ -152,23 +166,25 @@ fetch('http://localhost:8889/order-api/orders')
 ```javascript
 // 前端代码
 fetch('http://localhost:8888/api/user/info')
-  .then(res => res.json())
-  .then(data => console.log(data));
+    .then(res => res.json())
+    .then(data => console.log(data));
 ```
 
 **配置**:
+
 - 路径:`/user/info`(启用 stripPrefix 时)
 - 方法:`GET`
 - Mock 数据:
+
 ```json
 {
-  "code": 0,
-  "data": {
-    "id": 1,
-    "name": "张三",
-    "email": "zhangsan@example.com"
-  },
-  "message": "success"
+    "code": 0,
+    "data": {
+        "id": 1,
+        "name": "张三",
+        "email": "zhangsan@example.com"
+    },
+    "message": "success"
 }
 ```
 
@@ -177,8 +193,8 @@ fetch('http://localhost:8888/api/user/info')
 ```javascript
 // 此 API 没有 Mock 配置,将转发到原始服务器
 fetch('http://localhost:8888/api/posts')
-  .then(res => res.json())
-  .then(data => console.log(data));
+    .then(res => res.json())
+    .then(data => console.log(data));
 ```
 
 如果基础 URL 配置为 `http://api.example.com`,实际请求将是:`http://api.example.com/api/posts`
@@ -217,51 +233,51 @@ fetch('http://localhost:8888/api/posts')
 
 ```json
 {
-  "version": "2.0",
-  "proxyGroups": [
-    {
-      "id": "550e8400-e29b-41d4-a716-446655440000",
-      "name": "用户服务",
-      "enabled": true,
-      "port": 8888,
-      "interceptPrefix": "/api",
-      "baseUrl": "http://localhost:8080",
-      "stripPrefix": true,
-      "globalCookie": "sessionId=abc123; userId=456",
-      "mockApis": [
+    "version": "2.0",
+    "proxyGroups": [
         {
-          "path": "/user/info",
-          "enabled": true,
-          "mockData": "{\"code\":0,\"data\":{\"id\":1,\"name\":\"张三\"}}",
-          "method": "GET",
-          "statusCode": 200,
-          "useCookie": true,
-          "delay": 0
-        }
-      ]
-    },
-    {
-      "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-      "name": "订单服务",
-      "enabled": true,
-      "port": 8889,
-      "interceptPrefix": "/order-api",
-      "baseUrl": "http://localhost:8081",
-      "stripPrefix": true,
-      "globalCookie": "",
-      "mockApis": [
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "name": "用户服务",
+            "enabled": true,
+            "port": 8888,
+            "interceptPrefix": "/api",
+            "baseUrl": "http://localhost:8080",
+            "stripPrefix": true,
+            "globalCookie": "sessionId=abc123; userId=456",
+            "mockApis": [
+                {
+                    "path": "/user/info",
+                    "enabled": true,
+                    "mockData": "{\"code\":0,\"data\":{\"id\":1,\"name\":\"张三\"}}",
+                    "method": "GET",
+                    "statusCode": 200,
+                    "useCookie": true,
+                    "delay": 0
+                }
+            ]
+        },
         {
-          "path": "/orders",
-          "enabled": true,
-          "mockData": "{\"code\":0,\"data\":[]}",
-          "method": "GET",
-          "statusCode": 200,
-          "useCookie": false,
-          "delay": 0
+            "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+            "name": "订单服务",
+            "enabled": true,
+            "port": 8889,
+            "interceptPrefix": "/order-api",
+            "baseUrl": "http://localhost:8081",
+            "stripPrefix": true,
+            "globalCookie": "",
+            "mockApis": [
+                {
+                    "path": "/orders",
+                    "enabled": true,
+                    "mockData": "{\"code\":0,\"data\":[]}",
+                    "method": "GET",
+                    "statusCode": 200,
+                    "useCookie": false,
+                    "delay": 0
+                }
+            ]
         }
-      ]
-    }
-  ]
+    ]
 }
 ```
 
@@ -270,6 +286,7 @@ fetch('http://localhost:8888/api/posts')
 从 v1.x 升级到 v2.0 时,您的现有配置将自动迁移:
 
 **升级前 (v1.x)**:
+
 ```json
 {
   "port": 8888,
@@ -280,6 +297,7 @@ fetch('http://localhost:8888/api/posts')
 ```
 
 **升级后 (v2.0)**:
+
 ```json
 {
   "version": "2.0",
@@ -314,6 +332,7 @@ sessionId=abc123; userId=456; token=xyz789
 ### CORS 支持
 
 Mock 服务器自动添加以下 CORS 头:
+
 ```
 Access-Control-Allow-Origin: *
 Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
@@ -323,6 +342,7 @@ Access-Control-Allow-Headers: Content-Type, Authorization
 ### 代理模式
 
 未配置 Mock 的 API 将自动转发到原始服务器,保留:
+
 - 原始请求头
 - User-Agent
 - 请求体(对于 POST/PUT 等)
@@ -337,34 +357,44 @@ Access-Control-Allow-Headers: Content-Type, Authorization
 ## 常见问题
 
 ### 问:服务器启动失败怎么办?
+
 答:检查端口是否被占用,可以在配置中更改端口号。
 
 ### 问:为什么我的 API 没有被 Mock?
+
 答:确保 API 路径完全匹配且 Mock 配置已启用。同时检查 stripPrefix 设置。
 
 ### 问:如何查看请求日志?
+
 答:打开 VSCode 输出面板,从下拉菜单中选择"Intercept Wave"。
 
 ### 问:stripPrefix 如何工作?
+
 答:启用后,在匹配前会移除 interceptPrefix。例如:
+
 - 请求:`/api/user`,interceptPrefix 为 `/api`
 - 匹配路径:`/user`
 - 所以你的 Mock API 路径应该配置为 `/user`
 
 ### 问:如何管理多个代理组? (v2.0)
+
 答:使用侧边栏顶部的标签页界面:
+
 - 点击 **+** 按钮添加新组
 - 点击标签页切换不同组
 - 右键点击标签页或使用设置按钮编辑/删除组
 - 每个组在自己的端口上独立运行
 
 ### 问:可以同时运行多个代理组吗? (v2.0)
+
 答:可以!您可以:
+
 - 点击"全部启动"同时启动所有已启用的组
 - 逐个选择标签页并点击"启动服务"来启动单个组
 - 混合使用两种方式 - 某些组通过"全部启动",其他组单独启动
 
 ### 问:升级到 v2.0 后我的 v1.x 配置会怎样? (v2.0)
+
 答:您的配置会自动迁移到 v2.0 格式。您的旧单代理设置将成为一个名为"默认配置"的新代理组。所有现有的 Mock API 和设置都会保留。
 
 ## 反馈与贡献

@@ -1,18 +1,18 @@
 {
-  "displayName": "Intercept Wave",
-  "description": "A powerful VSCode extension that combines proxy and interception capabilities similar to Nginx and Charles, designed for local development",
+    "displayName": "Intercept Wave",
+    "description": "A powerful VSCode extension that combines proxy and interception capabilities similar to Nginx and Charles, designed for local development",
 
-  "command.startServer": "Intercept Wave: Start Mock Server",
-  "command.stopServer": "Intercept Wave: Stop Mock Server",
-  "command.configure": "Intercept Wave: Configure",
-  "command.openConfig": "Intercept Wave: Open Configuration File",
+    "command.startServer": "Intercept Wave: Start Mock Server",
+    "command.stopServer": "Intercept Wave: Stop Mock Server",
+    "command.configure": "Intercept Wave: Configure",
+    "command.openConfig": "Intercept Wave: Open Configuration File",
 
-  "view.container.title": "Intercept Wave",
-  "view.title": "Mock Server",
+    "view.container.title": "Intercept Wave",
+    "view.title": "Mock Server",
 
-  "config.title": "Intercept Wave",
-  "config.port.description": "Mock server port",
-  "config.interceptPrefix.description": "API path prefix to intercept",
-  "config.baseUrl.description": "Base URL of the original server",
-  "config.stripPrefix.description": "Strip intercept prefix before matching mock APIs"
+    "config.title": "Intercept Wave",
+    "config.port.description": "Mock server port",
+    "config.interceptPrefix.description": "API path prefix to intercept",
+    "config.baseUrl.description": "Base URL of the original server",
+    "config.stripPrefix.description": "Strip intercept prefix before matching mock APIs"
 }

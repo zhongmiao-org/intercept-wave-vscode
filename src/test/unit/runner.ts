@@ -11,33 +11,35 @@ const originalRequire = Module.prototype.require;
         // Return a basic mock of vscode API
         return {
             workspace: {
-                workspaceFolders: [{
-                    uri: { fsPath: process.cwd(), scheme: 'file', path: process.cwd() },
-                    name: 'test-workspace',
-                    index: 0
-                }],
+                workspaceFolders: [
+                    {
+                        uri: { fsPath: process.cwd(), scheme: 'file', path: process.cwd() },
+                        name: 'test-workspace',
+                        index: 0,
+                    },
+                ],
                 getConfiguration: () => ({
                     get: () => undefined,
-                    update: () => Promise.resolve()
-                })
+                    update: () => Promise.resolve(),
+                }),
             },
             env: {
-                language: 'en'
+                language: 'en',
             },
             window: {
                 showInformationMessage: () => Promise.resolve(),
                 showErrorMessage: () => Promise.resolve(),
-                showWarningMessage: () => Promise.resolve()
+                showWarningMessage: () => Promise.resolve(),
             },
             Uri: {
                 file: (p: string) => ({ fsPath: p, scheme: 'file', path: p }),
-                parse: (p: string) => ({ fsPath: p, scheme: 'file', path: p })
+                parse: (p: string) => ({ fsPath: p, scheme: 'file', path: p }),
             },
             ExtensionMode: {
                 Production: 1,
                 Development: 2,
-                Test: 3
-            }
+                Test: 3,
+            },
         };
     }
     // eslint-disable-next-line prefer-rest-params
@@ -64,7 +66,7 @@ export async function run(): Promise<void> {
     const mocha = new Mocha({
         ui: 'bdd',
         color: true,
-        timeout: 10000
+        timeout: 10000,
     });
 
     const testsRoot = path.resolve(__dirname);

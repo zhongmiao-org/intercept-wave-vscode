@@ -5,6 +5,7 @@ This document describes the automated release process for Intercept Wave VSCode 
 ## Overview
 
 The release process is semi-automated using GitHub Actions:
+
 1. **Manual**: Update version and changelog
 2. **Automatic**: CI creates draft release with changelog
 3. **Manual**: Review and publish the draft release
@@ -15,14 +16,17 @@ The release process is semi-automated using GitHub Actions:
 ### 1. Prepare the Release
 
 #### Update Version Number
+
 Edit `package.json`:
+
 ```json
 {
-  "version": "1.0.6" 
+    "version": "1.0.6"
 }
 ```
 
 #### Update CHANGELOG.md
+
 Move changes from `[Unreleased]` to a new version section:
 
 ```markdown
@@ -37,19 +41,23 @@ Move changes from `[Unreleased]` to a new version section:
 ## [1.0.6] - 2025-01-XX
 
 ### Added
+
 - ✨ New feature description
 - 🎯 Another feature
 
 ### Improved
+
 - 🚀 Performance improvements
 
 ### Fixed
+
 - 🐛 Bug fixes
 ```
 
 **Important**: Keep the `[Unreleased]` section at the top with empty subsections for future changes!
 
 #### Commit and Push
+
 ```bash
 git add package.json CHANGELOG.md
 git commit -m "chore: bump version to 1.0.6"
@@ -64,9 +72,9 @@ Once you push to `main`, GitHub Actions will automatically:
 2. ✅ Build the extension
 3. ✅ Extract changelog content from `[1.0.6]` section
 4. ✅ Create a draft release with:
-   - Version: `v1.0.6` (from package.json)
-   - Title: `v1.0.6`
-   - Body: Content from `[1.0.6]` section in CHANGELOG.md
+    - Version: `v1.0.6` (from package.json)
+    - Title: `v1.0.6`
+    - Body: Content from `[1.0.6]` section in CHANGELOG.md
 
 **Workflow**: `.github/workflows/build.yml`
 
@@ -106,17 +114,21 @@ The CI workflow expects this format:
 ## [X.Y.Z] - YYYY-MM-DD
 
 ### Added
+
 - Feature 1
 - Feature 2
 
 ### Improved
+
 - Improvement 1
 
 ### Fixed
+
 - Bug fix 1
 ```
 
 **Key Points**:
+
 - Always keep `[Unreleased]` at the top
 - Use `## [X.Y.Z] - YYYY-MM-DD` format for versions
 - Include date for released versions
@@ -137,6 +149,7 @@ Follow [Semantic Versioning](https://semver.org/):
 **Issue**: No draft release after pushing to main
 
 **Solution**:
+
 - Check GitHub Actions tab for errors
 - Ensure you pushed to `main` branch
 - Verify `package.json` has updated version
@@ -146,6 +159,7 @@ Follow [Semantic Versioning](https://semver.org/):
 **Issue**: Draft release has default notes instead of changelog
 
 **Solution**:
+
 - Check CHANGELOG.md format matches expected pattern
 - Ensure version header uses `## [X.Y.Z]` format
 - Version in CHANGELOG should match package.json
@@ -155,6 +169,7 @@ Follow [Semantic Versioning](https://semver.org/):
 **Issue**: Release published but not on VS Code Marketplace
 
 **Solution**:
+
 - Check GitHub Actions logs for errors
 - Verify `VSCE_PAT` secret is valid
 - Ensure publisher name in package.json is correct (`Ark65`)
@@ -164,6 +179,7 @@ Follow [Semantic Versioning](https://semver.org/):
 **Issue**: Old draft releases accumulating
 
 **Solution**:
+
 - Old drafts are automatically deleted before creating new ones
 - You can manually delete old drafts from GitHub Releases page
 
@@ -198,33 +214,36 @@ After publishing a release:
 ## CI Workflows Summary
 
 ### Build Workflow (`.github/workflows/build.yml`)
+
 - **Trigger**: Push to `main` or Pull Request
 - **Actions**:
-  - Build and test
-  - Create draft release (main only)
+    - Build and test
+    - Create draft release (main only)
 - **Outputs**:
-  - Build artifacts
-  - Draft release with changelog
+    - Build artifacts
+    - Draft release with changelog
 
 ### Test Workflow (`.github/workflows/test.yml`)
+
 - **Trigger**: Push to `main`/`ark/*` or Pull Request
 - **Actions**:
-  - Run tests on multiple platforms
-  - Generate coverage reports
-  - Post coverage comments on PRs
+    - Run tests on multiple platforms
+    - Generate coverage reports
+    - Post coverage comments on PRs
 - **Outputs**:
-  - Test results
-  - Coverage reports to Codecov
+    - Test results
+    - Coverage reports to Codecov
 
 ### Release Workflow (`.github/workflows/release.yml`)
+
 - **Trigger**: Release published (not draft)
 - **Actions**:
-  - Compile extension
-  - Publish to VS Code Marketplace
-  - Attach .vsix to release
+    - Compile extension
+    - Publish to VS Code Marketplace
+    - Attach .vsix to release
 - **Outputs**:
-  - Published extension
-  - Release assets
+    - Published extension
+    - Release assets
 
 ## Tips
 

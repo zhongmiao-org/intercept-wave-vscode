@@ -3,7 +3,7 @@ import { expect, use } from 'chai';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import { SidebarProvider } from '../../providers';
-import { MockServerManager,ConfigManager } from '../../common';
+import { MockServerManager, ConfigManager } from '../../common';
 
 const sinonChai = require('sinon-chai');
 use(sinonChai);
@@ -26,7 +26,7 @@ describe('SidebarProvider', () => {
         // Mock vscode.l10n for tests
         if (!vscode.l10n) {
             (vscode as any).l10n = {
-                t: (key: string, ..._: any[]) => key
+                t: (key: string, ..._: any[]) => key,
             };
         } else if (!(vscode.l10n as any).t) {
             (vscode.l10n as any).t = (key: string, ..._: any[]) => key;
@@ -40,17 +40,19 @@ describe('SidebarProvider', () => {
         configManager = {
             getConfig: sandbox.stub().returns({
                 version: '2.0',
-                proxyGroups: [{
-                    id: 'test-group-id',
-                    name: 'Test Group',
-                    port: 8888,
-                    interceptPrefix: '/api',
-                    baseUrl: 'http://localhost:8080',
-                    stripPrefix: true,
-                    globalCookie: '',
-                    enabled: true,
-                    mockApis: []
-                }]
+                proxyGroups: [
+                    {
+                        id: 'test-group-id',
+                        name: 'Test Group',
+                        port: 8888,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: true,
+                        mockApis: [],
+                    },
+                ],
             }),
             saveConfig: sandbox.stub().resolves(),
             addMockApi: sandbox.stub().resolves(),
@@ -59,7 +61,7 @@ describe('SidebarProvider', () => {
             addProxyGroup: sandbox.stub().resolves(),
             removeProxyGroup: sandbox.stub().resolves(),
             updateProxyGroup: sandbox.stub().resolves(),
-            getConfigPath: sandbox.stub().returns('/fake/config/path')
+            getConfigPath: sandbox.stub().returns('/fake/config/path'),
         } as any;
 
         mockServerManager = {
@@ -68,7 +70,7 @@ describe('SidebarProvider', () => {
             startGroupById: sandbox.stub().resolves('http://localhost:8888 (Test Group)'),
             stopGroupById: sandbox.stub().resolves(),
             getStatus: sandbox.stub().returns(false),
-            getGroupStatus: sandbox.stub().returns(false)
+            getGroupStatus: sandbox.stub().returns(false),
         } as any;
 
         sidebarProvider = new SidebarProvider(extensionUri, mockServerManager, configManager);

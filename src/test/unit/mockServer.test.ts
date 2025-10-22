@@ -2,7 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect } from 'chai';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
-import { MockServerManager, MockConfig,ConfigManager } from '../../common';
+import { MockServerManager, MockConfig, ConfigManager } from '../../common';
 import * as http from 'http';
 
 describe('MockServerManager', () => {
@@ -13,17 +13,19 @@ describe('MockServerManager', () => {
 
     const defaultConfig: MockConfig = {
         version: '2.0',
-        proxyGroups: [{
-            id: 'test-group-id',
-            name: 'Test Group',
-            port: 9999,
-            interceptPrefix: '/api',
-            baseUrl: 'http://localhost:8080',
-            stripPrefix: true,
-            globalCookie: '',
-            enabled: true,
-            mockApis: []
-        }]
+        proxyGroups: [
+            {
+                id: 'test-group-id',
+                name: 'Test Group',
+                port: 9999,
+                interceptPrefix: '/api',
+                baseUrl: 'http://localhost:8080',
+                stripPrefix: true,
+                globalCookie: '',
+                enabled: true,
+                mockApis: [],
+            },
+        ],
     };
 
     beforeEach(() => {
@@ -31,7 +33,7 @@ describe('MockServerManager', () => {
         appendLineStub = sinon.stub();
         outputChannel = {
             appendLine: appendLineStub,
-            show: sinon.stub()
+            show: sinon.stub(),
         } as any;
 
         // Create config manager stub
@@ -41,7 +43,7 @@ describe('MockServerManager', () => {
             addMockApi: sinon.stub(),
             removeMockApi: sinon.stub(),
             updateMockApi: sinon.stub(),
-            getConfigPath: sinon.stub()
+            getConfigPath: sinon.stub(),
         } as any;
 
         mockServerManager = new MockServerManager(configManager, outputChannel);
@@ -98,7 +100,8 @@ describe('MockServerManager', () => {
             await mockServerManager.start();
             expect(appendLineStub.called).to.be.true;
             // In v2.0, log message includes "Mock servers started" (plural)
-            expect(appendLineStub.args.some((arg: any) => arg[0].includes('Mock server'))).to.be.true;
+            expect(appendLineStub.args.some((arg: any) => arg[0].includes('Mock server'))).to.be
+                .true;
         });
     });
 
@@ -138,23 +141,27 @@ describe('MockServerManager', () => {
         it('should handle GET requests', async () => {
             const config = {
                 ...defaultConfig,
-                proxyGroups: [{
-                    ...defaultConfig.proxyGroups[0],
-                    mockApis: [{
-                        path: '/test',
-                        enabled: true,
-                        mockData: '{"result": "success"}',
-                        method: 'GET',
-                        statusCode: 200
-                    }]
-                }]
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        mockApis: [
+                            {
+                                path: '/test',
+                                enabled: true,
+                                mockData: '{"result": "success"}',
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 
             await mockServerManager.start();
 
             const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-                const req = http.get('http://localhost:9999/test', (res) => {
+                const req = http.get('http://localhost:9999/test', res => {
                     resolve(res);
                 });
                 req.on('error', reject);
@@ -166,17 +173,21 @@ describe('MockServerManager', () => {
         it('should handle mock response with delay', async () => {
             const config = {
                 ...defaultConfig,
-                proxyGroups: [{
-                    ...defaultConfig.proxyGroups[0],
-                    mockApis: [{
-                        path: '/delayed',
-                        enabled: true,
-                        mockData: '{"result": "delayed"}',
-                        method: 'GET',
-                        statusCode: 200,
-                        delay: 100
-                    }]
-                }]
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        mockApis: [
+                            {
+                                path: '/delayed',
+                                enabled: true,
+                                mockData: '{"result": "delayed"}',
+                                method: 'GET',
+                                statusCode: 200,
+                                delay: 100,
+                            },
+                        ],
+                    },
+                ],
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 
@@ -184,7 +195,7 @@ describe('MockServerManager', () => {
 
             const startTime = Date.now();
             const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-                const req = http.get('http://localhost:9999/delayed', (res) => {
+                const req = http.get('http://localhost:9999/delayed', res => {
                     resolve(res);
                 });
                 req.on('error', reject);
@@ -198,25 +209,29 @@ describe('MockServerManager', () => {
         it('should handle mock response with cookie', async () => {
             const config = {
                 ...defaultConfig,
-                proxyGroups: [{
-                    ...defaultConfig.proxyGroups[0],
-                    globalCookie: 'session=abc123',
-                    mockApis: [{
-                        path: '/with-cookie',
-                        enabled: true,
-                        mockData: '{"result": "with cookie"}',
-                        method: 'GET',
-                        statusCode: 200,
-                        useCookie: true
-                    }]
-                }]
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        globalCookie: 'session=abc123',
+                        mockApis: [
+                            {
+                                path: '/with-cookie',
+                                enabled: true,
+                                mockData: '{"result": "with cookie"}',
+                                method: 'GET',
+                                statusCode: 200,
+                                useCookie: true,
+                            },
+                        ],
+                    },
+                ],
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 
             await mockServerManager.start();
 
             const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-                const req = http.get('http://localhost:9999/with-cookie', (res) => {
+                const req = http.get('http://localhost:9999/with-cookie', res => {
                     resolve(res);
                 });
                 req.on('error', reject);
@@ -229,23 +244,27 @@ describe('MockServerManager', () => {
         it('should handle path with query parameters', async () => {
             const config = {
                 ...defaultConfig,
-                proxyGroups: [{
-                    ...defaultConfig.proxyGroups[0],
-                    mockApis: [{
-                        path: '/users',
-                        enabled: true,
-                        mockData: '{"users": []}',
-                        method: 'GET',
-                        statusCode: 200
-                    }]
-                }]
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        mockApis: [
+                            {
+                                path: '/users',
+                                enabled: true,
+                                mockData: '{"users": []}',
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 
             await mockServerManager.start();
 
             const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-                const req = http.get('http://localhost:9999/users?page=1&limit=10', (res) => {
+                const req = http.get('http://localhost:9999/users?page=1&limit=10', res => {
                     resolve(res);
                 });
                 req.on('error', reject);
@@ -257,25 +276,29 @@ describe('MockServerManager', () => {
         it('should strip prefix when matching paths', async () => {
             const config = {
                 ...defaultConfig,
-                proxyGroups: [{
-                    ...defaultConfig.proxyGroups[0],
-                    stripPrefix: true,
-                    interceptPrefix: '/api',
-                    mockApis: [{
-                        path: '/test',
-                        enabled: true,
-                        mockData: '{"result": "stripped"}',
-                        method: 'GET',
-                        statusCode: 200
-                    }]
-                }]
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        stripPrefix: true,
+                        interceptPrefix: '/api',
+                        mockApis: [
+                            {
+                                path: '/test',
+                                enabled: true,
+                                mockData: '{"result": "stripped"}',
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 
             await mockServerManager.start();
 
             const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-                const req = http.get('http://localhost:9999/api/test', (res) => {
+                const req = http.get('http://localhost:9999/api/test', res => {
                     resolve(res);
                 });
                 req.on('error', reject);
@@ -287,33 +310,40 @@ describe('MockServerManager', () => {
         it('should handle POST requests', async () => {
             const config = {
                 ...defaultConfig,
-                proxyGroups: [{
-                    ...defaultConfig.proxyGroups[0],
-                    mockApis: [{
-                        path: '/create',
-                        enabled: true,
-                        mockData: '{"id": 123}',
-                        method: 'POST',
-                        statusCode: 201
-                    }]
-                }]
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        mockApis: [
+                            {
+                                path: '/create',
+                                enabled: true,
+                                mockData: '{"id": 123}',
+                                method: 'POST',
+                                statusCode: 201,
+                            },
+                        ],
+                    },
+                ],
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 
             await mockServerManager.start();
 
             const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-                const req = http.request({
-                    hostname: 'localhost',
-                    port: 9999,
-                    path: '/create',
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
+                const req = http.request(
+                    {
+                        hostname: 'localhost',
+                        port: 9999,
+                        path: '/create',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    },
+                    res => {
+                        resolve(res);
                     }
-                }, (res) => {
-                    resolve(res);
-                });
+                );
                 req.on('error', reject);
                 req.write('{"name": "test"}');
                 req.end();
@@ -325,17 +355,21 @@ describe('MockServerManager', () => {
         it('should handle disabled mock APIs by forwarding', async () => {
             const config = {
                 ...defaultConfig,
-                proxyGroups: [{
-                    ...defaultConfig.proxyGroups[0],
-                    baseUrl: 'http://localhost:9998', // Non-existent server
-                    mockApis: [{
-                        path: '/disabled',
-                        enabled: false,
-                        mockData: '{"result": "should not return this"}',
-                        method: 'GET',
-                        statusCode: 200
-                    }]
-                }]
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        baseUrl: 'http://localhost:9998', // Non-existent server
+                        mockApis: [
+                            {
+                                path: '/disabled',
+                                enabled: false,
+                                mockData: '{"result": "should not return this"}',
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 
@@ -343,7 +377,7 @@ describe('MockServerManager', () => {
 
             // This should attempt to forward and fail (502)
             const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-                const req = http.get('http://localhost:9999/disabled', (res) => {
+                const req = http.get('http://localhost:9999/disabled', res => {
                     resolve(res);
                 });
                 req.on('error', reject);
@@ -356,38 +390,42 @@ describe('MockServerManager', () => {
         it('should return welcome page with correct data structure', async () => {
             const config = {
                 ...defaultConfig,
-                proxyGroups: [{
-                    ...defaultConfig.proxyGroups[0],
-                    mockApis: [
-                        {
-                            path: '/test1',
-                            enabled: true,
-                            mockData: '{}',
-                            method: 'GET',
-                            statusCode: 200
-                        },
-                        {
-                            path: '/test2',
-                            enabled: false,
-                            mockData: '{}',
-                            method: 'POST',
-                            statusCode: 200
-                        }
-                    ]
-                }]
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        mockApis: [
+                            {
+                                path: '/test1',
+                                enabled: true,
+                                mockData: '{}',
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                            {
+                                path: '/test2',
+                                enabled: false,
+                                mockData: '{}',
+                                method: 'POST',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 
             await mockServerManager.start();
 
-            const response = await new Promise<{res: http.IncomingMessage, body: string}>((resolve, reject) => {
-                const req = http.get('http://localhost:9999/', (res) => {
-                    let body = '';
-                    res.on('data', chunk => body += chunk);
-                    res.on('end', () => resolve({ res, body }));
-                });
-                req.on('error', reject);
-            });
+            const response = await new Promise<{ res: http.IncomingMessage; body: string }>(
+                (resolve, reject) => {
+                    const req = http.get('http://localhost:9999/', res => {
+                        let body = '';
+                        res.on('data', chunk => (body += chunk));
+                        res.on('end', () => resolve({ res, body }));
+                    });
+                    req.on('error', reject);
+                }
+            );
 
             expect(response.res.statusCode).to.equal(200);
             const data = JSON.parse(response.body);
@@ -400,7 +438,7 @@ describe('MockServerManager', () => {
             await mockServerManager.start();
 
             const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-                const req = http.get('http://localhost:9999/', (res) => {
+                const req = http.get('http://localhost:9999/', res => {
                     resolve(res);
                 });
                 req.on('error', reject);
@@ -413,14 +451,17 @@ describe('MockServerManager', () => {
             await mockServerManager.start();
 
             const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-                const req = http.request({
-                    hostname: 'localhost',
-                    port: 9999,
-                    path: '/test',
-                    method: 'OPTIONS'
-                }, (res) => {
-                    resolve(res);
-                });
+                const req = http.request(
+                    {
+                        hostname: 'localhost',
+                        port: 9999,
+                        path: '/test',
+                        method: 'OPTIONS',
+                    },
+                    res => {
+                        resolve(res);
+                    }
+                );
                 req.on('error', reject);
                 req.end();
             });
@@ -432,17 +473,19 @@ describe('MockServerManager', () => {
         it('should handle requests to non-existent endpoints by forwarding', async () => {
             const config = {
                 ...defaultConfig,
-                proxyGroups: [{
-                    ...defaultConfig.proxyGroups[0],
-                    baseUrl: 'http://localhost:9998' // Non-existent server
-                }]
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        baseUrl: 'http://localhost:9998', // Non-existent server
+                    },
+                ],
             };
             (configManager.getConfig as sinon.SinonStub).returns(config);
 
             await mockServerManager.start();
 
             const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-                const req = http.get('http://localhost:9999/nonexistent', (res) => {
+                const req = http.get('http://localhost:9999/nonexistent', res => {
                     resolve(res);
                 });
                 req.on('error', reject);

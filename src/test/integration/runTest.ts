@@ -15,8 +15,8 @@ async function main() {
             extensionTestsPath,
             launchArgs: [
                 '--disable-extensions', // Disable other extensions
-                '--disable-workspace-trust' // Disable workspace trust dialog
-            ]
+                '--disable-workspace-trust', // Disable workspace trust dialog
+            ],
         });
     } catch (err) {
         console.error('Failed to run integration tests:', err);

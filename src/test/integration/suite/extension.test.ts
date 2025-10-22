@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import * as vscode from 'vscode';
 
 describe('Extension Integration Tests', () => {
-    before(async function() {
+    before(async function () {
         this.timeout(60000); // Extension activation can take time
 
         // Activate the extension

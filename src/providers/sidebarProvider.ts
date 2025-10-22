@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { MockServerManager, ProxyGroup,ConfigManager,TemplateLoader } from '../common';
+import { MockServerManager, ProxyGroup, ConfigManager, TemplateLoader } from '../common';
 import { v4 as uuidv4 } from 'uuid';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
@@ -25,7 +25,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         try {
             webviewView.webview.options = {
                 enableScripts: true,
-                localResourceRoots: [this.extensionUri]
+                localResourceRoots: [this.extensionUri],
             };
             console.log('[SidebarProvider] Webview options set');
 
@@ -123,7 +123,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
             if (group) {
                 const serverInfo = `${group.name}(:${group.port})`;
-                vscode.window.showInformationMessage(vscode.l10n.t('success.groupStopped', serverInfo));
+                vscode.window.showInformationMessage(
+                    vscode.l10n.t('success.groupStopped', serverInfo)
+                );
             } else {
                 vscode.window.showInformationMessage(vscode.l10n.t('success.serversStopped'));
             }
@@ -151,7 +153,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             baseUrl: data.baseUrl,
             stripPrefix: data.stripPrefix,
             globalCookie: data.globalCookie,
-            mockApis: []
+            mockApis: [],
         };
 
         await this.configManager.addProxyGroup(newGroup);
@@ -268,7 +270,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 config,
                 activeGroupId: this.activeGroupId || config.proxyGroups[0]?.id,
                 isRunning: this.mockServerManager.getStatus(),
-                groupStatuses
+                groupStatuses,
             });
         }
     }
@@ -370,7 +372,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             baseUrlPlaceholder: vscode.l10n.t('ui.baseUrlPlaceholder'),
             pathPlaceholder: vscode.l10n.t('ui.pathPlaceholder'),
             responsePlaceholder: vscode.l10n.t('ui.responsePlaceholder'),
-            globalCookiePlaceholder: vscode.l10n.t('ui.globalCookiePlaceholder')
+            globalCookiePlaceholder: vscode.l10n.t('ui.globalCookiePlaceholder'),
         };
 
         // Get status for each group
@@ -381,41 +383,41 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         const template = TemplateLoader.loadTemplate('sidebarView');
         const replacements = {
-            'CONFIG_JSON': JSON.stringify(config),
-            'ACTIVE_GROUP_ID': this.activeGroupId || '',
-            'IS_RUNNING': isRunning.toString(),
-            'GROUP_STATUSES_JSON': JSON.stringify(groupStatuses),
-            'I18N_JSON': JSON.stringify(i18n),
-            'VSCODE_ELEMENTS_URI': vscodeElementsUri.toString(),
-            'CODICONS_FONT_URI': codiconsFontUri.toString(),
-            'NONCE': nonce,
+            CONFIG_JSON: JSON.stringify(config),
+            ACTIVE_GROUP_ID: this.activeGroupId || '',
+            IS_RUNNING: isRunning.toString(),
+            GROUP_STATUSES_JSON: JSON.stringify(groupStatuses),
+            I18N_JSON: JSON.stringify(i18n),
+            VSCODE_ELEMENTS_URI: vscodeElementsUri.toString(),
+            CODICONS_FONT_URI: codiconsFontUri.toString(),
+            NONCE: nonce,
 
             // Static placeholders for HTML
-            'I18N_START_ALL': i18n.startAll,
-            'I18N_STOP_ALL': i18n.stopAll,
-            'I18N_ADD_PROXY_GROUP': i18n.addProxyGroup,
-            'I18N_GROUP_NAME': i18n.groupName,
-            'I18N_GROUP_NAME_PLACEHOLDER': i18n.groupNamePlaceholder,
-            'I18N_ENABLED': i18n.enabled,
-            'I18N_PORT': i18n.port,
-            'I18N_INTERCEPT_PREFIX': i18n.interceptPrefix,
-            'I18N_BASE_URL': i18n.baseUrl,
-            'I18N_BASE_URL_PLACEHOLDER': i18n.baseUrlPlaceholder,
-            'I18N_STRIP_PREFIX': i18n.stripPrefix,
-            'I18N_GLOBAL_COOKIE': i18n.globalCookie,
-            'I18N_GLOBAL_COOKIE_PLACEHOLDER': i18n.globalCookiePlaceholder,
-            'I18N_SAVE': i18n.save,
-            'I18N_CANCEL': i18n.cancel,
-            'I18N_ADD_MOCK_API': i18n.addMockApi,
-            'I18N_METHOD': i18n.method,
-            'I18N_PATH': i18n.path,
-            'I18N_PATH_PLACEHOLDER': i18n.pathPlaceholder,
-            'I18N_STATUS_CODE': i18n.statusCode,
-            'I18N_RESPONSE_BODY': i18n.responseBody,
-            'I18N_RESPONSE_PLACEHOLDER': i18n.responsePlaceholder,
-            'I18N_FORMAT': i18n.format,
-            'I18N_VALIDATE': i18n.validate,
-            'I18N_DELAY': i18n.delay
+            I18N_START_ALL: i18n.startAll,
+            I18N_STOP_ALL: i18n.stopAll,
+            I18N_ADD_PROXY_GROUP: i18n.addProxyGroup,
+            I18N_GROUP_NAME: i18n.groupName,
+            I18N_GROUP_NAME_PLACEHOLDER: i18n.groupNamePlaceholder,
+            I18N_ENABLED: i18n.enabled,
+            I18N_PORT: i18n.port,
+            I18N_INTERCEPT_PREFIX: i18n.interceptPrefix,
+            I18N_BASE_URL: i18n.baseUrl,
+            I18N_BASE_URL_PLACEHOLDER: i18n.baseUrlPlaceholder,
+            I18N_STRIP_PREFIX: i18n.stripPrefix,
+            I18N_GLOBAL_COOKIE: i18n.globalCookie,
+            I18N_GLOBAL_COOKIE_PLACEHOLDER: i18n.globalCookiePlaceholder,
+            I18N_SAVE: i18n.save,
+            I18N_CANCEL: i18n.cancel,
+            I18N_ADD_MOCK_API: i18n.addMockApi,
+            I18N_METHOD: i18n.method,
+            I18N_PATH: i18n.path,
+            I18N_PATH_PLACEHOLDER: i18n.pathPlaceholder,
+            I18N_STATUS_CODE: i18n.statusCode,
+            I18N_RESPONSE_BODY: i18n.responseBody,
+            I18N_RESPONSE_PLACEHOLDER: i18n.responsePlaceholder,
+            I18N_FORMAT: i18n.format,
+            I18N_VALIDATE: i18n.validate,
+            I18N_DELAY: i18n.delay,
         };
 
         return TemplateLoader.replacePlaceholders(template, replacements);
@@ -435,8 +437,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         // Check for port conflicts
         const config = this.configManager.getConfig();
-        const conflictingGroup = config.proxyGroups.find(g =>
-            g.port === port && g.id !== editingGroupId
+        const conflictingGroup = config.proxyGroups.find(
+            g => g.port === port && g.id !== editingGroupId
         );
 
         if (conflictingGroup) {

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { MockServerManager,ConfigManager,TemplateLoader } from './common';
+import { MockServerManager, ConfigManager, TemplateLoader } from './common';
 import { SidebarProvider } from './providers';
 let mockServerManager: MockServerManager;
 let configManager: ConfigManager;
@@ -14,7 +14,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Check if workspace folder exists
     if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
-        outputChannel.appendLine('⚠ No workspace folder found. Extension requires a workspace to activate.');
+        outputChannel.appendLine(
+            '⚠ No workspace folder found. Extension requires a workspace to activate.'
+        );
         outputChannel.appendLine('=== Activation skipped ===');
 
         // Register a placeholder view provider that shows a message
@@ -26,17 +28,17 @@ export function activate(context: vscode.ExtensionContext) {
                 const message = vscode.l10n.t('noWorkspace.message');
 
                 webviewView.webview.options = {
-                    enableScripts: true
+                    enableScripts: true,
                 };
 
                 const template = TemplateLoader.loadTemplate('noWorkspaceView');
                 webviewView.webview.html = TemplateLoader.replacePlaceholders(template, {
-                    'TITLE': title,
-                    'MESSAGE': message
+                    TITLE: title,
+                    MESSAGE: message,
                 });
 
                 outputChannel.appendLine('[EmptyProvider] HTML set successfully');
-            }
+            },
         };
 
         context.subscriptions.push(
@@ -56,14 +58,18 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine('✓ MockServerManager initialized');
 
         // Register sidebar provider
-        const sidebarProvider = new SidebarProvider(context.extensionUri, mockServerManager, configManager);
+        const sidebarProvider = new SidebarProvider(
+            context.extensionUri,
+            mockServerManager,
+            configManager
+        );
         outputChannel.appendLine('✓ SidebarProvider created');
 
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider('interceptWaveView', sidebarProvider, {
                 webviewOptions: {
-                    retainContextWhenHidden: true
-                }
+                    retainContextWhenHidden: true,
+                },
             })
         );
         outputChannel.appendLine('✓ WebviewViewProvider registered for: interceptWaveView');
@@ -99,7 +105,6 @@ export function activate(context: vscode.ExtensionContext) {
             }
         })
     );
-
 
     context.subscriptions.push(
         vscode.commands.registerCommand('interceptWave.openConfig', async () => {

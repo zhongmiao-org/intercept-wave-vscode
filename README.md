@@ -1,17 +1,18 @@
 <div align="center">
   <img src="resources/logo.png" alt="Intercept Wave Logo" width="128" height="128">
 
-  # Intercept Wave for VSCode
+# Intercept Wave for VSCode
 
-  [![Version](https://vsmarketplacebadges.dev/version-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Installs](https://vsmarketplacebadges.dev/installs-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Downloads](https://vsmarketplacebadges.dev/downloads-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Rating](https://vsmarketplacebadges.dev/rating-star/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
-  [![Test](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml/badge.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml)
-  [![codecov](https://codecov.io/gh/zhongmiao-org/intercept-wave-vscode/branch/main/graph/badge.svg)](https://app.codecov.io/gh/zhongmiao-org/intercept-wave-vscode)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/blob/main/LICENSE)
+[![Version](https://vsmarketplacebadges.dev/version-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+[![Downloads](https://vsmarketplacebadges.dev/downloads-short/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+[![Rating](https://vsmarketplacebadges.dev/rating-star/Ark65.intercept-wave.svg)](https://marketplace.visualstudio.com/items?itemName=Ark65.intercept-wave)
+[![Test](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml/badge.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/zhongmiao-org/intercept-wave-vscode/branch/main/graph/badge.svg)](https://app.codecov.io/gh/zhongmiao-org/intercept-wave-vscode)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/zhongmiao-org/intercept-wave-vscode/blob/main/LICENSE)
 
-  English | [简体中文](./README_zh.md)
+English | [简体中文](./README_zh.md)
+
 </div>
 
 A powerful VSCode extension that combines the proxy and interception capabilities similar to **Nginx** and **Charles**, designed specifically for local development environments. It intelligently intercepts HTTP requests, either returning custom mock data or acting as a proxy server to forward real requests to the original server with full HTTP headers.
@@ -27,12 +28,14 @@ A powerful VSCode extension that combines the proxy and interception capabilitie
 ## Features
 
 ### Smart Interception & Proxy
+
 - 🎯 Configure intercept prefix (e.g., `/api`) to precisely target specific request paths
 - 🔄 **With Mock Config**: Returns preset mock data for offline development
 - 🌐 **Without Mock Config**: Acts as a proxy server, forwarding requests with complete HTTP headers to get real data
 - 🔀 Smart path matching with prefix stripping support
 
 ### Developer-Friendly Features
+
 - 👥 **Target Users**: Frontend Engineers, QA Engineers, Full-Stack Developers
 - 🎨 Visual configuration UI within VSCode
 - 💾 Persistent configuration with workspace-level isolation
@@ -58,22 +61,25 @@ Or install from the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`).
 2. Use tabs at the top to switch between different proxy configuration groups
 3. Click the **+** button to add a new proxy group
 4. Right-click a tab or use the Settings button to:
-   - Edit group name and configuration
-   - Delete the group (at least one group must remain)
-   - Enable/disable the group
+    - Edit group name and configuration
+    - Delete the group (at least one group must remain)
+    - Enable/disable the group
 
 ### 2. Start Mock Server
 
 **Start All Enabled Groups**:
+
 - Click the "Start All" button to start all enabled proxy groups simultaneously
 - Each group will run on its configured port
 
 **Start Individual Group**:
+
 - Select the desired group tab
 - Click the "Start Server" button within that group
 - Only this specific group will start
 
 **Stop Servers**:
+
 - Click "Stop All" to stop all running servers
 - Or click "Stop Server" within a specific group to stop only that one
 
@@ -82,7 +88,9 @@ Or install from the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`).
 Click the "Configure" or Settings button to set up each group:
 
 #### Per-Group Configuration
+
 Each proxy group has independent settings:
+
 - **Group Name**: Descriptive name for this configuration (e.g., "User Service", "Dev Environment")
 - **Mock Port**: Port for this group's mock server (e.g., 8888, 8889)
 - **Intercept Prefix**: API path prefix to intercept (default: /api)
@@ -92,7 +100,9 @@ Each proxy group has independent settings:
 - **Enabled**: Whether this group should start when clicking "Start All"
 
 #### Mock API Configuration
+
 Add mock APIs to each group:
+
 - **Path**: e.g., `/user` (when stripPrefix is true) or `/api/user` (when false)
 - **HTTP Method**: ALL, GET, POST, PUT, DELETE, PATCH
 - **Status Code**: HTTP response status code (default: 200)
@@ -108,28 +118,32 @@ Add mock APIs to each group:
 Mock multiple microservices simultaneously, each service running on an independent port:
 
 **Proxy Group 1 - User Service (Port 8888)**:
+
 ```javascript
 // Frontend code for user service
 fetch('http://localhost:8888/api/user/info')
-  .then(res => res.json())
-  .then(data => console.log(data));
+    .then(res => res.json())
+    .then(data => console.log(data));
 ```
 
 **Configuration**:
+
 - Group Name: "User Service"
 - Port: 8888
 - Intercept Prefix: `/api`
 - Mock API: `/user/info` returns user data
 
 **Proxy Group 2 - Order Service (Port 8889)**:
+
 ```javascript
 // Frontend code for order service
 fetch('http://localhost:8889/order-api/orders')
-  .then(res => res.json())
-  .then(data => console.log(data));
+    .then(res => res.json())
+    .then(data => console.log(data));
 ```
 
 **Configuration**:
+
 - Group Name: "Order Service"
 - Port: 8889
 - Intercept Prefix: `/order-api`
@@ -152,23 +166,25 @@ Switch between environments by selecting different tabs, and start only the envi
 ```javascript
 // Frontend code
 fetch('http://localhost:8888/api/user/info')
-  .then(res => res.json())
-  .then(data => console.log(data));
+    .then(res => res.json())
+    .then(data => console.log(data));
 ```
 
 **Configuration**:
+
 - Path: `/user/info` (with stripPrefix enabled)
 - Method: `GET`
 - Mock Data:
+
 ```json
 {
-  "code": 0,
-  "data": {
-    "id": 1,
-    "name": "John Doe",
-    "email": "john@example.com"
-  },
-  "message": "success"
+    "code": 0,
+    "data": {
+        "id": 1,
+        "name": "John Doe",
+        "email": "john@example.com"
+    },
+    "message": "success"
 }
 ```
 
@@ -177,8 +193,8 @@ fetch('http://localhost:8888/api/user/info')
 ```javascript
 // This API has no mock configuration, will be forwarded to original server
 fetch('http://localhost:8888/api/posts')
-  .then(res => res.json())
-  .then(data => console.log(data));
+    .then(res => res.json())
+    .then(data => console.log(data));
 ```
 
 If the base URL is configured as `http://api.example.com`, the actual request will be: `http://api.example.com/api/posts`
@@ -217,51 +233,51 @@ All configurations are saved in the `.intercept-wave` folder in your workspace:
 
 ```json
 {
-  "version": "2.0",
-  "proxyGroups": [
-    {
-      "id": "550e8400-e29b-41d4-a716-446655440000",
-      "name": "User Service",
-      "enabled": true,
-      "port": 8888,
-      "interceptPrefix": "/api",
-      "baseUrl": "http://localhost:8080",
-      "stripPrefix": true,
-      "globalCookie": "sessionId=abc123; userId=456",
-      "mockApis": [
+    "version": "2.0",
+    "proxyGroups": [
         {
-          "path": "/user/info",
-          "enabled": true,
-          "mockData": "{\"code\":0,\"data\":{\"id\":1,\"name\":\"John\"}}",
-          "method": "GET",
-          "statusCode": 200,
-          "useCookie": true,
-          "delay": 0
-        }
-      ]
-    },
-    {
-      "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-      "name": "Order Service",
-      "enabled": true,
-      "port": 8889,
-      "interceptPrefix": "/order-api",
-      "baseUrl": "http://localhost:8081",
-      "stripPrefix": true,
-      "globalCookie": "",
-      "mockApis": [
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "name": "User Service",
+            "enabled": true,
+            "port": 8888,
+            "interceptPrefix": "/api",
+            "baseUrl": "http://localhost:8080",
+            "stripPrefix": true,
+            "globalCookie": "sessionId=abc123; userId=456",
+            "mockApis": [
+                {
+                    "path": "/user/info",
+                    "enabled": true,
+                    "mockData": "{\"code\":0,\"data\":{\"id\":1,\"name\":\"John\"}}",
+                    "method": "GET",
+                    "statusCode": 200,
+                    "useCookie": true,
+                    "delay": 0
+                }
+            ]
+        },
         {
-          "path": "/orders",
-          "enabled": true,
-          "mockData": "{\"code\":0,\"data\":[]}",
-          "method": "GET",
-          "statusCode": 200,
-          "useCookie": false,
-          "delay": 0
+            "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+            "name": "Order Service",
+            "enabled": true,
+            "port": 8889,
+            "interceptPrefix": "/order-api",
+            "baseUrl": "http://localhost:8081",
+            "stripPrefix": true,
+            "globalCookie": "",
+            "mockApis": [
+                {
+                    "path": "/orders",
+                    "enabled": true,
+                    "mockData": "{\"code\":0,\"data\":[]}",
+                    "method": "GET",
+                    "statusCode": 200,
+                    "useCookie": false,
+                    "delay": 0
+                }
+            ]
         }
-      ]
-    }
-  ]
+    ]
 }
 ```
 
@@ -270,6 +286,7 @@ All configurations are saved in the `.intercept-wave` folder in your workspace:
 When upgrading from v1.x to v2.0, your existing configuration will be automatically migrated:
 
 **Before (v1.x)**:
+
 ```json
 {
   "port": 8888,
@@ -280,6 +297,7 @@ When upgrading from v1.x to v2.0, your existing configuration will be automatica
 ```
 
 **After (v2.0)**:
+
 ```json
 {
   "version": "2.0",
@@ -314,6 +332,7 @@ Then check "Use Global Cookie" for mock APIs that need cookies, and the response
 ### CORS Support
 
 Mock server automatically adds the following CORS headers:
+
 ```
 Access-Control-Allow-Origin: *
 Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
@@ -323,6 +342,7 @@ Access-Control-Allow-Headers: Content-Type, Authorization
 ### Proxy Mode
 
 Unconfigured mock APIs will be automatically forwarded to the original server, preserving:
+
 - Original request headers
 - User-Agent
 - Request body (for POST/PUT, etc.)
@@ -337,34 +357,44 @@ Unconfigured mock APIs will be automatically forwarded to the original server, p
 ## FAQ
 
 ### Q: What to do if the server fails to start?
+
 A: Check if the port is occupied, you can change the port number in the configuration.
 
 ### Q: Why is my API not being mocked?
+
 A: Make sure the API path matches exactly and the mock configuration is enabled. Also check the stripPrefix setting.
 
 ### Q: How to view request logs?
+
 A: Open the VSCode Output panel and select "Intercept Wave" from the dropdown.
 
 ### Q: How does stripPrefix work?
+
 A: When enabled, the interceptPrefix is removed before matching. For example:
+
 - Request: `/api/user` with interceptPrefix `/api`
 - Match path: `/user`
 - So your mock API path should be configured as `/user`
 
 ### Q: How do I manage multiple proxy groups? (v2.0)
+
 A: Use the tab interface at the top of the sidebar:
+
 - Click the **+** button to add a new group
 - Click on tabs to switch between groups
 - Right-click a tab or use the Settings button to edit/delete groups
 - Each group runs independently on its own port
 
 ### Q: Can I run multiple proxy groups at the same time? (v2.0)
+
 A: Yes! You can either:
+
 - Click "Start All" to start all enabled groups simultaneously
 - Start individual groups one by one by selecting the tab and clicking "Start Server"
 - Mix both approaches - some groups started via "Start All", others started individually
 
 ### Q: What happens to my v1.x configuration after upgrading? (v2.0)
+
 A: Your configuration is automatically migrated to v2.0 format. Your old single-proxy setup becomes a new proxy group named "默认配置" (Default Configuration). All your existing mock APIs and settings are preserved.
 
 ## Feedback & Contribution

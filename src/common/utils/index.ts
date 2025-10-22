@@ -1,1 +1,1 @@
-export * from './templateLoader'
+export * from './templateLoader';

@@ -1,11 +1,69 @@
+# Development files
 .vscode/**
 .vscode-test/**
+.idea/**
 src/**
-.gitignore
-.yarnrc
-vsc-extension-quickstart.md
-**/tsconfig.json
-**/*.map
+scripts/**
+.github/**
+
+# Test files
+out/test/**
+coverage/**
+.nyc_output/**
+.c8rc.json
+.mocharc.json
+**/*.test.js
+**/*.spec.js
+
+# Source files (only include compiled output)
 **/*.ts
+!out/**/*.ts
+**/*.map
+
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/**
+.codecov.yml
+
+# Documentation
+*.md
+!README.md
+CHANGELOG.md
+CONTRIBUTING.md
+RELEASE_PROCESS.md
+TEST_SETUP_SUMMARY.md
+README_zh.md
+
+# Dependencies (devDependencies)
+node_modules/**/@types/**
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/*.test.js
+node_modules/**/*.spec.js
+node_modules/**/*.md
+node_modules/**/README*
+node_modules/**/CHANGELOG*
+node_modules/**/LICENSE*
+node_modules/**/.bin/**
+
+# Build files
+tsconfig.json
+.eslintrc.json
+.prettierrc.json
+.prettierignore
+vsc-extension-quickstart.md
+.yarnrc
+
+# Keep only necessary files
+!out/**/*.js
 !resources/**
 !l10n/**
+!package.json
+!package.nls.json
+!package.nls.zh-cn.json
+!README.md
+!LICENSE

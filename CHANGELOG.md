@@ -86,12 +86,20 @@ All notable changes to the "intercept-wave" extension will be documented in this
 - ⚡ **CI/CD Pipeline Refactoring**: Unified workflow for better visibility
     - **Unified CI Workflow**: Merged `build.yml` and `test.yml` into single `ci.yml`
     - **Clear Pipeline Stages**:
-        - PR: Multi-platform testing (Ubuntu, macOS, Windows) × Multi-version (Node 18, 20)
-        - PR: Coverage report with comparison to base branch
-        - Push to main: Build → Package → Create Draft Release
-    - **Better Resource Management**: Tests run in parallel, build only after all tests pass
-    - **Artifact Management**: Extension package uploaded and attached to draft releases
+        - Step 1: Build & Package (generates .vsix, runs on all events)
+        - Step 2: Multi-platform testing (Ubuntu, macOS, Windows) × Multi-version (Node 18, 20)
+        - Step 3: Upload Codecov (only Ubuntu 20.x)
+        - Step 4: PR Coverage report with comparison to base branch (only PRs)
+        - Step 5: Create Draft Release with .vsix attached (only push to main, after all tests pass)
+    - **Better Resource Management**: Build first, tests depend on build success, release depends on tests
+    - **Full Testing on Main Branch**: Push to main runs complete multi-platform test suite before creating release
+    - **Artifact Management**: Extension package (.vsix) available for download in PRs (30 days retention)
 - 🐛 **Extension Activation Fix**: Commands now properly register in integration test environment
+- 📦 **Package Optimization**: Improved `.vscodeignore` to exclude unnecessary files
+    - Excluded test files (`out/test/**`), IDE configs (`.idea/**`), CI files (`.github/**`)
+    - Excluded development documentation and build configs
+    - Reduced package size by excluding devDependencies metadata
+    - Added `.gitattributes` for consistent line endings across platforms
 
 ## [2.0.0]
 

@@ -224,11 +224,11 @@ jobs:
                         body: commentBody
                       });
 
-    # Create draft release (only on push to main)
+    # Create draft release (only on push to main, after all tests pass)
     release-draft:
         name: Create Release Draft
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        needs: build
+        needs: test
         runs-on: ubuntu-latest
         permissions:
             contents: write

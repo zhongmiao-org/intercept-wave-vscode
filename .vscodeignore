@@ -1,5 +1,6 @@
 # ============================================
 # Bundle Mode: Use esbuild to create single dist/extension.js
+# Webview dependencies copied to dist/webview/
 # ============================================
 
 # Exclude source files

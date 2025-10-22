@@ -284,28 +284,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             this.activeGroupId = config.proxyGroups[0].id;
         }
 
-        // Get URI for vscode-elements
+        // Get URI for vscode-elements (use dist/webview for bundled extension)
         const vscodeElementsUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(
-                this.extensionUri,
-                'node_modules',
-                '@vscode-elements',
-                'elements',
-                'dist',
-                'bundled.js'
-            )
+            vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'bundled.js')
         );
 
-        // Get URI for codicons font (CSS is inlined in HTML with proper font URI)
+        // Get URI for codicons font (use dist/webview for bundled extension)
         const codiconsFontUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(
-                this.extensionUri,
-                'node_modules',
-                '@vscode',
-                'codicons',
-                'dist',
-                'codicon.ttf'
-            )
+            vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'codicon.ttf')
         );
 
         // Generate nonce for CSP

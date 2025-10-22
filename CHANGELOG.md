@@ -4,6 +4,15 @@ All notable changes to the "intercept-wave" extension will be documented in this
 
 ## [Unreleased]
 
+### 🐛 Bug Fixes
+
+- 🔧 **Tab Switching Issue**: Fixed active tab automatically switching to tab1 when starting a different tab's server
+    - Added `setActiveGroup` message type to synchronize activeGroupId between frontend and backend
+    - Frontend now notifies backend when user switches tabs
+    - Backend maintains correct activeGroupId state across all operations
+- 🚀 **CI/CD Fix**: Removed .vsix file upload from draft release creation to prevent conflicts with manual releases
+
+## [2.1.0]
 ### 🧪 Testing & Quality
 
 - ✅ **Test Architecture Refactoring**: Separated unit tests from integration tests

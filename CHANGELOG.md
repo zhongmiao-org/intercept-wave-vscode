@@ -1,9 +1,16 @@
-# Change Log
-
-All notable changes to the "intercept-wave" extension will be documented in this file.
+# Intercept Wave For VSCode Changelog
 
 ## [Unreleased]
 
+### 🚀 CI/CD
+
+- 📝 Release workflow now patches `CHANGELOG.md` at the start of the publish job:
+  - 🔁 Replaces the top `## [Unreleased]` with `## [<current version>]` and inserts a new empty `## [Unreleased]` above it.
+  - 📰 Ensures the packaged extension and Marketplace listing include the correct versioned changelog.
+- 🤖 After a successful publish, the workflow checks out `main`, opens a PR with the changelog update, and enables auto-merge so `main` reflects the release notes only after publish succeeds.
+- 🔍 Qodana static analysis also runs on pushes to `main` (and manual runs on `main`) to provide main-branch reports in Qodana Cloud, in addition to PR scans.
+
+## [2.2.0]
 ### ✨ Features
 
 - 🌟 Mock API path wildcard matching

@@ -14,12 +14,31 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       # Check out the current repository at the release tag
       - name: Fetch Sources
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name }}
+
+      # Patch CHANGELOG at the very beginning so packaging includes the correct versioned section
+      - name: Patch Changelog (prepare package)
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_RAW="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION_RAW#v}"
+
+          echo "Patching CHANGELOG.md: [Unreleased] -> [$VERSION] and adding new [Unreleased] on top."
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VERSION" '
+              !done && $0 ~ /^## \[Unreleased\]\s*$/ { print "## [Unreleased]"; print ""; print "## [" ver "]"; done=1; next }
+              { print }
+            ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+          else
+            echo "CHANGELOG.md not found; skipping patch."
+          fi
 
       # Set up Node.js environment
       - name: Setup Node.js
@@ -59,3 +78,63 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload ${{ github.event.release.tag_name }} *.vsix
+
+      # After successful publish, update main branch changelog via PR with auto-merge
+      - name: Check out main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch Changelog on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_RAW="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION_RAW#v}"
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VERSION" '
+              !done && $0 ~ /^## \[Unreleased\]\s*$/ { print "## [Unreleased]"; print ""; print "## [" ver "]"; done=1; next }
+              { print }
+            ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+          else
+            echo "CHANGELOG.md not found; skipping patch."
+          fi
+
+      - name: Create PR for changelog update (auto-merge)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_RAW="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION_RAW#v}"
+          BRANCH="changelog/update-$VERSION"
+          LABEL="release changelog"
+
+          git switch -c "$BRANCH"
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+
+          git add CHANGELOG.md || true
+
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(changelog): update for $VERSION"
+            git push --set-upstream origin "$BRANCH"
+
+            gh label create "$LABEL" \
+              --description "Pull requests with release changelog update" \
+              --force \
+              || true
+
+            gh pr create \
+              --title "Changelog update - $VERSION" \
+              --body "This PR updates \`CHANGELOG.md\` replacing Unreleased with \`$VERSION\` and adds a new Unreleased section." \
+              --label "$LABEL" \
+              --base main \
+              --head "$BRANCH"
+
+            gh pr merge --auto --squash "$BRANCH" || true
+          else
+            echo "No changelog changes detected; skipping PR creation."
+          fi

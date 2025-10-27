@@ -48,7 +48,8 @@ jobs:
     # Qodana static analysis (only on PRs, after build)
     qodana:
         name: Qodana
-        if: github.event_name == 'pull_request'
+        # Run on PRs and also on push to main so Qodana Cloud has main reports
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
         needs: build
         runs-on: ubuntu-latest
         permissions:
@@ -58,7 +59,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
-                  ref: ${{ github.event.pull_request.head.sha }}
+                  ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
                   fetch-depth: 0
             - name: Qodana Scan
               uses: JetBrains/qodana-action@v2025.2

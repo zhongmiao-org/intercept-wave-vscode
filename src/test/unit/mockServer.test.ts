@@ -494,5 +494,45 @@ describe('MockServerManager', () => {
             // Should get 502 when forwarding fails
             expect(response.statusCode).to.equal(502);
         });
+
+        it('should return 503 when proxy group is disabled at request time', async () => {
+            // First config: group enabled for server start
+            const enabledConfig = {
+                ...defaultConfig,
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        enabled: true,
+                        mockApis: [],
+                    },
+                ],
+            };
+
+            // Second config: same group but disabled when handling request
+            const disabledConfig = {
+                ...defaultConfig,
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        enabled: false,
+                        mockApis: [],
+                    },
+                ],
+            };
+
+            const getConfigStub = configManager.getConfig as sinon.SinonStub;
+            getConfigStub.reset();
+            getConfigStub.onFirstCall().returns(enabledConfig); // start()
+            getConfigStub.onSecondCall().returns(disabledConfig); // request handler
+
+            await mockServerManager.start();
+
+            const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+                const req = http.get('http://localhost:9999/any', res => resolve(res));
+                req.on('error', reject);
+            });
+
+            expect(response.statusCode).to.equal(503);
+        });
     });
 });

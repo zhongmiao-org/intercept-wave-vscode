@@ -51,4 +51,19 @@ describe('Wildcard path matcher', () => {
         const chosenMethod = selectBestMockApiForRequest(apis3, '/a/b/1', 'POST');
         expect(chosenMethod?.method).to.equal('POST');
     });
+
+    it('returns false on literal segment mismatch', () => {
+        // Mismatch at literal segment triggers immediate false path
+        expect(matchPathPattern('/a/b/c', '/a/b/d').matched).to.be.false;
+    });
+
+    it('returns false when ** cannot satisfy following pattern', () => {
+        // Here ** has no segments to consume before needing to match trailing literal
+        expect(matchPathPattern('/**/d', '/a').matched).to.be.false;
+    });
+
+    it('returns false when remaining pattern is not a single trailing **', () => {
+        // Remaining pattern contains ** and another segment -> not allowed per matcher
+        expect(matchPathPattern('/a/**/d', '/a').matched).to.be.false;
+    });
 });

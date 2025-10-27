@@ -33,6 +33,13 @@ A powerful VSCode extension that combines the proxy and interception capabilitie
 - 🌐 **Without Mock Config**: Acts as a proxy server, forwarding requests with complete HTTP headers to get real data
 - 🔀 Smart path matching with prefix stripping support
 
+### Wildcard Path Matching
+
+- Single-segment `*`: `/a/b/*` matches `/a/b/123` (not `/a/b/123/456`)
+- Multi-segment `**`: `/a/b/**` matches `/a/b/123` and `/a/b/123/456` (not `/a/b`)
+- In-segment position: `/order/*/submit` matches `/order/123/submit`
+- Match priority: Exact path > fewer wildcards > method-specific (non-ALL) > longer pattern
+
 ### Developer-Friendly Features
 
 - 👥 **Target Users**: Frontend Engineers, QA Engineers, Full-Stack Developers
@@ -361,7 +368,7 @@ A: Check if the port is occupied, you can change the port number in the configur
 
 ### Q: Why is my API not being mocked?
 
-A: Make sure the API path matches exactly and the mock configuration is enabled. Also check the stripPrefix setting.
+A: Ensure one of your mock paths matches the request path (wildcards supported) and the mock configuration is enabled. Also check the stripPrefix setting.
 
 ### Q: How to view request logs?
 

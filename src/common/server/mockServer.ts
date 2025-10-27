@@ -3,6 +3,7 @@ import * as https from 'https';
 import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
+import { selectBestMockApiForRequest } from './pathMatcher';
 
 export interface MockApiConfig {
     path: string;
@@ -257,13 +258,8 @@ export class MockServerManager {
         // Strip query parameters from request path for matching
         const pathWithoutQuery = requestPath.split('?')[0];
 
-        return group.mockApis.find(api => {
-            return (
-                api.enabled &&
-                api.path === pathWithoutQuery &&
-                (api.method === 'ALL' || api.method.toUpperCase() === method.toUpperCase())
-            );
-        });
+        // Use wildcard-aware matcher with prioritization
+        return selectBestMockApiForRequest(group.mockApis, pathWithoutQuery, method);
     }
 
     private handleWelcomePage(res: http.ServerResponse, group: ProxyGroup): void {

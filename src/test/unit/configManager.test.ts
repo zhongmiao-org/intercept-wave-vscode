@@ -68,6 +68,33 @@ describe('ConfigManager', () => {
             fs.mkdirSync(configDir, { recursive: true });
             expect(fs.existsSync(configDir)).to.be.true;
         });
+
+        it('should migrate legacy config during construction when file exists', () => {
+            // Remove any existing config and write a legacy config before creating manager
+            if (fs.existsSync(configDir)) {
+                fs.rmSync(configDir, { recursive: true, force: true });
+            }
+            fs.mkdirSync(configDir, { recursive: true });
+
+            const legacyConfig = {
+                port: 9000,
+                interceptPrefix: '/legacy',
+                // No version, no proxyGroups -> legacy
+            } as any;
+            fs.writeFileSync(configPath, JSON.stringify(legacyConfig, null, 2), 'utf-8');
+
+            // Construct a new manager to trigger constructor migration path
+            const cm = new ConfigManager(mockContext);
+
+            // Read back file and verify migrated structure
+            const content = fs.readFileSync(cm.getConfigPath(), 'utf-8');
+            const migrated = JSON.parse(content);
+
+            expect(migrated.version).to.equal('2.0');
+            expect(Array.isArray(migrated.proxyGroups)).to.be.true;
+            expect(migrated.proxyGroups[0].port).to.equal(9000);
+            expect(migrated.proxyGroups[0].interceptPrefix).to.equal('/legacy');
+        });
     });
 
     describe('getConfigPath', () => {

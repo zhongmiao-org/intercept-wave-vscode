@@ -137,6 +137,133 @@ describe('MockServerManager', () => {
         });
     });
 
+    describe('startGroupById and stopGroupById', () => {
+        it('startGroupById throws when group not found', async () => {
+            const cfg = { version: '2.0', proxyGroups: [] } as MockConfig;
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+            try {
+                await mockServerManager.startGroupById('missing-id');
+                expect.fail('should have thrown');
+            } catch (err: any) {
+                expect(err.message).to.equal('Group not found: missing-id');
+            }
+        });
+
+        it('startGroupById throws when group disabled', async () => {
+            const cfg: MockConfig = {
+                version: '2.0',
+                proxyGroups: [
+                    {
+                        id: 'g1',
+                        name: 'G1',
+                        port: 10001,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: false,
+                        mockApis: [],
+                    },
+                ],
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+            try {
+                await mockServerManager.startGroupById('g1');
+                expect.fail('should have thrown');
+            } catch (err: any) {
+                expect(err.message).to.equal('Group is disabled: G1');
+            }
+        });
+
+        it('startGroupById throws when server already running', async () => {
+            const cfg: MockConfig = {
+                version: '2.0',
+                proxyGroups: [
+                    {
+                        id: 'g1',
+                        name: 'G1',
+                        port: 10001,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: true,
+                        mockApis: [],
+                    },
+                ],
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+            await mockServerManager.startGroupById('g1');
+            try {
+                await mockServerManager.startGroupById('g1');
+                expect.fail('should have thrown');
+            } catch (err: any) {
+                expect(err.message).to.equal('Server for group "G1" is already running');
+            }
+        });
+
+        it('startGroupById starts server and stopGroupById stops it', async () => {
+            const cfg: MockConfig = {
+                version: '2.0',
+                proxyGroups: [
+                    {
+                        id: 'g1',
+                        name: 'G1',
+                        port: 10001,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: true,
+                        mockApis: [],
+                    },
+                    {
+                        id: 'g2',
+                        name: 'G2',
+                        port: 10002,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: true,
+                        mockApis: [],
+                    },
+                ],
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+            // Start two groups
+            const url1 = await mockServerManager.startGroupById('g1');
+            expect(url1).to.equal('http://localhost:10001 (G1)');
+            const url2 = await mockServerManager.startGroupById('g2');
+            expect(url2).to.equal('http://localhost:10002 (G2)');
+            expect(mockServerManager.getStatus()).to.be.true;
+            expect(mockServerManager.getGroupStatus('g1')).to.be.true;
+            expect(mockServerManager.getGroupStatus('g2')).to.be.true;
+
+            // Stop only g1 -> server still running because g2 is on
+            await mockServerManager.stopGroupById('g1');
+            expect(mockServerManager.getGroupStatus('g1')).to.be.false;
+            expect(mockServerManager.getGroupStatus('g2')).to.be.true;
+            expect(mockServerManager.getStatus()).to.be.true;
+
+            // Stop g2 -> no servers left
+            await mockServerManager.stopGroupById('g2');
+            expect(mockServerManager.getGroupStatus('g2')).to.be.false;
+            expect(mockServerManager.getStatus()).to.be.false;
+        });
+
+        it('stopGroupById is no-op when group server not running', async () => {
+            // ensure no servers
+            await mockServerManager.stop();
+            // call with non-existing id must not throw
+            await mockServerManager.stopGroupById('unknown');
+            expect(mockServerManager.getStatus()).to.be.false;
+        });
+    });
     describe('request handling', () => {
         it('should handle GET requests', async () => {
             const config = {
@@ -493,6 +620,101 @@ describe('MockServerManager', () => {
 
             // Should get 502 when forwarding fails
             expect(response.statusCode).to.equal(502);
+        });
+
+        it('should proxy requests to upstream and copy headers', async () => {
+            // Start a simple upstream server to proxy to
+            const upstreamPort = 10080;
+            const upstreamServer = http.createServer((req, res) => {
+                res.statusCode = 201;
+                res.setHeader('Content-Type', 'text/plain');
+                res.setHeader('X-Test', 'abc');
+                res.end('hello world');
+            });
+
+            await new Promise<void>((resolve, reject) => {
+                upstreamServer.listen(upstreamPort, (err?: any) =>
+                    err ? reject(err) : resolve()
+                );
+            });
+
+            try {
+                const cfg = {
+                    ...defaultConfig,
+                    proxyGroups: [
+                        {
+                            ...defaultConfig.proxyGroups[0],
+                            baseUrl: `http://localhost:${upstreamPort}`,
+                            mockApis: [],
+                        },
+                    ],
+                } as MockConfig;
+                (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+                await mockServerManager.start();
+
+                const response = await new Promise<{ res: http.IncomingMessage; body: string }>(
+                    (resolve, reject) => {
+                        const req = http.get('http://localhost:9999/proxy', res => {
+                            let body = '';
+                            res.on('data', chunk => (body += chunk));
+                            res.on('end', () => resolve({ res, body }));
+                        });
+                        req.on('error', reject);
+                    }
+                );
+
+                expect(response.res.statusCode).to.equal(201);
+                // Header copied from upstream
+                expect(response.res.headers['x-test']).to.equal('abc');
+                // CORS headers added
+                expect(response.res.headers['access-control-allow-origin']).to.equal('*');
+                // Body proxied through
+                expect(response.body).to.equal('hello world');
+            } finally {
+                await new Promise<void>(resolve => upstreamServer.close(() => resolve()));
+            }
+        });
+
+        it('should return 503 when proxy group is disabled at request time', async () => {
+            // First config: group enabled for server start
+            const enabledConfig = {
+                ...defaultConfig,
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        enabled: true,
+                        mockApis: [],
+                    },
+                ],
+            };
+
+            // Second config: same group but disabled when handling request
+            const disabledConfig = {
+                ...defaultConfig,
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        enabled: false,
+                        mockApis: [],
+                    },
+                ],
+            };
+
+            const getConfigStub = configManager.getConfig as sinon.SinonStub;
+            getConfigStub.reset();
+            getConfigStub.onFirstCall().returns(enabledConfig); // start()
+            getConfigStub.onSecondCall().returns(disabledConfig); // request handler
+            getConfigStub.returns(disabledConfig); // subsequent calls (e.g., stop())
+
+            await mockServerManager.start();
+
+            const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+                const req = http.get('http://localhost:9999/any', res => resolve(res));
+                req.on('error', reject);
+            });
+
+            expect(response.statusCode).to.equal(503);
         });
     });
 });

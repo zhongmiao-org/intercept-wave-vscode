@@ -4,6 +4,14 @@ All notable changes to the "intercept-wave" extension will be documented in this
 
 ## [Unreleased]
 
+### ✨ Features
+
+- 🌟 Mock API path wildcard matching
+    - Single-segment `*`: e.g., `/a/b/*` matches `/a/b/123` (not `/a/b/123/456`)
+    - Multi-segment `**`: e.g., `/a/b/**` matches `/a/b/123` and `/a/b/123/456` (not `/a/b`)
+    - Segment wildcard position: e.g., `/order/*/submit` matches `/order/123/submit`
+    - Match priority: Exact path > fewer wildcards > method-specific (non-ALL) > longer pattern
+
 ## [2.1.1]
 ### 🐛 Bug Fixes
 

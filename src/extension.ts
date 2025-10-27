@@ -79,9 +79,11 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.commands.registerCommand('interceptWave.startServer', async () => {
                 try {
                     const url = await mockServerManager.start();
-                    vscode.window.showInformationMessage(vscode.l10n.t('server.started', url));
+                    void vscode.window.showInformationMessage(
+                        vscode.l10n.t('server.started', url)
+                    );
                 } catch (error: any) {
-                    vscode.window.showErrorMessage(
+                    void vscode.window.showErrorMessage(
                         vscode.l10n.t('server.startFailed', error.message)
                     );
                 }
@@ -92,9 +94,11 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.commands.registerCommand('interceptWave.stopServer', async () => {
                 try {
                     await mockServerManager.stop();
-                    vscode.window.showInformationMessage(vscode.l10n.t('server.stopped'));
+                    void vscode.window.showInformationMessage(
+                        vscode.l10n.t('server.stopped')
+                    );
                 } catch (error: any) {
-                    vscode.window.showErrorMessage(
+                    void vscode.window.showErrorMessage(
                         vscode.l10n.t('server.stopFailed', error.message)
                     );
                 }
@@ -116,13 +120,15 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`✗ Activation error: ${error.message}`);
         outputChannel.appendLine(`Stack: ${error.stack}`);
         outputChannel.show(true);
-        vscode.window.showErrorMessage(`Intercept Wave activation failed: ${error.message}`);
+        void vscode.window.showErrorMessage(
+            `Intercept Wave activation failed: ${error.message}`
+        );
         throw error;
     }
 }
 
-export function deactivate() {
+export async function deactivate() {
     if (mockServerManager) {
-        mockServerManager.stop();
+        await mockServerManager.stop();
     }
 }

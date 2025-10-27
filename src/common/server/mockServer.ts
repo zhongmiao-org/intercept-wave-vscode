@@ -3,6 +3,7 @@ import * as https from 'https';
 import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
+import { selectBestMockApiForRequest } from './pathMatcher';
 
 export interface MockApiConfig {
     path: string;
@@ -39,12 +40,12 @@ export interface MockConfig {
 }
 
 export class MockServerManager {
-    private servers: Map<string, http.Server> = new Map(); // groupId -> server
+    private readonly servers: Map<string, http.Server> = new Map(); // groupId -> server
     private isRunning: boolean = false;
 
     constructor(
-        private configManager: ConfigManager,
-        private outputChannel: vscode.OutputChannel
+        private readonly configManager: ConfigManager,
+        private readonly outputChannel: vscode.OutputChannel
     ) {}
 
     async start(): Promise<string> {
@@ -82,7 +83,7 @@ export class MockServerManager {
                 const currentConfig = this.configManager.getConfig();
                 const currentGroup = currentConfig.proxyGroups.find(g => g.id === group.id);
                 if (currentGroup && currentGroup.enabled) {
-                    this.handleRequest(req, res, currentGroup);
+                    void this.handleRequest(req, res, currentGroup);
                 } else {
                     this.sendErrorResponse(res, 503, 'Proxy group is disabled');
                 }
@@ -198,11 +199,11 @@ export class MockServerManager {
         }
     }
 
-    private handleRequest(
+    private async handleRequest(
         req: http.IncomingMessage,
         res: http.ServerResponse,
         group: ProxyGroup
-    ): void {
+    ): Promise<void> {
         const requestPath = req.url || '/';
         const method = req.method || 'GET';
 
@@ -232,7 +233,7 @@ export class MockServerManager {
 
         if (mockApi && mockApi.enabled) {
             // Use mock data
-            this.handleMockResponse(res, mockApi, group);
+            await this.handleMockResponse(res, mockApi, group);
         } else {
             // Forward to original server
             this.forwardToOriginalServer(req, res, group);
@@ -257,13 +258,8 @@ export class MockServerManager {
         // Strip query parameters from request path for matching
         const pathWithoutQuery = requestPath.split('?')[0];
 
-        return group.mockApis.find(api => {
-            return (
-                api.enabled &&
-                api.path === pathWithoutQuery &&
-                (api.method === 'ALL' || api.method.toUpperCase() === method.toUpperCase())
-            );
-        });
+        // Use wildcard-aware matcher with prioritization
+        return selectBestMockApiForRequest(group.mockApis, pathWithoutQuery, method);
     }
 
     private handleWelcomePage(res: http.ServerResponse, group: ProxyGroup): void {

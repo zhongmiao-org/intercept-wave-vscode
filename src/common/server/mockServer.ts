@@ -83,7 +83,7 @@ export class MockServerManager {
                 const currentConfig = this.configManager.getConfig();
                 const currentGroup = currentConfig.proxyGroups.find(g => g.id === group.id);
                 if (currentGroup && currentGroup.enabled) {
-                    this.handleRequest(req, res, currentGroup);
+                    void this.handleRequest(req, res, currentGroup);
                 } else {
                     this.sendErrorResponse(res, 503, 'Proxy group is disabled');
                 }
@@ -199,11 +199,11 @@ export class MockServerManager {
         }
     }
 
-    private handleRequest(
+    private async handleRequest(
         req: http.IncomingMessage,
         res: http.ServerResponse,
         group: ProxyGroup
-    ): void {
+    ): Promise<void> {
         const requestPath = req.url || '/';
         const method = req.method || 'GET';
 
@@ -233,7 +233,7 @@ export class MockServerManager {
 
         if (mockApi && mockApi.enabled) {
             // Use mock data
-            this.handleMockResponse(res, mockApi, group);
+            await this.handleMockResponse(res, mockApi, group);
         } else {
             // Forward to original server
             this.forwardToOriginalServer(req, res, group);

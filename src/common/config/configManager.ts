@@ -22,7 +22,7 @@ export class ConfigManager {
 
         // Initialize config if not exists
         if (!fs.existsSync(this.configPath)) {
-            this.saveConfig(this.getDefaultConfig());
+            void this.saveConfig(this.getDefaultConfig());
         } else {
             // Migrate old config to new format if needed
             this.migrateConfig();
@@ -72,7 +72,7 @@ export class ConfigManager {
             // Check if migration is needed
             if (!config.version || !config.proxyGroups) {
                 const migratedConfig = this.migrateFromLegacy(config);
-                this.saveConfig(migratedConfig);
+                void this.saveConfig(migratedConfig);
                 console.log('Configuration migrated to v2.0 successfully');
             }
         } catch (error) {

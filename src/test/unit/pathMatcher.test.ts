@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { matchPathPattern, selectBestMockApiForRequest } from '../../common/server/pathMatcher';
+import { matchPathPattern, selectBestMockApiForRequest } from '../../common';
 
 describe('Wildcard path matcher', () => {
     it('matches single-segment * correctly', () => {
@@ -17,7 +17,8 @@ describe('Wildcard path matcher', () => {
     });
 
     it('normalizes slashes consistently', () => {
-        expect(matchPathPattern('/a/b/*', '/a/b/123/').matched).to.be.false;
+        // Trailing slash should be normalized away
+        expect(matchPathPattern('/a/b/*', '/a/b/123/').matched).to.be.true;
         expect(matchPathPattern('/a/b/*', '/a/b/123').matched).to.be.true;
         expect(matchPathPattern('/a/b/**', '/a/b/123/').matched).to.be.true;
     });
@@ -51,4 +52,3 @@ describe('Wildcard path matcher', () => {
         expect(chosenMethod?.method).to.equal('POST');
     });
 });
-

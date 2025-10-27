@@ -16,3 +16,4 @@ coverage/
 src/test/**/.test-config/
 
 intercept-wave-*
+intercept-wave-*/

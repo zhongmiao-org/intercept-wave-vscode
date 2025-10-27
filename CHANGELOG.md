@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.2.1]
+
 ### 🚀 CI/CD
 
 - 📝 Release workflow now patches `CHANGELOG.md` at the start of the publish job:

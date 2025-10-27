@@ -37,7 +37,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             });
         } catch (error: any) {
             console.error('[SidebarProvider] Error in resolveWebviewView:', error);
-            vscode.window.showErrorMessage(`Failed to load Intercept Wave view: ${error.message}`);
+            void vscode.window.showErrorMessage(
+                `Failed to load Intercept Wave view: ${error.message}`
+            );
         }
     }
 
@@ -82,37 +84,47 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     break;
             }
         } catch (error: any) {
-            vscode.window.showErrorMessage(`Error: ${error.message}`);
+            void vscode.window.showErrorMessage(`Error: ${error.message}`);
         }
     }
 
     private async handleStartServer(_: vscode.WebviewView) {
         try {
             const url = await this.mockServerManager.start();
-            vscode.window.showInformationMessage(vscode.l10n.t('success.serversStarted', url));
-            this.refreshWebview();
+            void vscode.window.showInformationMessage(
+                vscode.l10n.t('success.serversStarted', url)
+            );
+            await this.refreshWebview();
         } catch (error: any) {
-            vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStart', error.message));
+            void vscode.window.showErrorMessage(
+                vscode.l10n.t('error.failedToStart', error.message)
+            );
         }
     }
 
     private async handleStopServer(_: vscode.WebviewView) {
         try {
             await this.mockServerManager.stop();
-            vscode.window.showInformationMessage(vscode.l10n.t('success.serversStopped'));
-            this.refreshWebview();
+            void vscode.window.showInformationMessage(vscode.l10n.t('success.serversStopped'));
+            await this.refreshWebview();
         } catch (error: any) {
-            vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStop', error.message));
+            void vscode.window.showErrorMessage(
+                vscode.l10n.t('error.failedToStop', error.message)
+            );
         }
     }
 
     private async handleStartGroup(groupId: string) {
         try {
             const url = await this.mockServerManager.startGroupById(groupId);
-            vscode.window.showInformationMessage(vscode.l10n.t('success.serversStarted', url));
-            this.refreshWebview();
+            void vscode.window.showInformationMessage(
+                vscode.l10n.t('success.serversStarted', url)
+            );
+            await this.refreshWebview();
         } catch (error: any) {
-            vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStart', error.message));
+            void vscode.window.showErrorMessage(
+                vscode.l10n.t('error.failedToStart', error.message)
+            );
         }
     }
 
@@ -126,16 +138,19 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
             if (group) {
                 const serverInfo = `${group.name}(:${group.port})`;
-                vscode.window.showInformationMessage(
+                void vscode.window.showInformationMessage(
                     vscode.l10n.t('success.groupStopped', serverInfo)
                 );
             } else {
-                vscode.window.showInformationMessage(vscode.l10n.t('success.serversStopped'));
+                void vscode.window.showInformationMessage(
+                    vscode.l10n.t('success.serversStopped')
+                );
             }
-
-            this.refreshWebview();
+            await this.refreshWebview();
         } catch (error: any) {
-            vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStop', error.message));
+            void vscode.window.showErrorMessage(
+                vscode.l10n.t('error.failedToStop', error.message)
+            );
         }
     }
 
@@ -143,7 +158,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         // Validate group data
         const validationError = this.validateGroupData(data);
         if (validationError) {
-            vscode.window.showErrorMessage(validationError);
+            void vscode.window.showErrorMessage(validationError);
             return;
         }
 
@@ -161,39 +176,43 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         await this.configManager.addProxyGroup(newGroup);
         this.activeGroupId = newGroup.id;
-        this.refreshWebview();
+        await this.refreshWebview();
 
         // Close form after success
         if (this.webviewView) {
-            this.webviewView.webview.postMessage({ type: 'closeGroupForm' });
+            await this.webviewView.webview.postMessage({ type: 'closeGroupForm' });
         }
 
-        vscode.window.showInformationMessage(vscode.l10n.t('success.groupAdded', newGroup.name));
+        void vscode.window.showInformationMessage(
+            vscode.l10n.t('success.groupAdded', newGroup.name)
+        );
     }
 
     private async handleUpdateGroup(groupId: string, data: any) {
         // Validate group data
         const validationError = this.validateGroupData(data, groupId);
         if (validationError) {
-            vscode.window.showErrorMessage(validationError);
+            void vscode.window.showErrorMessage(validationError);
             return;
         }
 
         await this.configManager.updateProxyGroup(groupId, data);
-        this.refreshWebview();
+        await this.refreshWebview();
 
         // Close form after success
         if (this.webviewView) {
-            this.webviewView.webview.postMessage({ type: 'closeGroupForm' });
+            await this.webviewView.webview.postMessage({ type: 'closeGroupForm' });
         }
 
-        vscode.window.showInformationMessage(vscode.l10n.t('success.groupUpdated'));
+        void vscode.window.showInformationMessage(vscode.l10n.t('success.groupUpdated'));
     }
 
     private async handleDeleteGroup(groupId: string) {
         const config = this.configManager.getConfig();
         if (config.proxyGroups.length <= 1) {
-            vscode.window.showWarningMessage(vscode.l10n.t('error.cannotDeleteLastGroup'));
+            void vscode.window.showWarningMessage(
+                vscode.l10n.t('error.cannotDeleteLastGroup')
+            );
             return;
         }
 
@@ -216,20 +235,20 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             this.activeGroupId = updatedConfig.proxyGroups[0].id;
         }
 
-        this.refreshWebview();
-        vscode.window.showInformationMessage(vscode.l10n.t('success.groupDeleted'));
+        await this.refreshWebview();
+        void vscode.window.showInformationMessage(vscode.l10n.t('success.groupDeleted'));
     }
 
     private async handleAddMock(groupId: string, data: any) {
         await this.configManager.addMockApi(groupId, data);
-        this.refreshWebview();
-        vscode.window.showInformationMessage(vscode.l10n.t('success.mockAdded'));
+        await this.refreshWebview();
+        void vscode.window.showInformationMessage(vscode.l10n.t('success.mockAdded'));
     }
 
     private async handleUpdateMock(groupId: string, index: number, data: any) {
         await this.configManager.updateMockApi(groupId, index, data);
-        this.refreshWebview();
-        vscode.window.showInformationMessage(vscode.l10n.t('success.mockUpdated'));
+        await this.refreshWebview();
+        void vscode.window.showInformationMessage(vscode.l10n.t('success.mockUpdated'));
     }
 
     private async handleDeleteMock(groupId: string, index: number) {
@@ -245,8 +264,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
 
         await this.configManager.removeMockApi(groupId, index);
-        this.refreshWebview();
-        vscode.window.showInformationMessage(vscode.l10n.t('success.mockDeleted'));
+        await this.refreshWebview();
+        void vscode.window.showInformationMessage(vscode.l10n.t('success.mockDeleted'));
     }
 
     private async handleToggleMock(groupId: string, index: number) {
@@ -255,11 +274,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         if (group && group.mockApis[index]) {
             group.mockApis[index].enabled = !group.mockApis[index].enabled;
             await this.configManager.saveConfig(config);
-            this.refreshWebview();
+            await this.refreshWebview();
         }
     }
 
-    private refreshWebview() {
+    private async refreshWebview() {
         if (this.webviewView) {
             const config = this.configManager.getConfig();
             // Get status for each group
@@ -268,7 +287,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 groupStatuses[group.id] = this.mockServerManager.getGroupStatus(group.id);
             });
 
-            this.webviewView.webview.postMessage({
+            await this.webviewView.webview.postMessage({
                 type: 'configUpdated',
                 config,
                 activeGroupId: this.activeGroupId || config.proxyGroups[0]?.id,

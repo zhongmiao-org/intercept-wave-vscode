@@ -40,12 +40,12 @@ export interface MockConfig {
 }
 
 export class MockServerManager {
-    private servers: Map<string, http.Server> = new Map(); // groupId -> server
+    private readonly servers: Map<string, http.Server> = new Map(); // groupId -> server
     private isRunning: boolean = false;
 
     constructor(
-        private configManager: ConfigManager,
-        private outputChannel: vscode.OutputChannel
+        private readonly configManager: ConfigManager,
+        private readonly outputChannel: vscode.OutputChannel
     ) {}
 
     async start(): Promise<string> {

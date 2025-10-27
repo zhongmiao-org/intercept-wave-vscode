@@ -5,9 +5,9 @@ import { MockConfig, ProxyGroup } from '../server';
 import { v4 as uuidv4 } from 'uuid';
 
 export class ConfigManager {
-    private configPath: string;
+    private readonly configPath: string;
 
-    constructor(private _: vscode.ExtensionContext) {
+    constructor(private readonly _: vscode.ExtensionContext) {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
             throw new Error('No workspace folder found');

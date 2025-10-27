@@ -8,8 +8,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     constructor(
         private readonly extensionUri: vscode.Uri,
-        private mockServerManager: MockServerManager,
-        private configManager: ConfigManager
+        private readonly mockServerManager: MockServerManager,
+        private readonly configManager: ConfigManager
     ) {
         console.log('[SidebarProvider] Constructor called');
     }

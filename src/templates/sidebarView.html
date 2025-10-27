@@ -355,12 +355,12 @@
     <script type="module" nonce="{{NONCE}}" src="{{VSCODE_ELEMENTS_URI}}"></script>
     <script nonce="{{NONCE}}">
         const vscode = acquireVsCodeApi();
-        let config = {{CONFIG_JSON}};
+        let config = {{CONFIG_JSON}}
         let activeGroupId = '{{ACTIVE_GROUP_ID}}';
         let editingMockIndex = -1;
         let editingGroupId = null;
-        const i18n = {{I18N_JSON}};
-        let groupStatuses = {{GROUP_STATUSES_JSON}}; // Track running status for each group
+        const i18n = {{I18N_JSON}}
+        let groupStatuses = {{GROUP_STATUSES_JSON}} // Track running status for each group
 
         // Initialize
         initializeGlobalControls();

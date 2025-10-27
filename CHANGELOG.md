@@ -4,6 +4,7 @@ All notable changes to the "intercept-wave" extension will be documented in this
 
 ## [Unreleased]
 
+## [2.1.1]
 ### 🐛 Bug Fixes
 
 - 🔧 **Tab Switching Issue**: Fixed active tab automatically switching to tab1 when starting a different tab's server

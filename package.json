@@ -2,7 +2,7 @@
     "name": "intercept-wave",
     "displayName": "%displayName%",
     "description": "%description%",
-    "version": "2.2.0",
+    "version": "2.1.2",
     "publisher": "Ark65",
     "icon": "resources/logo.png",
     "repository": {

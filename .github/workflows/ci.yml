@@ -45,6 +45,29 @@ jobs:
                   path: '*.vsix'
                   retention-days: 30
 
+    # Qodana static analysis (only on PRs, after build)
+    qodana:
+        name: Qodana
+        if: github.event_name == 'pull_request'
+        needs: build
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            pull-requests: write
+            checks: write
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.pull_request.head.sha }}
+                  fetch-depth: 0
+            - name: Qodana Scan
+              uses: JetBrains/qodana-action@v2025.2
+              with:
+                  pr-mode: false
+              env:
+                  QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+                  QODANA_ENDPOINT: https://qodana.cloud
+
     # Multi-platform testing (runs after build succeeds)
     test:
         name: Test (${{ matrix.os }}, Node ${{ matrix.node-version }})

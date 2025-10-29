@@ -4,6 +4,15 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../../common';
 
+function expectedVersion(): string {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) return '2.0';
+    const pkgPath = path.join(workspaceFolder.uri.fsPath, 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    const parts = (pkg.version as string).split('.');
+    return `${parts[0]}.${parts[1]}`;
+}
+
 describe('ConfigManager', () => {
     let configManager: ConfigManager;
     let configDir: string;
@@ -90,10 +99,53 @@ describe('ConfigManager', () => {
             const content = fs.readFileSync(cm.getConfigPath(), 'utf-8');
             const migrated = JSON.parse(content);
 
-            expect(migrated.version).to.equal('2.0');
+            expect(migrated.version).to.equal(expectedVersion());
             expect(Array.isArray(migrated.proxyGroups)).to.be.true;
             expect(migrated.proxyGroups[0].port).to.equal(9000);
             expect(migrated.proxyGroups[0].interceptPrefix).to.equal('/legacy');
+        });
+
+        it('should compact mockData strings for v2.0 config on startup', () => {
+            // Prepare a v2.0 config with pretty mockData
+            if (fs.existsSync(configDir)) {
+                fs.rmSync(configDir, { recursive: true, force: true });
+            }
+            fs.mkdirSync(configDir, { recursive: true });
+
+            const prettyMock = JSON.stringify({ a: 1, b: [1, 2, 3] }, null, 2);
+            const v2Config = {
+                version: '2.0',
+                proxyGroups: [
+                    {
+                        id: 'g1',
+                        name: 'G1',
+                        port: 12345,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: true,
+                        mockApis: [
+                            {
+                                path: '/x',
+                                enabled: true,
+                                mockData: prettyMock,
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
+            } as any;
+            fs.writeFileSync(configPath, JSON.stringify(v2Config, null, 2), 'utf-8');
+
+            // Construct a new manager to trigger normalization
+            const cm = new ConfigManager(mockContext);
+
+            const saved = JSON.parse(fs.readFileSync(cm.getConfigPath(), 'utf-8'));
+            const savedMock = saved.proxyGroups[0].mockApis[0].mockData as string;
+            // Should be compact (no spaces/newlines except inside string literals)
+            expect(savedMock).to.equal(JSON.stringify({ a: 1, b: [1, 2, 3] }));
         });
     });
 
@@ -108,7 +160,7 @@ describe('ConfigManager', () => {
         it('should return default config for new installation', () => {
             const config = configManager.getConfig();
 
-            expect(config.version).to.equal('2.0');
+            expect(config.version).to.equal(expectedVersion());
             expect(Array.isArray(config.proxyGroups)).to.be.true;
             expect(config.proxyGroups.length).to.equal(1);
 
@@ -133,7 +185,7 @@ describe('ConfigManager', () => {
             const config = configManager.getConfig();
 
             // Should migrate to v2.0 format
-            expect(config.version).to.equal('2.0');
+            expect(config.version).to.equal(expectedVersion());
             expect(Array.isArray(config.proxyGroups)).to.be.true;
             expect(config.proxyGroups.length).to.equal(1);
             expect(config.proxyGroups[0].port).to.equal(9999);
@@ -153,7 +205,7 @@ describe('ConfigManager', () => {
             const config = configManager.getConfig();
 
             // Should migrate and fix invalid mockApis
-            expect(config.version).to.equal('2.0');
+            expect(config.version).to.equal(expectedVersion());
             expect(Array.isArray(config.proxyGroups)).to.be.true;
             expect(Array.isArray(config.proxyGroups[0].mockApis)).to.be.true;
             expect(config.proxyGroups[0].mockApis.length).to.equal(0);
@@ -164,7 +216,7 @@ describe('ConfigManager', () => {
 
             const config = configManager.getConfig();
 
-            expect(config.version).to.equal('2.0');
+            expect(config.version).to.equal(expectedVersion());
             expect(Array.isArray(config.proxyGroups)).to.be.true;
             expect(config.proxyGroups[0].port).to.equal(8888);
             expect(config.proxyGroups[0].interceptPrefix).to.equal('/api');
@@ -177,7 +229,7 @@ describe('ConfigManager', () => {
 
             const config = configManager.getConfig();
 
-            expect(config.version).to.equal('2.0');
+            expect(config.version).to.equal(expectedVersion());
             expect(Array.isArray(config.proxyGroups)).to.be.true;
             expect(config.proxyGroups[0].port).to.equal(8888);
             expect(Array.isArray(config.proxyGroups[0].mockApis)).to.be.true;
@@ -187,7 +239,7 @@ describe('ConfigManager', () => {
     describe('saveConfig', () => {
         it('should save config to file', async () => {
             const testConfig = {
-                version: '2.0',
+                version: expectedVersion(),
                 proxyGroups: [
                     {
                         id: 'test-id',
@@ -213,7 +265,7 @@ describe('ConfigManager', () => {
 
         it('should format JSON with proper indentation', async () => {
             const testConfig = {
-                version: '2.0',
+                version: expectedVersion(),
                 proxyGroups: [
                     {
                         id: 'test-id',

@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { MockConfig, ProxyGroup } from '../server';
-import { v4 as uuidv4 } from 'uuid';
+import {MockConfig, ProxyGroup} from '../server';
+import * as pkg from '../../../package.json';
+import {v4 as uuidv4} from 'uuid';
 
 export class ConfigManager {
     private readonly configPath: string;
@@ -27,6 +28,23 @@ export class ConfigManager {
             // Migrate old config to new format if needed
             this.migrateConfig();
         }
+
+        // Ensure v2 config compatibility and normalization (e.g., compact mockData)
+        this.normalizeV2Config();
+    }
+
+    private getTargetVersion(): string {
+        try {
+            const full = (pkg as any).version as string;
+            const parts = full.split('.');
+            if (parts.length >= 2) {
+                return `${parts[0]}.${parts[1]}`;
+            }
+        } catch (_) {
+            // ignore
+        }
+        // fallback
+        return '2.0';
     }
 
     getConfigPath(): string {
@@ -44,6 +62,13 @@ export class ConfigManager {
                     return this.migrateFromLegacy(config);
                 }
 
+                // Update version to current major.minor when loading
+                const targetVersion = this.getTargetVersion();
+                if (config.version !== targetVersion) {
+                    config.version = targetVersion;
+                    void this.saveConfig(config);
+                }
+
                 return config;
             }
         } catch (error) {
@@ -55,6 +80,9 @@ export class ConfigManager {
 
     async saveConfig(config: MockConfig): Promise<void> {
         try {
+            // Ensure version is updated on any save/format
+            config.version = this.getTargetVersion();
+
             const content = JSON.stringify(config, null, 4);
             fs.writeFileSync(this.configPath, content, 'utf-8');
             console.log('Configuration saved successfully');
@@ -80,6 +108,144 @@ export class ConfigManager {
         }
     }
 
+    // Normalize v2 config: compact mockData JSON strings to minified form
+    private normalizeV2Config(): void {
+        const parseJsonSmart = (raw: string) => {
+            const stripComments = (input: string) => {
+                let out = '';
+                let i = 0;
+                let inSingle = false,
+                    inDouble = false,
+                    inTemplate = false,
+                    inLineComment = false,
+                    inBlockComment = false;
+                while (i < input.length) {
+                    const ch = input[i];
+                    const next = input[i + 1];
+                    if (inLineComment) {
+                        if (ch === '\n') {
+                            inLineComment = false;
+                            out += ch;
+                        }
+                        i++;
+                        continue;
+                    }
+                    if (inBlockComment) {
+                        if (ch === '*' && next === '/') {
+                            inBlockComment = false;
+                            i += 2;
+                            continue;
+                        }
+                        i++;
+                        continue;
+                    }
+                    if (!inSingle && !inDouble && !inTemplate) {
+                        if (ch === '/' && next === '/') {
+                            inLineComment = true;
+                            i += 2;
+                            continue;
+                        }
+                        if (ch === '/' && next === '*') {
+                            inBlockComment = true;
+                            i += 2;
+                            continue;
+                        }
+                    }
+                    if (!inDouble && !inTemplate && ch === '\'' && input[i - 1] !== '\\') {
+                        inSingle = !inSingle;
+                        out += ch;
+                        i++;
+                        continue;
+                    }
+                    if (!inSingle && !inTemplate && ch === '"' && input[i - 1] !== '\\') {
+                        inDouble = !inDouble;
+                        out += ch;
+                        i++;
+                        continue;
+                    }
+                    if (!inSingle && !inDouble && ch === '`' && input[i - 1] !== '\\') {
+                        inTemplate = !inTemplate;
+                        out += ch;
+                        i++;
+                        continue;
+                    }
+                    out += ch;
+                    i++;
+                }
+                return out;
+            };
+
+            const removeTrailingCommas = (input: string) => input.replace(/,\s*(?=[}\]])/g, '');
+            const quoteUnquotedKeys = (input: string) =>
+                input.replace(/([,{]\s*)([A-Za-z_$][\w$\-]*)(\s*):/g, (m, p1, key, p3) => {
+                    if (key.startsWith('"') || key.startsWith('\'')) return m;
+                    return `${p1}"${key}"${p3}:`;
+                });
+            const convertSingleQuotedStrings = (input: string) =>
+                input.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_m, inner) => {
+                    const content = String(inner)
+                        .replace(/\\'/g, "'")
+                        .replace(/"/g, '"')
+                        .replace(/\\/g, '\\\\')
+                        .replace(/"/g, '\\"');
+                    return `"${content}"`;
+                });
+
+            const text = (raw ?? '').trim();
+            if (!text) throw new Error('Empty JSON');
+            try {
+                return JSON.parse(text);
+            } catch {
+                let s = stripComments(text);
+                s = convertSingleQuotedStrings(s);
+                s = quoteUnquotedKeys(s);
+                s = removeTrailingCommas(s);
+                return JSON.parse(s);
+            }
+        };
+        try {
+            if (!fs.existsSync(this.configPath)) return;
+            const content = fs.readFileSync(this.configPath, 'utf-8');
+            const config = JSON.parse(content);
+
+            if (!config || config.version !== '2.0' || !Array.isArray(config.proxyGroups)) {
+                return;
+            }
+
+            let changed = false;
+            for (const group of config.proxyGroups) {
+                if (!group || !Array.isArray(group.mockApis)) continue;
+                for (const api of group.mockApis) {
+                    if (!api || typeof api.mockData !== 'string') continue;
+                    const raw = api.mockData;
+                    try {
+                        let parsed: any;
+                        try {
+                            parsed = JSON.parse(raw);
+                        } catch {
+                            // try tolerant parsing
+                            parsed = parseJsonSmart(raw);
+                        }
+                        const compact = JSON.stringify(parsed);
+                        if (raw !== compact) {
+                            api.mockData = compact;
+                            changed = true;
+                        }
+                    } catch (e) {
+                        // Keep original when not valid JSON; user can fix via UI
+                    }
+                }
+            }
+
+            if (changed) {
+                // Use existing save to write pretty file with compacted mockData strings
+                void this.saveConfig(config);
+            }
+        } catch (error) {
+            console.error('Error normalizing v2 config:', error);
+        }
+    }
+
     private migrateFromLegacy(oldConfig: any): MockConfig {
         // Migrate from old format to new format
         const defaultGroup: ProxyGroup = {
@@ -95,7 +261,7 @@ export class ConfigManager {
         };
 
         return {
-            version: '2.0',
+            version: this.getTargetVersion(),
             proxyGroups: [defaultGroup],
         };
     }
@@ -114,7 +280,7 @@ export class ConfigManager {
         };
 
         return {
-            version: '2.0',
+            version: this.getTargetVersion(),
             proxyGroups: [defaultGroup],
         };
     }

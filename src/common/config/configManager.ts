@@ -177,17 +177,16 @@ export class ConfigManager {
 
             const removeTrailingCommas = (input: string) => input.replace(/,\s*(?=[}\]])/g, '');
             const quoteUnquotedKeys = (input: string) =>
-                input.replace(/([,{]\s*)([A-Za-z_$][\w$\-]*)(\s*):/g, (m, p1, key, p3) => {
+                input.replace(/([,{]\s*)([A-Za-z_$][\w$-]*)(\s*):/g, (m, p1, key, p3) => {
                     if (key.startsWith('"') || key.startsWith('\'')) return m;
                     return `${p1}"${key}"${p3}:`;
                 });
             const convertSingleQuotedStrings = (input: string) =>
                 input.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_m, inner) => {
-                    const content = String(inner)
-                        .replace(/\\'/g, "'")
-                        .replace(/"/g, '"')
-                        .replace(/\\/g, '\\\\')
-                        .replace(/"/g, '\\"');
+                    let content = String(inner);
+                    content = content.replace(/\\'/g, "'");
+                    content = content.replace(/\\/g, '\\\\');
+                    content = content.replace(/"/g, '\\"');
                     return `"${content}"`;
                 });
 

@@ -147,6 +147,94 @@ describe('ConfigManager', () => {
             // Should be compact (no spaces/newlines except inside string literals)
             expect(savedMock).to.equal(JSON.stringify({ a: 1, b: [1, 2, 3] }));
         });
+
+        it('should tolerant-parse JS/JSON5-like mockData and compact it', () => {
+            // v2.0 config with non-strict JSON features in mockData
+            if (fs.existsSync(configDir)) {
+                fs.rmSync(configDir, { recursive: true, force: true });
+            }
+            fs.mkdirSync(configDir, { recursive: true });
+
+            const tolerant = `// top comment\n{ a: 1, /* mid */ b: 'text', list: [1, 2,], }`;
+            const v2Config = {
+                version: '2.0',
+                proxyGroups: [
+                    {
+                        id: 'g1',
+                        name: 'G1',
+                        port: 12346,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: true,
+                        mockApis: [
+                            {
+                                path: '/y',
+                                enabled: true,
+                                mockData: tolerant,
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
+            } as any;
+            fs.writeFileSync(configPath, JSON.stringify(v2Config, null, 2), 'utf-8');
+
+            // Trigger normalization
+            const cm = new ConfigManager(mockContext);
+
+            const saved = JSON.parse(fs.readFileSync(cm.getConfigPath(), 'utf-8'));
+            const savedMock = saved.proxyGroups[0].mockApis[0].mockData as string;
+            expect(savedMock).to.equal(
+                JSON.stringify({ a: 1, b: 'text', list: [1, 2] })
+            );
+        });
+
+        it('should keep mockData unchanged if tolerant parse still fails', () => {
+            // v2.0 config with irrecoverable JSON (double comma in array)
+            if (fs.existsSync(configDir)) {
+                fs.rmSync(configDir, { recursive: true, force: true });
+            }
+            fs.mkdirSync(configDir, { recursive: true });
+
+            const bad = `{ a: 1, list: [1,,2] }`;
+            const v2Config = {
+                version: '2.0',
+                proxyGroups: [
+                    {
+                        id: 'g1',
+                        name: 'G1',
+                        port: 12347,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: true,
+                        mockApis: [
+                            {
+                                path: '/z',
+                                enabled: true,
+                                mockData: bad,
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
+            } as any;
+            fs.writeFileSync(configPath, JSON.stringify(v2Config, null, 2), 'utf-8');
+
+            // Trigger normalization
+            const cm = new ConfigManager(mockContext);
+
+            const savedRaw = fs.readFileSync(cm.getConfigPath(), 'utf-8');
+            const saved = JSON.parse(savedRaw);
+            const savedMock = saved.proxyGroups[0].mockApis[0].mockData as string;
+            // Should remain unchanged
+            expect(savedMock).to.equal(bad);
+        });
     });
 
     describe('getConfigPath', () => {

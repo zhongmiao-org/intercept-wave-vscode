@@ -215,6 +215,17 @@ export class MockServerManager {
             return;
         }
 
+        // Handle prefix welcome page when stripPrefix=true
+        if (group.stripPrefix && group.interceptPrefix) {
+            const prefix = group.interceptPrefix.endsWith('/')
+                ? group.interceptPrefix.slice(0, -1)
+                : group.interceptPrefix;
+            if (requestPath === prefix || requestPath === prefix + '/') {
+                this.handleWelcomePage(res, group);
+                return;
+            }
+        }
+
         // Handle OPTIONS request (CORS preflight)
         if (method === 'OPTIONS') {
             this.sendCorsHeaders(res);
@@ -263,6 +274,23 @@ export class MockServerManager {
     }
 
     private handleWelcomePage(res: http.ServerResponse, group: ProxyGroup): void {
+        // Only list enabled mock APIs and attach example links
+        const enabledApis = group.mockApis.filter(api => api.enabled);
+        const normalizedPrefix = group.interceptPrefix.endsWith('/')
+            ? group.interceptPrefix.slice(0, -1)
+            : group.interceptPrefix;
+
+        const apis = enabledApis.map(api => {
+            const normalizedPath = api.path.startsWith('/') ? api.path : `/${api.path}`;
+            const examplePath = `${normalizedPrefix}${normalizedPath}`;
+            return {
+                path: api.path,
+                method: api.method,
+                enabled: true,
+                example: examplePath,
+            };
+        });
+
         const welcomeData = {
             status: 'running',
             message: 'Intercept Wave Mock Server is running',
@@ -271,16 +299,13 @@ export class MockServerManager {
                 port: group.port,
                 baseUrl: group.baseUrl,
                 interceptPrefix: group.interceptPrefix,
+                serverUrl: `http://localhost:${group.port}`,
             },
             mockApis: {
                 total: group.mockApis.length,
-                enabled: group.mockApis.filter(api => api.enabled).length,
+                enabled: enabledApis.length,
             },
-            apis: group.mockApis.map(api => ({
-                path: api.path,
-                method: api.method,
-                enabled: api.enabled,
-            })),
+            apis,
         };
 
         this.sendCorsHeaders(res);

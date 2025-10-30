@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -287,7 +288,7 @@ describe('ConfigManager', () => {
             // Include double quotes, backticks, comments and trailing commas
             const tolerant = `{
                 a: 1, // line comment
-                str: "quoted \"text\"", /* block comment */
+                str: "quoted text", /* block comment */
                 temp: ` + "`tm`" + `,
                 arr: [1,2,],
             }`;

@@ -4,6 +4,7 @@ import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import { MockServerManager, MockConfig, ConfigManager } from '../../common';
 import * as http from 'http';
+import { EventEmitter } from 'events';
 
 describe('MockServerManager', () => {
     let mockServerManager: MockServerManager;
@@ -278,11 +279,9 @@ describe('MockServerManager', () => {
 
         it('startGroup logs error and rejects on server error', async () => {
             // Stub http.createServer to emit error on listen
-            const http = require('http') as typeof import('http');
-            const orig = http.createServer;
-            const emitter = require('events');
-            const createServerStub = sinon.stub(http, 'createServer').callsFake(() => {
-                const srv = new emitter.EventEmitter() as any;
+            const orig = (http as any).createServer;
+            const createServerStub = sinon.stub(http as any, 'createServer').callsFake(() => {
+                const srv = new EventEmitter() as any;
                 srv.listen = (_port: number, _cb?: any) => {
                     setImmediate(() => srv.emit('error', new Error('boom')));
                 };
@@ -303,7 +302,7 @@ describe('MockServerManager', () => {
             } finally {
                 createServerStub.restore();
                 // restore original reference in case
-                (require('http') as any).createServer = orig;
+                (http as any).createServer = orig;
             }
         });
 

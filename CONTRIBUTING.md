@@ -25,7 +25,7 @@ cd intercept-wave-vscode
 npm install
 ```
 
-3. Compile the extension
+3. Compile the extension (Node build + copy static)
 
 ```bash
 npm run compile
@@ -37,7 +37,55 @@ npm run compile
 code .
 ```
 
-5. Press `F5` to run the extension in development mode
+5. Start Webview in watch mode (optional, recommended for UI work)
+
+```bash
+npm run webview:watch
+```
+
+6. Press `F5` to run the extension in development mode
+
+Tip: run a standalone Webview dev server without VS Code:
+
+```bash
+npm run webview:dev
+# open http://127.0.0.1:5173
+```
+
+This uses a stubbed `acquireVsCodeApi()` and injected INITIAL_STATE for quick UI iteration.
+
+### Project Structure
+
+```
+src/
+  common/
+    server/
+      types.ts            # MockApiConfig/ProxyGroup/MockConfig (backend types)
+      mockServer.ts
+      pathMatcher.ts
+    utils/
+      json.ts             # tolerant JSON parse/stringify
+      webviewHtml.ts      # buildReactWebviewHtml helper (CSP-safe)
+  providers/
+    sidebarProvider.ts    # loads React Webview HTML via helper
+  extension.ts            # no-workspace fallback loads React Webview too
+
+webview/
+  src/
+    interfaces/
+      business.ts         # UI-facing business entities (MockApiConfig, ...)
+      ui.ts               # InitialState, GroupSummary, VsCodeApi
+      ui.components.ts    # Props types for UI components
+    components/           # Small, focused React components
+    app.tsx               # Composes components, posts messages
+    index.tsx             # Boot entry, message bridge
+  dev/index.html          # Local dev shell (stub API)
+```
+
+Notes:
+- Do not declare interfaces inside `.tsx` files. Put them under `webview/src/interfaces/*`.
+- Avoid using TemplateLoader (removed). Use `buildReactWebviewHtml` to generate Webview HTML.
+- Prefer `import type { ... }` for types.
 
 ## Testing
 
@@ -175,10 +223,22 @@ The PR comment will look like:
 
 ## Code Style
 
-- Follow TypeScript best practices
-- Use ESLint for linting: `npm run lint`
-- Use meaningful variable and function names
-- Add comments for complex logic
+- TypeScript + ESLint. Run `npm run lint` before pushing.
+- React components should stay small and focused; lift shared types into `webview/src/interfaces`.
+- Keep backend vs UI types separate (`src/common/server/types.ts` vs `webview/src/interfaces`).
+- Use the shared JSON utils for tolerant parsing; do not duplicate JSON pipelines.
+- Webview HTML must be created via `buildReactWebviewHtml` to ensure CSP-safe nonce and font URIs.
+
+## Build, Package, VSIX
+
+- Dev compile: `npm run compile`
+- Watch (extension host): `npm run package:watch`
+- Webview watch: `npm run webview:watch`
+- One-off Webview build: `npm run webview:build`
+- Lint: `npm run lint`
+- Unit tests: `npm run test:unit`
+- All tests: `npm run test`
+- Create VSIX: `npm run build:local` (produces `intercept-wave-<version>.vsix`)
 
 ## Commit Messages
 

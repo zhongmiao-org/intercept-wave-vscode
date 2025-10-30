@@ -95,7 +95,10 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run package",
-        "compile": "tsc -p ./ && npm run copy:templates",
+        "webview:build": "node scripts/build-webview.js",
+        "webview:watch": "node scripts/build-webview-watch.js",
+        "webview:dev": "node scripts/serve-webview.js",
+        "compile": "rm -rf out && tsc -p ./ && npm run copy:templates",
         "copy:templates": "node scripts/copy-templates.js",
         "watch": "tsc -watch -p ./",
         "package": "npm run copy:templates && node esbuild.js --production",
@@ -113,6 +116,8 @@
         "build:local": "npm run package && npx @vscode/vsce package --allow-star-activation --allow-missing-repository"
     },
     "devDependencies": {
+        "@types/react": "^18.3.12",
+        "@types/react-dom": "^18.3.1",
         "@types/chai": "^4.3.20",
         "@types/glob": "^8.1.0",
         "@types/mocha": "^10.0.6",
@@ -137,6 +142,8 @@
         "typescript": "^5.9.3"
     },
     "dependencies": {
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
         "@vscode-elements/elements": "^2.3.1",
         "@vscode/codicons": "^0.0.41",
         "uuid": "^9.0.1"

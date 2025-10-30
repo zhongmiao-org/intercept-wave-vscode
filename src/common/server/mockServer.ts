@@ -4,40 +4,7 @@ import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
 import { selectBestMockApiForRequest } from './pathMatcher';
-
-export interface MockApiConfig {
-    path: string;
-    enabled: boolean;
-    mockData: string; // JSON string (compatible with JetBrains plugin)
-    method: string;
-    statusCode: number;
-    useCookie?: boolean;
-    delay?: number;
-}
-
-export interface ProxyGroup {
-    id: string;
-    name: string;
-    port: number;
-    interceptPrefix: string;
-    baseUrl: string;
-    stripPrefix: boolean;
-    globalCookie: string;
-    enabled: boolean;
-    mockApis: MockApiConfig[];
-}
-
-export interface MockConfig {
-    version: string;
-    proxyGroups: ProxyGroup[];
-    // Legacy fields for backward compatibility
-    port?: number;
-    interceptPrefix?: string;
-    baseUrl?: string;
-    stripPrefix?: boolean;
-    globalCookie?: string;
-    mockApis?: MockApiConfig[];
-}
+import type { MockApiConfig, ProxyGroup } from './types';
 
 export class MockServerManager {
     private readonly servers: Map<string, http.Server> = new Map(); // groupId -> server

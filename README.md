@@ -410,3 +410,19 @@ If you have any questions or suggestions, feel free to submit an [Issue](https:/
 ## License
 
 MIT License - see the [LICENSE](LICENSE) file for details
+
+## Development
+
+- Compile: `npm run compile`
+- Lint: `npm run lint`
+- Unit tests: `npm run test:unit`
+- All tests: `npm run test`
+- Webview watch (React UI): `npm run webview:watch`
+- Standalone Webview dev server: `npm run webview:dev` (http://127.0.0.1:5173)
+- Build Webview once: `npm run webview:build`
+- Package extension (dev): `npm run package`
+- Create VSIX: `npm run build:local`
+
+Notes:
+- The UI is implemented with React in `webview/` (no HTML templates). All Webview HTML is generated via `buildReactWebviewHtml` to ensure CSP safety.
+- UI types live under `webview/src/interfaces`; backend types under `src/common/server/types.ts`.

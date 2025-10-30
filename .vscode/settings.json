@@ -19,4 +19,12 @@
     },
     "typescript.tsdk": "node_modules/typescript/lib",
     "eslint.validate": ["javascript", "typescript"]
+    ,
+    // Relax CSS diagnostics for VS Code Webview theme vars (e.g. var(--vscode-...))
+    "css.lint.unknownProperties": "ignore",
+    "less.lint.unknownProperties": "ignore",
+    "scss.lint.unknownProperties": "ignore",
+    "css.lint.unknownAtRules": "ignore",
+    "less.lint.unknownAtRules": "ignore",
+    "scss.lint.unknownAtRules": "ignore"
 }

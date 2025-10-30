@@ -411,3 +411,19 @@ Access-Control-Allow-Headers: Content-Type, Authorization
 ## 许可证
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
+
+## 开发说明
+
+- 编译：`npm run compile`
+- 代码规范：`npm run lint`
+- 单元测试：`npm run test:unit`
+- 全量测试：`npm run test`
+- Webview 实时构建（React UI）：`npm run webview:watch`
+- 独立 Webview 开发服务器：`npm run webview:dev`（http://127.0.0.1:5173）
+- 一次性构建 Webview：`npm run webview:build`
+- 扩展打包（开发）：`npm run package`
+- 生成 VSIX：`npm run build:local`
+
+说明：
+- UI 已迁移为 React（位于 `webview/`），不再使用 HTML 模板。Webview 容器 HTML 由 `buildReactWebviewHtml` 统一生成，保证 CSP/nonce 安全。
+- UI 层类型位于 `webview/src/interfaces`；后端类型位于 `src/common/server/types.ts`。

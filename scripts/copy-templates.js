@@ -21,22 +21,25 @@ const distWebviewDir = path.join(__dirname, '..', 'dist', 'webview');
 });
 
 try {
-    // Copy HTML templates to both out and dist
-    const templateFiles = fs
-        .readdirSync(srcTemplatesDir)
-        .filter(file => file.endsWith('.html'));
+    let templateFiles = [];
+    if (fs.existsSync(srcTemplatesDir)) {
+        // Copy HTML templates to both out and dist
+        templateFiles = fs
+            .readdirSync(srcTemplatesDir)
+            .filter(file => file.endsWith('.html'));
 
-    templateFiles.forEach(file => {
-        const srcFile = path.join(srcTemplatesDir, file);
+        templateFiles.forEach(file => {
+            const srcFile = path.join(srcTemplatesDir, file);
 
-        // Copy to out directory (for tests)
-        const outFile = path.join(outTemplatesDir, file);
-        fs.copyFileSync(srcFile, outFile);
+            // Copy to out directory (for tests)
+            const outFile = path.join(outTemplatesDir, file);
+            fs.copyFileSync(srcFile, outFile);
 
-        // Copy to dist directory (for bundled extension)
-        const distFile = path.join(distTemplatesDir, file);
-        fs.copyFileSync(srcFile, distFile);
-    });
+            // Copy to dist directory (for bundled extension)
+            const distFile = path.join(distTemplatesDir, file);
+            fs.copyFileSync(srcFile, distFile);
+        });
+    }
 
     console.log(`✓ Copied ${templateFiles.length} template(s) to out/ and dist/`);
 

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import {MockConfig, ProxyGroup} from '../server';
+import { parseJsonTolerant, stringifyCompact } from '../utils';
 import * as pkg from '../../../package.json';
 import {v4 as uuidv4} from 'uuid';
 
@@ -110,98 +111,6 @@ export class ConfigManager {
 
     // Normalize v2 config: compact mockData JSON strings to minified form
     private normalizeV2Config(): void {
-        const parseJsonSmart = (raw: string) => {
-            const stripComments = (input: string) => {
-                let out = '';
-                let i = 0;
-                let inSingle = false,
-                    inDouble = false,
-                    inTemplate = false,
-                    inLineComment = false,
-                    inBlockComment = false;
-                while (i < input.length) {
-                    const ch = input[i];
-                    const next = input[i + 1];
-                    if (inLineComment) {
-                        if (ch === '\n') {
-                            inLineComment = false;
-                            out += ch;
-                        }
-                        i++;
-                        continue;
-                    }
-                    if (inBlockComment) {
-                        if (ch === '*' && next === '/') {
-                            inBlockComment = false;
-                            i += 2;
-                            continue;
-                        }
-                        i++;
-                        continue;
-                    }
-                    if (!inSingle && !inDouble && !inTemplate) {
-                        if (ch === '/' && next === '/') {
-                            inLineComment = true;
-                            i += 2;
-                            continue;
-                        }
-                        if (ch === '/' && next === '*') {
-                            inBlockComment = true;
-                            i += 2;
-                            continue;
-                        }
-                    }
-                    if (!inDouble && !inTemplate && ch === '\'' && input[i - 1] !== '\\') {
-                        inSingle = !inSingle;
-                        out += ch;
-                        i++;
-                        continue;
-                    }
-                    if (!inSingle && !inTemplate && ch === '"' && input[i - 1] !== '\\') {
-                        inDouble = !inDouble;
-                        out += ch;
-                        i++;
-                        continue;
-                    }
-                    if (!inSingle && !inDouble && ch === '`' && input[i - 1] !== '\\') {
-                        inTemplate = !inTemplate;
-                        out += ch;
-                        i++;
-                        continue;
-                    }
-                    out += ch;
-                    i++;
-                }
-                return out;
-            };
-
-            const removeTrailingCommas = (input: string) => input.replace(/,\s*(?=[}\]])/g, '');
-            const quoteUnquotedKeys = (input: string) =>
-                input.replace(/([,{]\s*)([A-Za-z_$][\w$-]*)(\s*):/g, (m, p1, key, p3) => {
-                    if (key.startsWith('"') || key.startsWith('\'')) return m;
-                    return `${p1}"${key}"${p3}:`;
-                });
-            const convertSingleQuotedStrings = (input: string) =>
-                input.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_m, inner) => {
-                    let content = String(inner);
-                    content = content.replace(/\\'/g, "'");
-                    content = content.replace(/\\/g, '\\\\');
-                    content = content.replace(/"/g, '\\"');
-                    return `"${content}"`;
-                });
-
-            const text = (raw ?? '').trim();
-            if (!text) throw new Error('Empty JSON');
-            try {
-                return JSON.parse(text);
-            } catch {
-                let s = stripComments(text);
-                s = convertSingleQuotedStrings(s);
-                s = quoteUnquotedKeys(s);
-                s = removeTrailingCommas(s);
-                return JSON.parse(s);
-            }
-        };
         try {
             if (!fs.existsSync(this.configPath)) return;
             const content = fs.readFileSync(this.configPath, 'utf-8');
@@ -222,10 +131,10 @@ export class ConfigManager {
                         try {
                             parsed = JSON.parse(raw);
                         } catch {
-                            // try tolerant parsing
-                            parsed = parseJsonSmart(raw);
+                            // try tolerant parsing via shared utils
+                            parsed = parseJsonTolerant(raw);
                         }
-                        const compact = JSON.stringify(parsed);
+                        const compact = stringifyCompact(parsed);
                         if (raw !== compact) {
                             api.mockData = compact;
                             changed = true;

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { MockServerManager, ConfigManager, TemplateLoader } from './common';
+import { MockServerManager, ConfigManager, buildReactWebviewHtml } from './common';
 import { SidebarProvider } from './providers';
 let mockServerManager: MockServerManager;
 let configManager: ConfigManager;
@@ -19,24 +19,82 @@ export function activate(context: vscode.ExtensionContext) {
         );
         outputChannel.appendLine('=== Activation skipped ===');
 
-        // Register a placeholder view provider that shows a message
+        // Register a placeholder view provider that renders React UI with empty data
         const emptyProvider: vscode.WebviewViewProvider = {
             resolveWebviewView(webviewView: vscode.WebviewView) {
                 outputChannel.appendLine('[EmptyProvider] resolveWebviewView called');
 
-                const title = vscode.l10n.t('noWorkspace.title');
-                const message = vscode.l10n.t('noWorkspace.message');
+                webviewView.webview.options = { enableScripts: true, localResourceRoots: [context.extensionUri] };
 
-                webviewView.webview.options = {
-                    enableScripts: true,
+                const codiconsFontUri = webviewView.webview.asWebviewUri(
+                    vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'codicon.ttf')
+                );
+                const reactAppUri = webviewView.webview.asWebviewUri(
+                    vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'app.js')
+                );
+                const nonce = getNonce();
+
+                const i18n = {
+                    startAll: vscode.l10n.t('ui.startAll'),
+                    stopAll: vscode.l10n.t('ui.stopAll'),
+                    startServer: vscode.l10n.t('ui.startServer'),
+                    stopServer: vscode.l10n.t('ui.stopServer'),
+                    settings: vscode.l10n.t('ui.settings'),
+                    add: vscode.l10n.t('ui.add'),
+                    edit: vscode.l10n.t('ui.edit'),
+                    delete: vscode.l10n.t('ui.delete'),
+                    enable: vscode.l10n.t('ui.enable'),
+                    disable: vscode.l10n.t('ui.disable'),
+                    save: vscode.l10n.t('ui.save'),
+                    cancel: vscode.l10n.t('ui.cancel'),
+                    format: vscode.l10n.t('ui.format'),
+                    validate: vscode.l10n.t('ui.validate'),
+                    groupName: vscode.l10n.t('ui.groupName'),
+                    enabled: vscode.l10n.t('ui.enabled'),
+                    port: vscode.l10n.t('ui.port'),
+                    interceptPrefix: vscode.l10n.t('ui.interceptPrefix'),
+                    baseUrl: vscode.l10n.t('ui.baseUrl'),
+                    stripPrefix: vscode.l10n.t('ui.stripPrefix'),
+                    globalCookie: vscode.l10n.t('ui.globalCookie'),
+                    method: vscode.l10n.t('ui.method'),
+                    path: vscode.l10n.t('ui.path'),
+                    statusCode: vscode.l10n.t('ui.statusCode'),
+                    responseBody: vscode.l10n.t('ui.responseBody'),
+                    delay: vscode.l10n.t('ui.delay'),
+                    addProxyGroup: vscode.l10n.t('ui.addProxyGroup'),
+                    editProxyGroup: vscode.l10n.t('ui.editProxyGroup'),
+                    addMockApi: vscode.l10n.t('ui.addMockApi'),
+                    editMockApi: vscode.l10n.t('ui.editMockApi'),
+                    running: vscode.l10n.t('ui.running'),
+                    stopped: vscode.l10n.t('ui.stopped'),
+                    mockApis: vscode.l10n.t('ui.mockApis'),
+                    noMockApis: vscode.l10n.t('ui.noMockApis'),
+                    clickAddToCreate: vscode.l10n.t('ui.clickAddToCreate'),
+                    jsonFormatSuccess: vscode.l10n.t('ui.jsonFormatted'),
+                    jsonValid: vscode.l10n.t('ui.jsonValid'),
+                    invalidJson: vscode.l10n.t('ui.jsonInvalid'),
+                    groupNamePlaceholder: vscode.l10n.t('ui.groupNamePlaceholder'),
+                    baseUrlPlaceholder: vscode.l10n.t('ui.baseUrlPlaceholder'),
+                    pathPlaceholder: vscode.l10n.t('ui.pathPlaceholder'),
+                    responsePlaceholder: vscode.l10n.t('ui.responsePlaceholder'),
+                    globalCookiePlaceholder: vscode.l10n.t('ui.globalCookiePlaceholder'),
                 };
 
-                const template = TemplateLoader.loadTemplate('noWorkspaceView');
-                webviewView.webview.html = TemplateLoader.replacePlaceholders(template, {
-                    TITLE: title,
-                    MESSAGE: message,
-                });
+                const initialData = {
+                    config: { version: '2.0', proxyGroups: [] },
+                    activeGroupId: undefined,
+                    isRunning: false,
+                    groupStatuses: {},
+                    i18n,
+                };
 
+                webviewView.webview.html = buildReactWebviewHtml({
+                    nonce,
+                    codiconsFontUri: codiconsFontUri.toString(),
+                    appJsUri: reactAppUri.toString(),
+                    initialDataJson: JSON.stringify(initialData),
+                });
+                
                 outputChannel.appendLine('[EmptyProvider] HTML set successfully');
             },
         };
@@ -131,4 +189,13 @@ export async function deactivate() {
     if (mockServerManager) {
         await mockServerManager.stop();
     }
+}
+
+function getNonce() {
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 32; i++) {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
 }

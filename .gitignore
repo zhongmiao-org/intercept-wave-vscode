@@ -6,6 +6,10 @@ dist/
 .DS_Store
 .intercept-wave
 
+# Webview dev outputs
+webview/dev/app.js
+webview/dev/*.map
+
 # Test coverage
 coverage/
 .nyc_output/

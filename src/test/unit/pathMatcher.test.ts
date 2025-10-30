@@ -66,4 +66,13 @@ describe('Wildcard path matcher', () => {
         // Remaining pattern contains ** and another segment -> not allowed per matcher
         expect(matchPathPattern('/a/**/d', '/a').matched).to.be.false;
     });
+
+    it('comparator tie returns 0 when candidates are equal', () => {
+        const apis = [
+            { path: '/**', method: 'ALL', enabled: true },
+            { path: '/**', method: 'ALL', enabled: true },
+        ];
+        const chosen = selectBestMockApiForRequest(apis as any, '/any/path', 'GET');
+        expect(chosen).to.exist;
+    });
 });

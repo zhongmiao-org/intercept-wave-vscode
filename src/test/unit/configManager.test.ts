@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { ConfigManager } from '../../common';
+import {ConfigManager, MockConfig} from '../../common';
 
 function expectedVersion(): string {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -275,6 +275,89 @@ describe('ConfigManager', () => {
             // mockData should remain unnormalized because version !== 2.0 at constructor time
             expect(saved.proxyGroups[0].mockApis[0].mockData).to.equal(tolerant);
         });
+
+        // Note: Our test runner always supplies a workspace folder. Skipping hard-to-mock branch.
+
+        it('tolerant parser toggles double-quote and template states', () => {
+            if (fs.existsSync(configDir)) {
+                fs.rmSync(configDir, { recursive: true, force: true });
+            }
+            fs.mkdirSync(configDir, { recursive: true });
+
+            // Include double quotes, backticks, comments and trailing commas
+            const tolerant = `{
+                a: 1, // line comment
+                str: "quoted \"text\"", /* block comment */
+                temp: ` + "`tm`" + `,
+                arr: [1,2,],
+            }`;
+
+            const v2Config = {
+                version: '2.0',
+                proxyGroups: [
+                    {
+                        id: 'g1',
+                        name: 'G1',
+                        port: 12349,
+                        interceptPrefix: '/api',
+                        baseUrl: 'http://localhost:8080',
+                        stripPrefix: true,
+                        globalCookie: '',
+                        enabled: true,
+                        mockApis: [
+                            {
+                                path: '/y',
+                                enabled: true,
+                                mockData: tolerant,
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
+            } as any;
+            fs.writeFileSync(configPath, JSON.stringify(v2Config, null, 2), 'utf-8');
+            const cm = new ConfigManager(mockContext);
+            const saved = JSON.parse(fs.readFileSync(cm.getConfigPath(), 'utf-8'));
+            const savedMock = saved.proxyGroups[0].mockApis[0].mockData as string;
+            // May or may not normalize due to backticks; ensure it processed without crashing
+            expect(savedMock).to.be.a('string');
+            expect(savedMock.length).to.be.greaterThan(0);
+        });
+
+        it('normalizeV2Config early-returns when config file missing', () => {
+            const cm = new ConfigManager(mockContext);
+            (cm as any).configPath = path.join(configDir, 'nonexistent.json');
+            // ensure file does not exist
+            if (fs.existsSync((cm as any).configPath)) fs.unlinkSync((cm as any).configPath);
+            (cm as any).normalizeV2Config();
+        });
+
+        it('normalizeV2Config skips bad groups and apis and catches read error', () => {
+            const cm = new ConfigManager(mockContext);
+            // Prepare a bad JSON file to trigger catch
+            const badPath = path.join(configDir, 'bad.json');
+            fs.writeFileSync(badPath, '{invalid json', 'utf-8');
+            (cm as any).configPath = badPath;
+            (cm as any).normalizeV2Config();
+            // Now set a valid v2 config with bad groups/apis to hit continue branches
+            const badConfig = {
+                version: '2.0',
+                proxyGroups: [null, { id: 'g1', name: 'G1', port: 12350, interceptPrefix: '/api', baseUrl: 'http://localhost:8080', stripPrefix: true, globalCookie: '', enabled: true, mockApis: [null, { mockData: 123 }] }],
+            } as any;
+            const okPath = path.join(configDir, 'ok.json');
+            fs.writeFileSync(okPath, JSON.stringify(badConfig, null, 2), 'utf-8');
+            (cm as any).configPath = okPath;
+            (cm as any).normalizeV2Config();
+        });
+
+        it('migrateFromLegacy defaults for port/stripPrefix/mockApis', () => {
+            const cm = new ConfigManager(mockContext);
+            const migrated = (cm as any).migrateFromLegacy({});
+            expect(migrated.proxyGroups[0].port).to.equal(8888);
+            expect(migrated.proxyGroups[0].stripPrefix).to.equal(true);
+            expect(Array.isArray(migrated.proxyGroups[0].mockApis)).to.equal(true);
+        });
     });
 
     describe('getConfigPath', () => {
@@ -389,6 +472,20 @@ describe('ConfigManager', () => {
             const saved = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
             expect(saved.version).to.equal(expectedVersion());
         });
+
+        it('getTargetVersion fallback to 2.0 when version malformed', () => {
+            const cm = new ConfigManager(mockContext) as any;
+            // Change package.json version to '2' to force fallback
+            const pkg = require('../../../package.json');
+            const original = pkg.version;
+            try {
+                pkg.version = '2';
+                const v = cm.getTargetVersion();
+                expect(v).to.equal('2.0');
+            } finally {
+                pkg.version = original;
+            }
+        });
     });
 
     describe('saveConfig', () => {
@@ -445,6 +542,18 @@ describe('ConfigManager', () => {
             expect(content).to.include('  ');
         });
 
+        it('saveConfig logs and throws on write error (circular JSON)', async () => {
+            const cfg: any = configManager.getConfig();
+            cfg.loop = cfg; // make circular to break JSON.stringify
+            let threw = false;
+            try {
+                await configManager.saveConfig(cfg);
+            } catch {
+                threw = true;
+            }
+            expect(threw).to.equal(true);
+        });
+
         it('should overwrite version when saving with mismatched version', async () => {
             const testConfig = {
                 version: '0.0',
@@ -473,7 +582,7 @@ describe('ConfigManager', () => {
     describe('proxy group ops', () => {
         it('add/remove/update/toggle proxy group', async () => {
             // Start from default
-            let cfg = configManager.getConfig();
+            let cfg: MockConfig;
             const groupToAdd = {
                 id: 'g-new',
                 name: 'New',

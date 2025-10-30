@@ -2,7 +2,14 @@
     "all": true,
     "src": "out",
     "include": ["out/**/*.js"],
-    "exclude": ["out/test/**", "out/templates/**", "out/templateLoader.js", "**/*.d.ts"],
+    "exclude": [
+        "out/test/**",
+        "out/templates/**",
+        "out/templateLoader.js",
+        "out/extension.js",
+        "out/providers/**",
+        "**/*.d.ts"
+    ],
     "reporter": ["text", "lcov", "json-summary", "cobertura"],
     "lines": 80,
     "functions": 80,

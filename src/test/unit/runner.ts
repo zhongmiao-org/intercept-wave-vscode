@@ -23,6 +23,9 @@ const originalRequire = Module.prototype.require;
                     update: () => Promise.resolve(),
                 }),
             },
+            l10n: {
+                t: (key: string, ..._args: any[]) => key,
+            },
             env: {
                 language: 'en',
             },

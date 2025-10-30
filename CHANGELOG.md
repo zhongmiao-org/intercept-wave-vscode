@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### ✨ Added
+- 🏠 Prefix welcome route: When `stripPrefix=true`, requests to `/<interceptPrefix>` and `/<interceptPrefix>/` now return the same JSON welcome page as `/`, showing only enabled Mock APIs and example URLs. (MockServerService)
+- 🧠 Smart mock input: Mock API editor accepts JS/JSON5-like snippets (single quotes, unquoted keys, trailing commas, comments) pasted from code and converts them to strict JSON before saving. (MockApiDialog)
+
+### 🔄 Changed
+- 🗜️ Mock data persistence: On save, `mockData` is strictly validated and minified to compact JSON (no spaces or newlines). Invalid JSON is rejected with clear errors; the “Format JSON” button now pretty-prints using a real JSON parser for readability only, storage remains minified. (MockApiDialog)
+
+
+## [2.2.1]
 ### 🚀 CI/CD
 
 - 📝 Release workflow now patches `CHANGELOG.md` at the start of the publish job:

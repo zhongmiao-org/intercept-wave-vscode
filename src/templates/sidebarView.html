@@ -665,12 +665,28 @@
         }
 
         document.getElementById('saveMockBtn').addEventListener('click', () => {
+            const errorDiv = document.getElementById('jsonError');
+            const successDiv = document.getElementById('jsonSuccess');
+            const raw = document.getElementById('mockResponse').value;
+            let compact = '';
+            try {
+                const parsed = parseJsonSmart(raw);
+                // Persist as compact JSON (no spaces/newlines)
+                compact = JSON.stringify(parsed);
+            } catch (e) {
+                const msg = e && e.message ? e.message : 'Unknown error';
+                successDiv.style.display = 'none';
+                errorDiv.textContent = `✗ ${i18n.invalidJson.replace('{0}', msg)}`;
+                errorDiv.style.display = 'block';
+                return; // Abort save on invalid JSON
+            }
+
             const mockData = {
                 enabled: document.getElementById('mockEnabled').checked,
                 method: document.getElementById('mockMethod').value,
                 path: document.getElementById('mockPath').value,
                 statusCode: parseInt(document.getElementById('mockStatus').value),
-                mockData: document.getElementById('mockResponse').value,
+                mockData: compact,
                 useCookie: false,
                 delay: parseInt(document.getElementById('mockDelay').value)
             };
@@ -696,14 +712,122 @@
             document.getElementById('mockDelay').value = '0';
         }
 
-        // JSON Utilities
+        // JSON Utilities (Smart paste + JSON5-like tolerant parse)
+        function stripComments(input) {
+            // Remove // and /* */ comments while respecting strings
+            let out = '';
+            let i = 0;
+            let inSingle = false, inDouble = false, inTemplate = false;
+            let inLineComment = false, inBlockComment = false;
+            while (i < input.length) {
+                const ch = input[i];
+                const next = input[i + 1];
+
+                if (inLineComment) {
+                    if (ch === '\n') { inLineComment = false; out += ch; }
+                    i++;
+                    continue;
+                }
+                if (inBlockComment) {
+                    if (ch === '*' && next === '/') { inBlockComment = false; i += 2; continue; }
+                    i++;
+                    continue;
+                }
+
+                if (!inSingle && !inDouble && !inTemplate) {
+                    if (ch === '/' && next === '/') { inLineComment = true; i += 2; continue; }
+                    if (ch === '/' && next === '*') { inBlockComment = true; i += 2; continue; }
+                }
+
+                if (!inDouble && !inTemplate && ch === '\'' && input[i - 1] !== '\\') {
+                    inSingle = !inSingle; out += ch; i++; continue;
+                }
+                if (!inSingle && !inTemplate && ch === '"' && input[i - 1] !== '\\') {
+                    inDouble = !inDouble; out += ch; i++; continue;
+                }
+                if (!inSingle && !inDouble && ch === '`' && input[i - 1] !== '\\') {
+                    inTemplate = !inTemplate; out += ch; i++; continue;
+                }
+
+                out += ch;
+                i++;
+            }
+            return out;
+        }
+
+        function removeTrailingCommas(input) {
+            return input.replace(/,\s*(?=[}\]])/g, '');
+        }
+
+        function quoteUnquotedKeys(input) {
+            // Adds quotes to unquoted object keys: { a:1, b_c:2 } -> { "a":1, "b_c":2 }
+            return input.replace(/([,{]\s*)([A-Za-z_$][\w$\-]*)(\s*):/g, (m, p1, key, p3) => {
+                // if already quoted, leave as is
+                if (key.startsWith('"') || key.startsWith('\'')) return m;
+                return `${p1}"${key}"${p3}:`;
+            });
+        }
+
+        function convertSingleQuotedStrings(input) {
+            // Convert single-quoted strings to double-quoted JSON strings
+            // This is a best-effort transformation and assumes balanced quotes
+            return input.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (m, inner) => {
+                const content = inner
+                    .replace(/\\'/g, "'") // unescape escaped single quotes
+                    .replace(/\"/g, '"')   // keep existing double quotes
+                    .replace(/\\/g, '\\\\') // escape backslashes
+                    .replace(/"/g, '\\"'); // escape double quotes
+                return `"${content}"`;
+            });
+        }
+
+        function parseJsonSmart(raw) {
+            const text = (raw ?? '').trim();
+            if (!text) throw new Error('Empty JSON');
+            try {
+                return JSON.parse(text);
+            } catch (_) {
+                // tolerant pipeline
+                let s = stripComments(text);
+                s = convertSingleQuotedStrings(s);
+                s = quoteUnquotedKeys(s);
+                s = removeTrailingCommas(s);
+                return JSON.parse(s);
+            }
+        }
+
+        // Smart paste: try to normalize on paste
+        const responseTextarea = document.getElementById('mockResponse');
+        responseTextarea.addEventListener('paste', (e) => {
+            try {
+                const data = e.clipboardData?.getData('text/plain');
+                if (!data) return;
+                const parsed = parseJsonSmart(data);
+                e.preventDefault();
+                const formatted = JSON.stringify(parsed, null, 2);
+                // Insert at cursor
+                const value = responseTextarea.value ?? '';
+                const hasSel = typeof responseTextarea.selectionStart === 'number' && typeof responseTextarea.selectionEnd === 'number';
+                const start = hasSel ? responseTextarea.selectionStart : value.length;
+                const end = hasSel ? responseTextarea.selectionEnd : value.length;
+                responseTextarea.value = value.slice(0, start) + formatted + value.slice(end);
+                // Try to move caret to end of inserted (if supported)
+                if (hasSel) {
+                    const pos = start + formatted.length;
+                    responseTextarea.selectionStart = responseTextarea.selectionEnd = pos;
+                }
+            } catch (_) {
+                // fallback to default paste
+            }
+        });
+
         document.getElementById('formatJsonBtn').addEventListener('click', () => {
             const textarea = document.getElementById('mockResponse');
             const errorDiv = document.getElementById('jsonError');
             const successDiv = document.getElementById('jsonSuccess');
 
             try {
-                const parsed = JSON.parse(textarea.value);
+                const parsed = parseJsonSmart(textarea.value);
                 textarea.value = JSON.stringify(parsed, null, 2);
                 errorDiv.style.display = 'none';
                 successDiv.textContent = `✓ ${i18n.jsonFormatSuccess}`;
@@ -711,7 +835,8 @@
                 setTimeout(() => { successDiv.style.display = 'none'; }, 3000);
             } catch (e) {
                 successDiv.style.display = 'none';
-                errorDiv.textContent = `✗ ${i18n.invalidJson.replace('{0}', e.message)}`;
+                const msg = e && e.message ? e.message : 'Unknown error';
+                errorDiv.textContent = `✗ ${i18n.invalidJson.replace('{0}', msg)}`;
                 errorDiv.style.display = 'block';
             }
         });
@@ -722,14 +847,15 @@
             const successDiv = document.getElementById('jsonSuccess');
 
             try {
-                JSON.parse(textarea.value);
+                void parseJsonSmart(textarea.value);
                 errorDiv.style.display = 'none';
                 successDiv.textContent = `✓ ${i18n.jsonValid}`;
                 successDiv.style.display = 'block';
                 setTimeout(() => { successDiv.style.display = 'none'; }, 3000);
             } catch (e) {
                 successDiv.style.display = 'none';
-                errorDiv.textContent = `✗ ${i18n.invalidJson.replace('{0}', e.message)}`;
+                const msg = e && e.message ? e.message : 'Unknown error';
+                errorDiv.textContent = `✗ ${i18n.invalidJson.replace('{0}', msg)}`;
                 errorDiv.style.display = 'block';
             }
         });

@@ -265,6 +265,44 @@ describe('MockServerManager', () => {
         });
     });
     describe('request handling', () => {
+        it('start throws when no enabled proxy groups', async () => {
+            const cfg: MockConfig = { version: '2.0', proxyGroups: [ { id: 'g0', name: 'G0', port: 10050, interceptPrefix: '/api', baseUrl: 'http://localhost:8080', stripPrefix: true, globalCookie: '', enabled: false, mockApis: [] } ] } as any;
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+            try {
+                await mockServerManager.start();
+                expect.fail('should throw');
+            } catch (e: any) {
+                expect(e.message).to.equal('No enabled proxy groups found');
+            }
+        });
+
+        it('startGroup logs error and rejects on server error', async () => {
+            // Try to bind a privileged port to trigger EACCES
+            const cfg: MockConfig = { version: '2.0', proxyGroups: [ { id: 'g1', name: 'G1', port: 1, interceptPrefix: '/api', baseUrl: 'http://localhost:8080', stripPrefix: true, globalCookie: '', enabled: true, mockApis: [] } ] } as any;
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+            try {
+                await mockServerManager.start();
+                expect.fail('should reject');
+            } catch (e: any) {
+                expect(appendLineStub.called).to.be.true;
+            }
+        });
+
+        it('forwardToOriginalServer catches URL parse error and returns 500', async () => {
+            const cfg: MockConfig = {
+                version: '2.0',
+                proxyGroups: [
+                    { id: 'g1', name: 'G1', port: 10052, interceptPrefix: '/api', baseUrl: 'http://:', stripPrefix: true, globalCookie: '', enabled: true, mockApis: [] },
+                ],
+            } as any;
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+            await mockServerManager.start();
+            const res = await new Promise<http.IncomingMessage>((resolve, reject) => {
+                const req = http.get('http://localhost:10052/anything', resolve);
+                req.on('error', reject);
+            });
+            expect(res.statusCode).to.equal(500);
+        });
         it('should handle GET requests', async () => {
             const config = {
                 ...defaultConfig,
@@ -559,6 +597,119 @@ describe('MockServerManager', () => {
             expect(data.status).to.equal('running');
             expect(data.mockApis.total).to.equal(2);
             expect(data.mockApis.enabled).to.equal(1);
+        });
+
+        it('should return same welcome JSON for prefix when stripPrefix=true', async () => {
+            const config = {
+                ...defaultConfig,
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        interceptPrefix: '/api',
+                        stripPrefix: true,
+                        mockApis: [
+                            {
+                                path: '/hello',
+                                enabled: true,
+                                mockData: '{}',
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(config);
+
+            await mockServerManager.start();
+
+            async function getJson(path: string) {
+                return new Promise<{ res: http.IncomingMessage; body: string }>((resolve, reject) => {
+                    const req = http.get(`http://localhost:9999${path}`, res => {
+                        let body = '';
+                        res.on('data', chunk => (body += chunk));
+                        res.on('end', () => resolve({ res, body }));
+                    });
+                    req.on('error', reject);
+                });
+            }
+
+            const root = await getJson('/');
+            const pre1 = await getJson('/api');
+            const pre2 = await getJson('/api/');
+
+            expect(root.res.statusCode).to.equal(200);
+            expect(pre1.res.statusCode).to.equal(200);
+            expect(pre2.res.statusCode).to.equal(200);
+
+            const rootJson = JSON.parse(root.body);
+            const pre1Json = JSON.parse(pre1.body);
+            const pre2Json = JSON.parse(pre2.body);
+
+            expect(pre1Json).to.deep.equal(rootJson);
+            expect(pre2Json).to.deep.equal(rootJson);
+            // Ensure serverUrl exists
+            expect(rootJson.group.serverUrl).to.equal('http://localhost:9999');
+        });
+
+        it('welcome page lists only enabled APIs and provides example links', async () => {
+            const config = {
+                ...defaultConfig,
+                proxyGroups: [
+                    {
+                        ...defaultConfig.proxyGroups[0],
+                        interceptPrefix: '/api',
+                        stripPrefix: true,
+                        mockApis: [
+                            {
+                                path: '/a',
+                                enabled: true,
+                                mockData: '{}',
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                            {
+                                path: '/b',
+                                enabled: false,
+                                mockData: '{}',
+                                method: 'GET',
+                                statusCode: 200,
+                            },
+                            {
+                                path: 'users', // no leading slash
+                                enabled: true,
+                                mockData: '{}',
+                                method: 'POST',
+                                statusCode: 200,
+                            },
+                        ],
+                    },
+                ],
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(config);
+
+            await mockServerManager.start();
+
+            const result = await new Promise<{ res: http.IncomingMessage; body: string }>(
+                (resolve, reject) => {
+                    const req = http.get('http://localhost:9999/', res => {
+                        let body = '';
+                        res.on('data', chunk => (body += chunk));
+                        res.on('end', () => resolve({ res, body }));
+                    });
+                    req.on('error', reject);
+                }
+            );
+
+            expect(result.res.statusCode).to.equal(200);
+            const json = JSON.parse(result.body);
+            // Only enabled apis are listed
+            expect(json.apis).to.be.an('array');
+            expect(json.apis.length).to.equal(2);
+            const examples = json.apis.map((a: any) => a.example);
+            expect(examples).to.include('/api/a');
+            expect(examples).to.include('/api/users');
+            expect(examples).to.not.include('/api/b');
         });
 
         it('should handle root path welcome page', async () => {

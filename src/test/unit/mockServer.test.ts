@@ -4,7 +4,6 @@ import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import { MockServerManager, MockConfig, ConfigManager } from '../../common';
 import * as http from 'http';
-import { EventEmitter } from 'events';
 
 describe('MockServerManager', () => {
     let mockServerManager: MockServerManager;
@@ -278,31 +277,14 @@ describe('MockServerManager', () => {
         });
 
         it('startGroup logs error and rejects on server error', async () => {
-            // Stub http.createServer to emit error on listen
-            const orig = (http as any).createServer;
-            const createServerStub = sinon.stub(http as any, 'createServer').callsFake(() => {
-                const srv = new EventEmitter() as any;
-                srv.listen = (_port: number, _cb?: any) => {
-                    setImmediate(() => srv.emit('error', new Error('boom')));
-                };
-                srv.close = (cb?: any) => { if (cb) cb(); };
-                srv.on = srv.addListener.bind(srv);
-                srv.removeListener = (_: any, __: any) => {};
-                return srv;
-            });
+            // Try to bind a privileged port to trigger EACCES
+            const cfg: MockConfig = { version: '2.0', proxyGroups: [ { id: 'g1', name: 'G1', port: 1, interceptPrefix: '/api', baseUrl: 'http://localhost:8080', stripPrefix: true, globalCookie: '', enabled: true, mockApis: [] } ] } as any;
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
             try {
-                const cfg: MockConfig = { version: '2.0', proxyGroups: [ { id: 'g1', name: 'G1', port: 10051, interceptPrefix: '/api', baseUrl: 'http://localhost:8080', stripPrefix: true, globalCookie: '', enabled: true, mockApis: [] } ] } as any;
-                (configManager.getConfig as sinon.SinonStub).returns(cfg);
-                try {
-                    await mockServerManager.start();
-                    expect.fail('should reject');
-                } catch (e: any) {
-                    expect(appendLineStub.called).to.be.true;
-                }
-            } finally {
-                createServerStub.restore();
-                // restore original reference in case
-                (http as any).createServer = orig;
+                await mockServerManager.start();
+                expect.fail('should reject');
+            } catch (e: any) {
+                expect(appendLineStub.called).to.be.true;
             }
         });
 

@@ -1,5 +1,11 @@
 # Intercept Wave For VSCode Changelog
 
+All notable changes to the **proxyMocker** extension will be documented in this file.
+
+Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+
+## [Unreleased]
+
 ## [3.0.0]
 
 ### 🎨 UI & UX

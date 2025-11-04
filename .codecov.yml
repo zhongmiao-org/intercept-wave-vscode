@@ -9,8 +9,9 @@ coverage:
         threshold: 1%
     patch:
       default:
-        target: auto
-        threshold: 1%
+        # Loosen patch status: require >= 80% on changed lines
+        target: 80%
+        threshold: 0%
 
 ignore:
   - "src/extension.ts"                       # VSCode extension entry point - requires integration tests

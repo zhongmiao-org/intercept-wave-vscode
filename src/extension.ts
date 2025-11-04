@@ -76,7 +76,6 @@ export function activate(context: vscode.ExtensionContext) {
             context.extensionUri,
             mockServerManager,
             configManager,
-            outputChannel,
             panelProvider
         );
         outputChannel.appendLine('✓ SidebarProvider created');

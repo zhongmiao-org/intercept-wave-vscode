@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Q&A / 使用交流
+    url: https://github.com/zhongmiao-org/intercept-wave-vscode/discussions
+    about: 一般性使用问题或讨论请移步 Discussions

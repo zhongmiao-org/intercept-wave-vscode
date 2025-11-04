@@ -79,6 +79,7 @@ export interface MockModalProps {
     delay: string;
     responseBody: string;
     format: string;
+    cancel?: string;
     save: string;
   };
   isEdit: boolean;

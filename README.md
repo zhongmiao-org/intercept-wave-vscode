@@ -16,13 +16,13 @@ English | [简体中文](./README_zh.md)
 
 A powerful VSCode extension that combines the proxy and interception capabilities similar to **Nginx** and **Charles**, designed specifically for local development environments. It intelligently intercepts HTTP requests, either returning custom mock data or acting as a proxy server to forward real requests to the original server with full HTTP headers.
 
-## ✨ v2.0 New Features: Multi-Service Proxy
+## Highlights
 
 - 📑 **Tab-based Interface**: Manage multiple proxy configuration groups in separate tabs
 - 🚀 **Multiple Proxy Groups**: Run multiple mock services simultaneously, each on its own port
 - 🏗️ **Microservices Ready**: Perfect for microservices architecture (e.g., user service on port 8888, order service on port 8889)
 - 🔄 **Quick Switching**: Easily switch and manage different service configurations via tabs
-- 🌍 **Multi-Environment**: Effortlessly manage dev, test, staging, and other environments
+- 🎨 **Refreshed UI**: Compact buttons, responsive layout, codicon icons, clearer disabled states
 
 ## Features
 
@@ -61,7 +61,7 @@ Or install from the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`).
 
 ## Quick Start
 
-### 1. Manage Proxy Groups (v2.0)
+### 1. Manage Proxy Groups
 
 1. Click the "Intercept Wave" icon in the Activity Bar
 2. Use tabs at the top to switch between different proxy configuration groups
@@ -119,7 +119,7 @@ Add mock APIs to each group:
 
 ## Use Cases
 
-### Case 1: Microservices Development (v2.0)
+### Case 1: Microservices Development
 
 Mock multiple microservices simultaneously, each service running on an independent port:
 
@@ -157,7 +157,7 @@ fetch('http://localhost:8889/order-api/orders')
 
 Both services can run simultaneously, each on its own port!
 
-### Case 2: Multi-Environment Management (v2.0)
+### Case 2: Multi-Environment Management
 
 Create different proxy groups for different environments:
 
@@ -235,11 +235,11 @@ All configurations are saved in the `.intercept-wave` folder in your workspace:
 └── config.json           # Global configuration and API mappings
 ```
 
-### config.json Example (v2.0)
+### config.json Example
 
 ```json
 {
-    "version": "2.0",
+    "version": "3.0",
     "proxyGroups": [
         {
             "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -287,41 +287,9 @@ All configurations are saved in the `.intercept-wave` folder in your workspace:
 }
 ```
 
-### Migration from v1.x to v2.0
+Note: the `version` field is managed by the extension and may be updated automatically to match the installed major.minor version.
 
-When upgrading from v1.x to v2.0, your existing configuration will be automatically migrated:
-
-**Before (v1.x)**:
-
-```json
-{
-  "port": 8888,
-  "interceptPrefix": "/api",
-  "baseUrl": "http://localhost:8080",
-  "mockApis": [...]
-}
-```
-
-**After (v2.0)**:
-
-```json
-{
-  "version": "2.0",
-  "proxyGroups": [
-    {
-      "id": "auto-generated-uuid",
-      "name": "默认配置",
-      "enabled": true,
-      "port": 8888,
-      "interceptPrefix": "/api",
-      "baseUrl": "http://localhost:8080",
-      "mockApis": [...]
-    }
-  ]
-}
-```
-
-Your old configuration becomes a new proxy group named "默认配置" (Default Configuration).
+<!-- Migration notes for older versions have been removed for brevity. -->
 
 ## Advanced Features
 
@@ -382,7 +350,7 @@ A: When enabled, the interceptPrefix is removed before matching. For example:
 - Match path: `/user`
 - So your mock API path should be configured as `/user`
 
-### Q: How do I manage multiple proxy groups? (v2.0)
+### Q: How do I manage multiple proxy groups?
 
 A: Use the tab interface at the top of the sidebar:
 
@@ -391,7 +359,7 @@ A: Use the tab interface at the top of the sidebar:
 - Right-click a tab or use the Settings button to edit/delete groups
 - Each group runs independently on its own port
 
-### Q: Can I run multiple proxy groups at the same time? (v2.0)
+### Q: Can I run multiple proxy groups at the same time?
 
 A: Yes! You can either:
 
@@ -399,9 +367,7 @@ A: Yes! You can either:
 - Start individual groups one by one by selecting the tab and clicking "Start Server"
 - Mix both approaches - some groups started via "Start All", others started individually
 
-### Q: What happens to my v1.x configuration after upgrading? (v2.0)
-
-A: Your configuration is automatically migrated to v2.0 format. Your old single-proxy setup becomes a new proxy group named "默认配置" (Default Configuration). All your existing mock APIs and settings are preserved.
+<!-- Legacy migration FAQ removed -->
 
 ## Feedback & Contribution
 

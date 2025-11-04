@@ -1,13 +1,23 @@
 # Intercept Wave For VSCode Changelog
 
-## [Unreleased]
+## [3.0.0]
 
-### ✨ Added
-- 🏠 Prefix welcome route: When `stripPrefix=true`, requests to `/<interceptPrefix>` and `/<interceptPrefix>/` now return the same JSON welcome page as `/`, showing only enabled Mock APIs and example URLs. (MockServerService)
-- 🧠 Smart mock input: Mock API editor accepts JS/JSON5-like snippets (single quotes, unquoted keys, trailing commas, comments) pasted from code and converts them to strict JSON before saving. (MockApiDialog)
+### 🎨 UI & UX
+- Compact buttons with clear disabled styling; better fit for narrow sidebars
+- Codicon icons for global/group actions and dialogs; status with green/red indicators
+- Modal dialogs responsive (max-width 90vw), close via ESC/×/mask
+- Mock list wraps long paths without pushing action buttons out of view
 
-### 🔄 Changed
-- 🗜️ Mock data persistence: On save, `mockData` is strictly validated and minified to compact JSON (no spaces or newlines). Invalid JSON is rejected with clear errors; the “Format JSON” button now pretty-prints using a real JSON parser for readability only, storage remains minified. (MockApiDialog)
+### ✨ Improvements
+- Modern Webview CSP with `webview.cspSource`; reliable script execution on latest VS Code
+- Method+Path uniqueness validation for Mock APIs (RESTful friendly)
+- Clear errors and non-blocking refresh on partial failures (start-all with port conflicts)
+
+### 🧰 Dev Experience
+- Added `.editorconfig`; Prettier/VS Code settings already included
+- Bundled `@vscode/codicons` CSS alongside TTF to ensure icons render in Webview
+
+> Note: Previous v2.0-specific release notes have been trimmed from README to keep things concise. Historical entries remain below for reference.
 
 
 ## [2.2.1]

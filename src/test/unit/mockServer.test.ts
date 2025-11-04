@@ -4,6 +4,7 @@ import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import { MockServerManager, MockConfig, ConfigManager } from '../../common';
 import * as http from 'http';
+import * as net from 'net';
 
 describe('MockServerManager', () => {
     let mockServerManager: MockServerManager;
@@ -100,8 +101,45 @@ describe('MockServerManager', () => {
             await mockServerManager.start();
             expect(appendLineStub.called).to.be.true;
             // In v2.0, log message includes "Mock servers started" (plural)
-            expect(appendLineStub.args.some((arg: any) => arg[0].includes('Mock server'))).to.be
-                .true;
+            expect(appendLineStub.args.some((arg: any) => arg[0].includes('Mock server'))).to.be.true;
+        });
+
+        it('logs failed groups and still starts successful ones', async () => {
+            const cfg: MockConfig = {
+                version: '2.0',
+                proxyGroups: [
+                    { id: 'good', name: 'Good', port: 10070, interceptPrefix: '/api', baseUrl: 'http://localhost:8080', stripPrefix: true, globalCookie: '', enabled: true, mockApis: [] },
+                    { id: 'bad', name: 'Bad', port: 1, interceptPrefix: '/api', baseUrl: 'http://localhost:8080', stripPrefix: true, globalCookie: '', enabled: true, mockApis: [] },
+                ],
+            } as any;
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+            // On some macOS environments, binding to port 1 may not fail deterministically.
+            // Stub net.Server.prototype.listen so that port 1 triggers an error reliably.
+            const realListen = net.Server.prototype.listen as unknown as (...args: any[]) => any;
+            const listenStub = sinon
+                .stub(net.Server.prototype as any, 'listen')
+                .callsFake(function (this: net.Server, ...args: any[]) {
+                    const port = typeof args[0] === 'number' ? args[0] : (typeof args[1] === 'number' ? args[1] : undefined);
+                    if (port === 1) {
+                        setImmediate(() => (this as net.Server).emit('error', Object.assign(new Error('EACCES'), { code: 'EACCES' })));
+                        return this as net.Server;
+                    }
+                    return realListen.apply(this as any, args);
+                });
+
+            await mockServerManager.start();
+
+            // one succeeded, one failed
+            expect(mockServerManager.getStatus()).to.be.true;
+            expect(mockServerManager.getGroupStatus('good')).to.be.true;
+            expect(mockServerManager.getGroupStatus('bad')).to.be.false;
+
+            const logs = appendLineStub.args.map(a => String(a[0]));
+            expect(logs.some(l => l.includes('Mock servers started') && l.includes('Good'))).to.be.true;
+            expect(logs.some(l => l.includes('failed to start') && l.includes('[Bad]'))).to.be.true;
+
+            listenStub.restore();
         });
     });
 

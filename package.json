@@ -2,7 +2,7 @@
     "name": "intercept-wave",
     "displayName": "%displayName%",
     "description": "%description%",
-    "version": "2.2.1",
+    "version": "3.0.0",
     "publisher": "Ark65",
     "icon": "resources/logo.png",
     "repository": {
@@ -47,6 +47,10 @@
             {
                 "command": "interceptWave.openConfig",
                 "title": "%command.openConfig%"
+            },
+            {
+                "command": "interceptWave.openFullView",
+                "title": "Open Full View"
             }
         ],
         "viewsContainers": {
@@ -64,6 +68,15 @@
                     "id": "interceptWaveView",
                     "name": "%view.title%",
                     "type": "webview"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "interceptWave.openConfig",
+                    "when": "view == interceptWaveView",
+                    "group": "navigation@10"
                 }
             ]
         },
@@ -113,7 +126,7 @@
         "test:integration": "npm run compile && npm run package && node ./out/test/integration/runTest.js",
         "test:coverage": "c8 npm run test:unit",
         "test:coverage:ci": "c8 --reporter=lcov --reporter=text --reporter=json-summary npm run test:unit",
-        "build:local": "npm run package && npx @vscode/vsce package --allow-star-activation --allow-missing-repository"
+        "build:local": "npm run webview:build && npm run package && npx -y @vscode/vsce package --allow-star-activation --allow-missing-repository"
     },
     "devDependencies": {
         "@types/react": "^18.3.12",

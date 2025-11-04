@@ -28,7 +28,7 @@
   "ui.editMockApi": "Edit Mock API",
   "ui.deleteMockApi": "Delete this mock API?",
   "ui.noMockApis": "No mock APIs configured.",
-  "ui.clickAddToCreate": "Click \"+ Add\" to create one.",
+  "ui.clickAddToCreate": "Click \"+ Add Mock API\" to create one.",
   "ui.groupName": "Group Name",
   "ui.enabled": "Enabled",
   "ui.port": "Port",
@@ -36,6 +36,9 @@
   "ui.baseUrl": "Base URL",
   "ui.stripPrefix": "Strip Prefix",
   "ui.globalCookie": "Global Cookie",
+  "ui.yes": "Yes",
+  "ui.no": "No",
+  "ui.notSet": "(Not set)",
   "ui.method": "Method",
   "ui.path": "Path",
   "ui.statusCode": "Status Code",
@@ -69,5 +72,8 @@
   "error.emptyGroupName": "Group name cannot be empty",
   "error.invalidPort": "Port must be between 1024 and 65535",
   "error.portInUse": "Port {0} is already used by group \"{1}\"",
+  "error.duplicateGroupName": "Group name \"{0}\" already exists",
+  "error.mockPathExists": "Mock path already exists in this group: {0}",
+  "error.mockRouteExists": "Mock route already exists in this group: {0} {1}",
   "success.groupStopped": "Server stopped: {0}"
 }

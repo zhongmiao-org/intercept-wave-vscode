@@ -71,6 +71,19 @@ try {
             dest: path.join(distWebviewDir, 'codicon.ttf'),
             name: '@vscode/codicons/codicon.ttf',
         },
+        {
+            src: path.join(
+                __dirname,
+                '..',
+                'node_modules',
+                '@vscode',
+                'codicons',
+                'dist',
+                'codicon.css'
+            ),
+            dest: path.join(distWebviewDir, 'codicon.css'),
+            name: '@vscode/codicons/codicon.css',
+        },
     ];
 
     webviewDeps.forEach(({ src, dest, name }) => {

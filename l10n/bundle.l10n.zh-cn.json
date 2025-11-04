@@ -28,7 +28,7 @@
   "ui.editMockApi": "编辑 Mock API",
   "ui.deleteMockApi": "确定删除此 Mock API 吗?",
   "ui.noMockApis": "暂无 Mock API 配置。",
-  "ui.clickAddToCreate": "点击\"+ 添加\"创建一个。",
+  "ui.clickAddToCreate": "点击\"+ 添加 Mock API\"创建一个。",
   "ui.groupName": "配置组名称",
   "ui.enabled": "启用",
   "ui.port": "端口号",
@@ -36,6 +36,9 @@
   "ui.baseUrl": "目标地址",
   "ui.stripPrefix": "剥离前缀",
   "ui.globalCookie": "全局 Cookie",
+  "ui.yes": "是",
+  "ui.no": "否",
+  "ui.notSet": "(未设置)",
   "ui.method": "请求方法",
   "ui.path": "路径",
   "ui.statusCode": "状态码",
@@ -69,5 +72,8 @@
   "error.emptyGroupName": "组名称不能为空",
   "error.invalidPort": "端口号必须在 1024 到 65535 之间",
   "error.portInUse": "端口 {0} 已被组 \"{1}\" 占用",
+  "error.duplicateGroupName": "配置组名称 \"{0}\" 已存在",
+  "error.mockPathExists": "该组内已存在相同的路径: {0}",
+  "error.mockRouteExists": "该组内已存在相同的请求方法与路径: {0} {1}",
   "success.groupStopped": "服务器已停止: {0}"
 }

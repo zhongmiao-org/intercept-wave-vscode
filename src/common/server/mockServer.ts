@@ -30,17 +30,31 @@ export class MockServerManager {
             throw new Error('All enabled servers are already running');
         }
 
-        const startPromises = groupsToStart.map(group => this.startGroup(group));
-        await Promise.all(startPromises);
+        const results = await Promise.allSettled(groupsToStart.map(group => this.startGroup(group)));
+        const succeeded: ProxyGroup[] = [];
+        const failed: { group: ProxyGroup; error: any }[] = [];
+        results.forEach((r, i) => {
+            if (r.status === 'fulfilled') {
+                succeeded.push(groupsToStart[i]);
+            } else {
+                failed.push({ group: groupsToStart[i], error: r.reason });
+            }
+        });
 
-        // Update isRunning flag
-        this.isRunning = true;
+        if (succeeded.length > 0) {
+            this.isRunning = true;
+            const urls = succeeded.map(g => `http://localhost:${g.port} (${g.name})`).join(', ');
+            this.outputChannel.appendLine(`✅ Mock servers started: ${urls}`);
+            if (failed.length > 0) {
+                failed.forEach(f => this.outputChannel.appendLine(`❌ [${f.group.name}] failed to start: ${f.error?.message || f.error}`));
+            }
+            this.outputChannel.show(true);
+            return urls;
+        }
 
-        const urls = groupsToStart.map(g => `http://localhost:${g.port} (${g.name})`).join(', ');
-        this.outputChannel.appendLine(`✅ Mock servers started: ${urls}`);
-        this.outputChannel.show(true);
-
-        return urls;
+        // none succeeded
+        const errorMsg = failed.map(f => `${f.group.name}(:${f.group.port}) - ${f.error?.message || f.error}`).join('; ');
+        throw new Error(`Failed to start any server: ${errorMsg}`);
     }
 
     private async startGroup(group: ProxyGroup): Promise<void> {

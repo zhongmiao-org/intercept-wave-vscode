@@ -407,6 +407,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             // Form labels
             'ui.groupName', 'ui.enabled', 'ui.port', 'ui.interceptPrefix', 'ui.baseUrl', 'ui.stripPrefix',
             'ui.globalCookie', 'ui.method', 'ui.path', 'ui.statusCode', 'ui.responseBody', 'ui.delay',
+            'ui.yes', 'ui.no', 'ui.notSet',
             // Titles and lists
             'ui.addProxyGroup', 'ui.editProxyGroup', 'ui.addMockApi', 'ui.editMockApi', 'ui.running', 'ui.stopped', 'ui.mockApis',
             // Empty state

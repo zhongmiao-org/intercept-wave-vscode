@@ -351,6 +351,7 @@ export class PanelProvider {
             'ui.format', 'ui.validate',
             'ui.groupName', 'ui.enabled', 'ui.port', 'ui.interceptPrefix', 'ui.baseUrl', 'ui.stripPrefix',
             'ui.globalCookie', 'ui.method', 'ui.path', 'ui.statusCode', 'ui.responseBody', 'ui.delay',
+            'ui.yes', 'ui.no', 'ui.notSet',
             'ui.addProxyGroup', 'ui.editProxyGroup', 'ui.addMockApi', 'ui.editMockApi', 'ui.running', 'ui.stopped', 'ui.mockApis',
             'ui.noMockApis', 'ui.clickAddToCreate',
             'ui.deleteProxyGroup', 'ui.deleteMockApi',

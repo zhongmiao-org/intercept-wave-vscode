@@ -379,18 +379,18 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
             {/* Group info + actions */}
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
               <div style={{ flex: 1, background: 'var(--vscode-editor-background)', border: '1px solid var(--vscode-panel-border)', borderRadius: 4, padding: 10 }}>
-                <div style={{ marginBottom: 6, fontWeight: 600 }}>{(t('ui.groupName') || '配置组名称') + ': '} {activeGroup.name} ({activeGroup.port})</div>
+                <div style={{ marginBottom: 6, fontWeight: 600 }}>{(t('ui.groupName') || 'Group Name') + ': '} {activeGroup.name} ({activeGroup.port})</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', rowGap: 4, columnGap: 8 }}>
-                  <div>{t('ui.port') || '端口号'}:</div>
+                  <div>{t('ui.port') || 'Port'}:</div>
                   <div>{activeGroup.port}</div>
-                  <div>{t('ui.interceptPrefix') || '拦截前缀'}:</div>
+                  <div>{t('ui.interceptPrefix') || 'Intercept Prefix'}:</div>
                   <div>{activeGroup.interceptPrefix}</div>
-                  <div>{t('ui.baseUrl') || '目标地址'}:</div>
+                  <div>{t('ui.baseUrl') || 'Base URL'}:</div>
                   <div style={{ wordBreak: 'break-all' }}>{activeGroup.baseUrl}</div>
-                  <div>{t('ui.stripPrefix') || '剥离前缀'}:</div>
-                  <div>{activeGroup.stripPrefix ? '是' : '否'}</div>
-                  <div>{t('ui.globalCookie') || '全局Cookie'}:</div>
-                  <div>{(activeGroup.globalCookie && activeGroup.globalCookie.trim()) ? activeGroup.globalCookie : '(未设置)'}</div>
+                  <div>{t('ui.stripPrefix') || 'Strip Prefix'}:</div>
+                  <div>{activeGroup.stripPrefix ? (t('ui.yes') || 'Yes') : (t('ui.no') || 'No')}</div>
+                  <div>{t('ui.globalCookie') || 'Global Cookie'}:</div>
+                  <div>{(activeGroup.globalCookie && activeGroup.globalCookie.trim()) ? activeGroup.globalCookie : (t('ui.notSet') || '(Not set)')}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

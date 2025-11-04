@@ -113,6 +113,24 @@ describe('MockServerManager', () => {
             } as any;
             (configManager.getConfig as sinon.SinonStub).returns(cfg);
 
+            // On some macOS environments, binding to port 1 may not fail deterministically.
+            // Stub http.createServer().listen so that port 1 triggers an error reliably.
+            const realCreate = http.createServer;
+            const createStub = sinon.stub(http, 'createServer').callsFake(((...args: any[]) => {
+                const srv = (realCreate as any).apply(http, args) as http.Server;
+                const realListen = srv.listen.bind(srv);
+                (srv as any).listen = ((port?: any, ...rest: any[]) => {
+                    const p = typeof port === 'number' ? port : (typeof rest[0] === 'number' ? rest[0] : undefined);
+                    if (p === 1) {
+                        // simulate async listen error
+                        setImmediate(() => srv.emit('error', Object.assign(new Error('EACCES'), { code: 'EACCES' })));
+                        return srv;
+                    }
+                    return realListen(port as any, ...(rest as any)) as any;
+                }) as any;
+                return srv;
+            }) as any);
+
             await mockServerManager.start();
 
             // one succeeded, one failed
@@ -123,6 +141,8 @@ describe('MockServerManager', () => {
             const logs = appendLineStub.args.map(a => String(a[0]));
             expect(logs.some(l => l.includes('Mock servers started') && l.includes('Good'))).to.be.true;
             expect(logs.some(l => l.includes('failed to start') && l.includes('[Bad]'))).to.be.true;
+
+            createStub.restore();
         });
     });
 

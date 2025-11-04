@@ -8,7 +8,7 @@ function useVscode(): VsCodeApi {
   try {
     const w = window as unknown as IWWindow;
     const api = (w.__IW_VSCODE__ || (w.acquireVsCodeApi ? w.acquireVsCodeApi() : ({ postMessage: (_: unknown) => {} } as VsCodeApi)));
-    const proxy: VsCodeApi = {
+      return {
       postMessage: (message: unknown) => {
         try { console.debug('[IW] postMessage →', message); } catch {}
         try { (api as any).postMessage(message); } catch (e) { try { console.error('[IW] postMessage error', e); } catch {} }
@@ -16,7 +16,6 @@ function useVscode(): VsCodeApi {
       getState: (api as any).getState?.bind(api),
       setState: (api as any).setState?.bind(api),
     } as VsCodeApi;
-    return proxy;
   } catch {
     return { postMessage: (_: unknown) => { try { console.warn('[IW] postMessage dropped: vscode api missing'); } catch {} } } as VsCodeApi;
   }

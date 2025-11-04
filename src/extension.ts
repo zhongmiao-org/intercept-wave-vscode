@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { MockServerManager, ConfigManager, buildReactWebviewHtml } from './common';
+import { MockServerManager, ConfigManager } from './common';
 import { SidebarProvider, PanelProvider } from './providers';
 let mockServerManager: MockServerManager;
 let configManager: ConfigManager;
@@ -147,13 +147,4 @@ export async function deactivate() {
     if (mockServerManager) {
         await mockServerManager.stop();
     }
-}
-
-function getNonce() {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
 }

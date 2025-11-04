@@ -1,0 +1,76 @@
+name: "Bug 报告 / Bug Report"
+description: "报告在使用 Intercept Wave VS Code 扩展时遇到的问题"
+title: "[Bug]: "
+labels: [bug]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽可能详细地填写以下内容，方便我们快速定位与修复。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述 / Description
+      description: 简要说明问题现象（包括实际结果 vs 预期结果）
+      placeholder: 例如：启动服务按钮点击无效，应该弹出错误提示并禁用按钮…
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤 / Steps To Reproduce
+      description: 请给出最小可复现步骤
+      placeholder: |
+        1. 打开扩展侧边栏
+        2. 点击“启动服务”
+        3. 观察…
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志与错误信息 / Logs & Errors
+      description: 如有，请粘贴 VS Code Output → Intercept Wave 的日志、开发者工具 Console 日志、或报错截图链接
+      render: shell
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: 扩展版本 / Extension Version
+      placeholder: 例如：3.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code 版本 / VS Code Version
+      placeholder: 例如：1.105.1 (Stable/Insiders)
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: 操作系统 / OS
+      placeholder: 例如：macOS 15 / Windows 11 / Ubuntu 22.04
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: 配置片段（如适用）/ Config Snippet (if applicable)
+      description: 如果问题与某组配置或 Mock 有关，请附上相关片段（注意脱敏）
+      render: json
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他信息 / Additional Context
+      description: 任何有助于定位问题的补充信息
+

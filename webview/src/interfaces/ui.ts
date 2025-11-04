@@ -6,6 +6,8 @@ export interface InitialState {
   isRunning: boolean;
   groupStatuses: GroupStatusMap;
   i18n: I18nMap;
+  viewKind?: 'sidebar' | 'panel';
+  panelAction?: { type: string; groupId?: string; index?: number } | null;
 }
 
 export interface GroupSummary {
@@ -24,4 +26,6 @@ export interface VsCodeApi {
 export type IWWindow = Window & {
   acquireVsCodeApi?: () => VsCodeApi;
   __IW_INITIAL_STATE__?: InitialState;
+  __IW_HAS_VSCODE__?: boolean;
+  __IW_VSCODE__?: VsCodeApi;
 };

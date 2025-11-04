@@ -1,18 +1,24 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { GroupDraft, MockApiDraft, MockApiConfig, ProxyGroup } from './interfaces/business';
 import { GroupSummary, InitialState, IWWindow, VsCodeApi } from './interfaces/ui';
-import { GroupList } from './components/GroupList';
-import { GroupHeader } from './components/GroupHeader';
-import { MockList } from './components/MockList';
 import { GroupModal } from './components/GroupModal';
 import { MockModal } from './components/MockModal';
 
 function useVscode(): VsCodeApi {
   try {
     const w = window as unknown as IWWindow;
-    return w.acquireVsCodeApi ? w.acquireVsCodeApi() : ({ postMessage: (_: unknown) => {} } as VsCodeApi);
+    const api = (w.__IW_VSCODE__ || (w.acquireVsCodeApi ? w.acquireVsCodeApi() : ({ postMessage: (_: unknown) => {} } as VsCodeApi)));
+    const proxy: VsCodeApi = {
+      postMessage: (message: unknown) => {
+        try { console.debug('[IW] postMessage →', message); } catch {}
+        try { (api as any).postMessage(message); } catch (e) { try { console.error('[IW] postMessage error', e); } catch {} }
+      },
+      getState: (api as any).getState?.bind(api),
+      setState: (api as any).setState?.bind(api),
+    } as VsCodeApi;
+    return proxy;
   } catch {
-    return { postMessage: (_: unknown) => {} } as VsCodeApi;
+    return { postMessage: (_: unknown) => { try { console.warn('[IW] postMessage dropped: vscode api missing'); } catch {} } } as VsCodeApi;
   }
 }
 
@@ -118,7 +124,19 @@ function parseJsonSmart(raw: string): unknown {
 
 export function App({ state, setState }: { state: InitialState; setState: (s: InitialState) => void }) {
   const vscode = useVscode();
-  const t = useCallback((k: string) => state.i18n?.[k] ?? k, [state.i18n]);
+  const t = useCallback((k: string) => {
+    const v = (state.i18n && (state.i18n as any)[k]) as string | undefined;
+    if (!v) return '';
+    // If VS Code l10n returns the key itself (e.g., 'ui.startAll') in base locale, treat as missing
+    if (v === k) return '';
+    // Defensive: if value still looks like a dotted key, fallback to default text in UI
+    if (/^[a-z]+\./i.test(v)) return '';
+    return v;
+  }, [state.i18n]);
+
+  const Icon = ({ name, color }: { name: string; color?: string }) => (
+    <span className={`codicon codicon-${name}`} style={{ color }} />
+  );
 
   const groups: GroupSummary[] = (state.config?.proxyGroups ?? []).map((g: ProxyGroup) => ({
     id: g.id,
@@ -135,6 +153,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
   // UI state
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null as GroupDraft | null);
+  const [isEditingGroup, setIsEditingGroup] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
   const [editingMockIndex, setEditingMockIndex] = useState(null as number | null);
   const [mockDraft, setMockDraft] = useState(null as MockApiDraft | null);
@@ -150,6 +169,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
 
   // Group operations
   const onAddGroup = () => {
+    setIsEditingGroup(false);
     setEditingGroup({
       name: '',
       enabled: true,
@@ -165,6 +185,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
     if (!activeGroup) return;
     const { id: _id, mockApis: _m, ...rest } = activeGroup as ProxyGroup;
     setEditingGroup({ ...(rest as GroupDraft) });
+    setIsEditingGroup(true);
     setShowGroupModal(true);
   };
   const onDeleteGroup = () => {
@@ -173,7 +194,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
   };
   const onSaveGroup = () => {
     if (!editingGroup) return;
-    if (activeGroup && showGroupModal && activeGroup.id) {
+    if (isEditingGroup && activeGroup && activeGroup.id) {
       vscode.postMessage({ type: 'updateGroup', groupId: activeGroup.id, data: editingGroup });
     } else {
       vscode.postMessage({ type: 'addGroup', data: editingGroup });
@@ -184,14 +205,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
   const onAddMock = () => {
     if (!activeGroup) return;
     setEditingMockIndex(null);
-    setMockDraft({
-      enabled: true,
-      method: 'GET',
-      path: '/',
-      statusCode: 200,
-      mockData: '{"ok":true}',
-      delay: 0,
-    } as MockApiDraft);
+    setMockDraft({ enabled: true, method: 'GET', path: '/', statusCode: 200, mockData: '{"ok":true}', delay: 0 } as MockApiDraft);
     setShowMockModal(true);
   };
   const onEditMock = (index: number) => {
@@ -242,61 +256,180 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
   };
 
   React.useEffect(() => {
-    const handler = (_e: Event) => setShowGroupModal(false);
+    const handler = (_e: Event) => {
+      setShowGroupModal(false);
+      setIsEditingGroup(false);
+      setShowMockModal(false);
+      // Also clear any panel action when extension requests close
+      if (state.viewKind === 'panel') setState({ ...state, panelAction: null });
+    };
     window.addEventListener('iw:closeGroupForm', handler);
     return () => window.removeEventListener('iw:closeGroupForm', handler);
-  }, []);
+  }, [state.viewKind, setState, state]);
+
+  // When a panelAction arrives (from sidebar), prepare local drafts
+  React.useEffect(() => {
+    const act = state.panelAction?.type;
+    if (!act) return;
+    if (act === 'addGroup') {
+      setEditingGroup({ name: '', enabled: true, port: 8888, interceptPrefix: '/api', baseUrl: '', stripPrefix: true, globalCookie: '' } as GroupDraft);
+      setShowGroupModal(false);
+    }
+    if (act === 'editGroup' && activeGroup) {
+      const { id: _id, mockApis: _m, ...rest } = activeGroup as ProxyGroup;
+      setEditingGroup({ ...(rest as GroupDraft) });
+      setShowGroupModal(false);
+    }
+    if (act === 'addMock' && activeGroup) {
+      setEditingMockIndex(null);
+      setMockDraft({ enabled: true, method: 'GET', path: '/', statusCode: 200, mockData: '{"ok":true}', delay: 0 } as MockApiDraft);
+      setShowMockModal(false);
+    }
+    if (act === 'editMock' && activeGroup && typeof state.panelAction?.index === 'number') {
+      const idx = state.panelAction.index as number;
+      const m = (activeGroup.mockApis as MockApiConfig[])[idx];
+      setEditingMockIndex(idx);
+      let response = m.mockData; try { response = JSON.stringify(JSON.parse(m.mockData), null, 2); } catch {}
+      setMockDraft({ ...m, mockData: response });
+      setShowMockModal(false);
+    }
+  }, [state.panelAction, activeGroup]);
+
+  const removeGroupFromTab = (id: string) => {
+    vscode.postMessage({ type: 'deleteGroup', groupId: id });
+  };
+
+  const methodColor = (m: string) => {
+    const k = (m || '').toUpperCase();
+    if (k === 'GET') return '#2ecc71';
+    if (k === 'POST') return '#f1c40f';
+    if (k === 'PUT') return '#e67e22';
+    if (k === 'DELETE') return '#e74c3c';
+    return '#3498db';
+  };
+
+  // Aggregated running info for buttons
+  const totalGroups = (state.config?.proxyGroups || []).length;
+  const runningCount = (state.config?.proxyGroups || []).reduce((acc: number, g: ProxyGroup) => acc + (state.groupStatuses?.[g.id] ? 1 : 0), 0);
+  const allRunning = totalGroups > 0 && runningCount === totalGroups;
+  const noneRunning = runningCount === 0;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', height: '100vh', fontFamily: 'var(--vscode-font-family, system-ui, Arial)' }}>
-      <div>
-        <div style={{ display: 'flex', gap: 8, padding: 12 }}>
-          <button onClick={startAll}>{t('ui.startAll') || 'Start All'}</button>
-          <button onClick={stopAll}>{t('ui.stopAll') || 'Stop All'}</button>
-        </div>
-        <GroupList
-          groups={groups}
-          activeGroupId={state.activeGroupId}
-          onSelect={setActiveGroup}
-          onAddGroup={onAddGroup}
-          noGroupsText={t('ui.noMockApis') || 'No groups yet'}
-        />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontFamily: 'var(--vscode-font-family, system-ui, Arial)' }}>
+      {/* Global controls */}
+      <div style={{ display: 'flex', gap: 8, padding: 12, flexWrap: 'wrap' }}>
+        <button style={{ minWidth: 96 }} onClick={startAll} disabled={allRunning}><Icon name="play" />{t('ui.startAll') || 'Start All'}</button>
+        <button style={{ minWidth: 96 }} onClick={stopAll} disabled={noneRunning}><Icon name="stop" />{t('ui.stopAll') || 'Stop All'}</button>
+        <div style={{ flex: 1 }} />
       </div>
 
-      <div style={{ padding: 12 }}>
+      {/* Group tabs */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px 8px 12px', overflowX: 'auto' }}>
+        {groups.map(g => (
+          <div
+            key={g.id}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '0 8px', height: 24, fontSize: 12,
+              border: '1px solid var(--vscode-panel-border)', borderRadius: 3,
+              cursor: 'pointer',
+              background: state.activeGroupId === g.id ? 'var(--vscode-tab-activeBackground)' : 'var(--vscode-tab-inactiveBackground)',
+              color: state.activeGroupId === g.id ? 'var(--vscode-tab-activeForeground)' : 'var(--vscode-tab-inactiveForeground)'
+            }}
+            onClick={() => setActiveGroup(g.id)}
+          >
+            <span style={{ lineHeight: 1 }}>{g.name}(:{g.port})</span>
+            <span
+              onClick={(e) => { e.stopPropagation(); removeGroupFromTab(g.id); }}
+              style={{ opacity: 0.8, fontSize: 12, lineHeight: 1, display: 'inline-block' }}
+            >
+              ×
+            </span>
+          </div>
+        ))}
+        <button
+          onClick={onAddGroup}
+          aria-label={t('ui.addProxyGroup') || 'Add Group'}
+          title={t('ui.addProxyGroup') || 'Add Group'}
+          style={{ marginLeft: 4, minWidth: 0, padding: 0, width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <span className="codicon codicon-add" />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: 12, overflowY: 'auto' }}>
         {activeGroup ? (
           <>
-            <GroupHeader
-              group={activeGroup as ProxyGroup}
-              running={!!state.groupStatuses?.[activeGroup.id]}
-              onStart={() => startGroup(activeGroup.id)}
-              onStop={() => stopGroup(activeGroup.id)}
-              onEdit={onEditGroup}
-              onDelete={onDeleteGroup}
-              labels={{
-                start: t('ui.startServer') || 'Start',
-                stop: t('ui.stopServer') || 'Stop',
-                edit: t('ui.edit') || 'Edit',
-                delete: t('ui.delete') || 'Delete',
-              }}
-            />
+            {/* Group title and status */}
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>{activeGroup.name}</div>
+              <div style={{ color: 'var(--vscode-descriptionForeground)', display: 'flex', alignItems: 'center' }}>
+                {state.groupStatuses?.[activeGroup.id]
+                  ? (<><Icon name="circle-filled" color="#2ecc71" />{t('ui.running') || 'Running'}</>)
+                  : (<><Icon name="circle-filled" color="#e74c3c" />{t('ui.stopped') || 'Stopped'}</>)}
+              </div>
+            </div>
 
-            <MockList
-              mocks={(activeGroup.mockApis as MockApiConfig[]) || []}
-              onToggle={onToggleMock}
-              onEdit={onEditMock}
-              onDelete={onDeleteMock}
-              onAdd={onAddMock}
-              labels={{
-                mockApis: t('ui.mockApis') || 'Mock APIs',
-                addMock: t('ui.addMockApi') || 'Add Mock',
-                enable: t('ui.enable') || 'Enable',
-                disable: t('ui.disable') || 'Disable',
-                edit: t('ui.edit') || 'Edit',
-                delete: t('ui.delete') || 'Delete',
-                emptyText: t('ui.clickAddToCreate') || 'Click Add to create',
-              }}
-            />
+            {/* Start/Stop buttons */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <button style={{ minWidth: 96 }} onClick={() => startGroup(activeGroup.id)} disabled={!!state.groupStatuses?.[activeGroup.id]}><Icon name="play" />{t('ui.startServer') || 'Start'}</button>
+              <button style={{ minWidth: 96 }} onClick={() => stopGroup(activeGroup.id)} disabled={!state.groupStatuses?.[activeGroup.id]}><Icon name="stop" />{t('ui.stopServer') || 'Stop'}</button>
+            </div>
+
+            {/* Group info + actions */}
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+              <div style={{ flex: 1, background: 'var(--vscode-editor-background)', border: '1px solid var(--vscode-panel-border)', borderRadius: 4, padding: 10 }}>
+                <div style={{ marginBottom: 6, fontWeight: 600 }}>{(t('ui.groupName') || '配置组名称') + ': '} {activeGroup.name} ({activeGroup.port})</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', rowGap: 4, columnGap: 8 }}>
+                  <div>{t('ui.port') || '端口号'}:</div>
+                  <div>{activeGroup.port}</div>
+                  <div>{t('ui.interceptPrefix') || '拦截前缀'}:</div>
+                  <div>{activeGroup.interceptPrefix}</div>
+                  <div>{t('ui.baseUrl') || '目标地址'}:</div>
+                  <div style={{ wordBreak: 'break-all' }}>{activeGroup.baseUrl}</div>
+                  <div>{t('ui.stripPrefix') || '剥离前缀'}:</div>
+                  <div>{activeGroup.stripPrefix ? '是' : '否'}</div>
+                  <div>{t('ui.globalCookie') || '全局Cookie'}:</div>
+                  <div>{(activeGroup.globalCookie && activeGroup.globalCookie.trim()) ? activeGroup.globalCookie : '(未设置)'}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={onEditGroup}><Icon name="gear" />{t('ui.settings') || 'Settings'}</button>
+                <button onClick={onDeleteGroup}><Icon name="trash" />{t('ui.delete') || 'Delete'}</button>
+              </div>
+            </div>
+
+            {/* Mock APIs header */}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+              {(() => {
+                const total = (activeGroup.mockApis || []).length;
+                const enabledCount = ((activeGroup.mockApis || []) as MockApiConfig[]).filter(m => m.enabled).length;
+                return <div style={{ fontWeight: 600 }}>{`${t('ui.mockApis') || 'Mock APIs'} (${enabledCount}/${total})`}</div>;
+              })()}
+              <div style={{ flex: 1 }} />
+              <button onClick={onAddMock}><Icon name="add" />{t('ui.addMockApi') || 'Add Mock'}</button>
+            </div>
+
+            {/* Mock APIs list */}
+            <div>
+              {((activeGroup.mockApis as MockApiConfig[]) || []).map((m, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 8, background: 'var(--vscode-editor-background)', borderRadius: 3, borderLeft: `3px solid ${m.enabled ? '#4caf50' : '#9e9e9e'}`, flexWrap: 'nowrap' }}>
+                  <div style={{ minWidth: 42, textAlign: 'center', color: '#fff', background: methodColor(m.method), padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 700 }}>{(m.method || '').toUpperCase()}</div>
+                  <div style={{ flex: '1 1 auto', minWidth: 0, color: m.enabled ? 'var(--vscode-editor-foreground)' : 'var(--vscode-descriptionForeground)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{m.path}</div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                    <button onClick={() => onToggleMock(idx)}>
+                      {m.enabled ? (<><Icon name="circle-slash" />{t('ui.disable') || 'Disable'}</>) : (<><Icon name="check" />{t('ui.enable') || 'Enable'}</>)}
+                    </button>
+                    <button onClick={() => onEditMock(idx)}><Icon name="edit" />{t('ui.edit') || 'Edit'}</button>
+                    <button onClick={() => onDeleteMock(idx)}><Icon name="trash" />{t('ui.delete') || 'Delete'}</button>
+                  </div>
+                </div>
+              ))}
+              {((activeGroup.mockApis as MockApiConfig[]) || []).length === 0 && (
+                <div style={{ color: 'var(--vscode-descriptionForeground, #888)', fontStyle: 'italic' }}>{t('ui.clickAddToCreate') || 'Click Add to create'}</div>
+              )}
+            </div>
           </>
         ) : (
           <div style={{ color: 'var(--vscode-descriptionForeground, #888)' }}>No active group</div>
@@ -310,7 +443,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
         onChange={setEditingGroup as (d: GroupDraft) => void}
         onSave={onSaveGroup}
         onCancel={() => setShowGroupModal(false)}
-        isEdit={!!(editingGroup && activeGroup)}
+        isEdit={isEditingGroup}
         labels={{
           titleAdd: t('ui.addProxyGroup') || 'Add Group',
           titleEdit: t('ui.editProxyGroup') || 'Edit Group',
@@ -345,6 +478,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
           responseBody: t('ui.responseBody') || 'Response Body (JSON)',
           format: t('ui.format') || 'Format',
           save: t('ui.save') || 'Save',
+          cancel: t('ui.cancel') || 'Cancel',
         }}
       />
     </div>

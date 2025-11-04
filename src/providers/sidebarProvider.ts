@@ -11,11 +11,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         private readonly extensionUri: vscode.Uri,
         private readonly mockServerManager: MockServerManager,
         private readonly configManager: ConfigManager,
-        private readonly outputChannel?: vscode.OutputChannel,
         private readonly panelProvider?: PanelProvider
-    ) {
-        console.log('[SidebarProvider] Constructor called');
-    }
+    ) {}
 
     private async notify(level: 'info' | 'warn' | 'error', text: string) {
         try {
@@ -32,7 +29,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         _context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken
     ) {
-        console.log('[SidebarProvider] resolveWebviewView called');
         this.webviewView = webviewView;
 
         try {
@@ -40,16 +36,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 enableScripts: true,
                 localResourceRoots: [this.extensionUri],
             };
-            console.log('[SidebarProvider] Webview options set');
-
             webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
-            console.log('[SidebarProvider] Webview HTML set');
 
             webviewView.webview.onDidReceiveMessage(async data => {
                 await this.handleMessage(data, webviewView);
             });
         } catch (error: any) {
-            console.error('[SidebarProvider] Error in resolveWebviewView:', error);
             void vscode.window.showErrorMessage(
                 `Failed to load Intercept Wave view: ${error.message}`
             );
@@ -61,9 +53,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             switch (data.type) {
                 case 'openPanel': {
                     const action = data.action;
-                    this.outputChannel?.appendLine(`[Sidebar] openPanel action: ${JSON.stringify(action)}`);
                     if (this.panelProvider) {
-                        this.panelProvider.focusWithAction(action);
+                        await this.panelProvider.focusWithAction(action);
                     } else {
                         await vscode.commands.executeCommand('interceptWave.openFullView');
                     }

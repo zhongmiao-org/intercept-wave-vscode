@@ -240,7 +240,7 @@ fetch('http://localhost:8888/api/posts')
 
 ```json
 {
-    "version": "2.0",
+    "version": "3.0",
     "proxyGroups": [
         {
             "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -287,6 +287,8 @@ fetch('http://localhost:8888/api/posts')
     ]
 }
 ```
+
+说明: `version` 字段由扩展自动维护，会根据安装的主次版本自动更新，无需手动修改。
 
 <!-- 旧版本迁移说明已移除，保持简洁 -->
 

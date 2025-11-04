@@ -100,8 +100,29 @@ describe('MockServerManager', () => {
             await mockServerManager.start();
             expect(appendLineStub.called).to.be.true;
             // In v2.0, log message includes "Mock servers started" (plural)
-            expect(appendLineStub.args.some((arg: any) => arg[0].includes('Mock server'))).to.be
-                .true;
+            expect(appendLineStub.args.some((arg: any) => arg[0].includes('Mock server'))).to.be.true;
+        });
+
+        it('logs failed groups and still starts successful ones', async () => {
+            const cfg: MockConfig = {
+                version: '2.0',
+                proxyGroups: [
+                    { id: 'good', name: 'Good', port: 10070, interceptPrefix: '/api', baseUrl: 'http://localhost:8080', stripPrefix: true, globalCookie: '', enabled: true, mockApis: [] },
+                    { id: 'bad', name: 'Bad', port: 1, interceptPrefix: '/api', baseUrl: 'http://localhost:8080', stripPrefix: true, globalCookie: '', enabled: true, mockApis: [] },
+                ],
+            } as any;
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+            await mockServerManager.start();
+
+            // one succeeded, one failed
+            expect(mockServerManager.getStatus()).to.be.true;
+            expect(mockServerManager.getGroupStatus('good')).to.be.true;
+            expect(mockServerManager.getGroupStatus('bad')).to.be.false;
+
+            const logs = appendLineStub.args.map(a => String(a[0]));
+            expect(logs.some(l => l.includes('Mock servers started') && l.includes('Good'))).to.be.true;
+            expect(logs.some(l => l.includes('failed to start') && l.includes('[Bad]'))).to.be.true;
         });
     });
 

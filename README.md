@@ -239,7 +239,7 @@ All configurations are saved in the `.intercept-wave` folder in your workspace:
 
 ```json
 {
-    "version": "2.0",
+    "version": "3.0",
     "proxyGroups": [
         {
             "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -286,6 +286,8 @@ All configurations are saved in the `.intercept-wave` folder in your workspace:
     ]
 }
 ```
+
+Note: the `version` field is managed by the extension and may be updated automatically to match the installed major.minor version.
 
 <!-- Migration notes for older versions have been removed for brevity. -->
 

@@ -4,6 +4,7 @@ import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import { MockServerManager, MockConfig, ConfigManager } from '../../common';
 import * as http from 'http';
+import * as net from 'net';
 
 describe('MockServerManager', () => {
     let mockServerManager: MockServerManager;
@@ -114,22 +115,18 @@ describe('MockServerManager', () => {
             (configManager.getConfig as sinon.SinonStub).returns(cfg);
 
             // On some macOS environments, binding to port 1 may not fail deterministically.
-            // Stub http.createServer().listen so that port 1 triggers an error reliably.
-            const realCreate = http.createServer;
-            const createStub = sinon.stub(http, 'createServer').callsFake(((...args: any[]) => {
-                const srv = (realCreate as any).apply(http, args) as http.Server;
-                const realListen = srv.listen.bind(srv);
-                (srv as any).listen = ((port?: any, ...rest: any[]) => {
-                    const p = typeof port === 'number' ? port : (typeof rest[0] === 'number' ? rest[0] : undefined);
-                    if (p === 1) {
-                        // simulate async listen error
-                        setImmediate(() => srv.emit('error', Object.assign(new Error('EACCES'), { code: 'EACCES' })));
-                        return srv;
+            // Stub net.Server.prototype.listen so that port 1 triggers an error reliably.
+            const realListen = net.Server.prototype.listen as unknown as (...args: any[]) => any;
+            const listenStub = sinon
+                .stub(net.Server.prototype as any, 'listen')
+                .callsFake(function (this: net.Server, ...args: any[]) {
+                    const port = typeof args[0] === 'number' ? args[0] : (typeof args[1] === 'number' ? args[1] : undefined);
+                    if (port === 1) {
+                        setImmediate(() => (this as net.Server).emit('error', Object.assign(new Error('EACCES'), { code: 'EACCES' })));
+                        return this as net.Server;
                     }
-                    return realListen(port as any, ...(rest as any)) as any;
-                }) as any;
-                return srv;
-            }) as any);
+                    return realListen.apply(this as any, args);
+                });
 
             await mockServerManager.start();
 
@@ -142,7 +139,7 @@ describe('MockServerManager', () => {
             expect(logs.some(l => l.includes('Mock servers started') && l.includes('Good'))).to.be.true;
             expect(logs.some(l => l.includes('failed to start') && l.includes('[Bad]'))).to.be.true;
 
-            createStub.restore();
+            listenStub.restore();
         });
     });
 

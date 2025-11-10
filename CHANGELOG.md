@@ -6,6 +6,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [3.0.1]
+
 ### Fixed
 
 - Ensure webview bundle is built during packaging to avoid missing `dist/webview/app.js` after install. Fixes Webview.loadLocalResource 404 when loading `app.js` by updating `vscode:prepublish` to run `webview:build` before bundling.

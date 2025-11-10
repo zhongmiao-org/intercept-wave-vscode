@@ -2,7 +2,7 @@
     "name": "intercept-wave",
     "displayName": "%displayName%",
     "description": "%description%",
-    "version": "3.0.0",
+    "version": "3.0.1",
     "publisher": "Ark65",
     "icon": "resources/logo.png",
     "repository": {
@@ -107,7 +107,7 @@
         }
     },
     "scripts": {
-        "vscode:prepublish": "npm run package",
+        "vscode:prepublish": "npm run webview:build && npm run package",
         "webview:build": "node scripts/build-webview.js",
         "webview:watch": "node scripts/build-webview-watch.js",
         "webview:dev": "node scripts/serve-webview.js",

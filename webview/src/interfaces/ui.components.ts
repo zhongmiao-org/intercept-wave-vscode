@@ -51,11 +51,20 @@ export interface GroupModalProps {
     titleAdd: string;
     titleEdit: string;
     name: string;
+    protocol: string;
+    protocolHttp: string;
+    protocolWs: string;
     port: string;
     interceptPrefix: string;
     baseUrl: string;
     stripPrefix: string;
     globalCookie: string;
+    wsBaseUrl: string;
+    wsInterceptPrefix: string;
+    wsManualPush: string;
+    wssEnabled: string;
+    wssKeystorePath: string;
+    wssKeystorePassword: string;
     save: string;
     cancel: string;
   };
@@ -84,4 +93,3 @@ export interface MockModalProps {
   };
   isEdit: boolean;
 }
-

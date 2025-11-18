@@ -102,10 +102,60 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 case 'toggleMock':
                     await this.handleToggleMock(data.groupId, data.index);
                     break;
+                case 'wsManualPushByRule':
+                    await this.handleWsManualPushByRule(data.groupId, data.ruleIndex, data.target);
+                    break;
+                case 'wsManualPushCustom':
+                    await this.handleWsManualPushCustom(data.groupId, data.target, data.payload);
+                    break;
             }
         } catch (error: any) {
             void vscode.window.showErrorMessage(`Error: ${error.message}`);
         }
+    }
+
+    private async handleWsManualPushByRule(groupId: string, ruleIndex: number, target: 'match' | 'all' | 'recent') {
+        const config = this.configManager.getConfig();
+        const group = config.proxyGroups.find(g => g.id === groupId);
+        if (!group) {
+            const msg = vscode.l10n.t('error.ws.groupNotFound');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
+        const rules = group.wsPushRules || [];
+        const rule = rules[ruleIndex] as any;
+        if (!rule) {
+            const msg = vscode.l10n.t('error.ws.ruleNotFound');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
+        await this.mockServerManager.manualPushByRule(groupId, rule, target);
+        const info = vscode.l10n.t('success.ws.manualPushed');
+        void vscode.window.showInformationMessage(info);
+        await this.notify('info', info);
+    }
+
+    private async handleWsManualPushCustom(groupId: string, target: 'match' | 'all' | 'recent', payload: string) {
+        const config = this.configManager.getConfig();
+        const group = config.proxyGroups.find(g => g.id === groupId);
+        if (!group) {
+            const msg = vscode.l10n.t('error.ws.groupNotFound');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
+        if (!payload || !payload.trim()) {
+            const msg = vscode.l10n.t('error.ws.invalidMessage');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
+        await this.mockServerManager.manualPushCustom(groupId, payload, target);
+        const info = vscode.l10n.t('success.ws.manualPushed');
+        void vscode.window.showInformationMessage(info);
+        await this.notify('info', info);
     }
 
     private async handleStartServer(_: vscode.WebviewView) {
@@ -200,6 +250,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             stripPrefix: data.stripPrefix,
             globalCookie: data.globalCookie,
             mockApis: [],
+            protocol: data.protocol ?? 'HTTP',
+            wsBaseUrl: data.wsBaseUrl ?? null,
+            wsInterceptPrefix: data.wsInterceptPrefix ?? null,
+            wsManualPush: data.wsManualPush ?? true,
+            wsPushRules: [],
+            wssEnabled: data.wssEnabled ?? false,
+            wssKeystorePath: data.wssKeystorePath ?? null,
+            wssKeystorePassword: data.wssKeystorePassword ?? null,
         };
 
         await this.configManager.addProxyGroup(newGroup);
@@ -398,6 +456,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             // Form labels
             'ui.groupName', 'ui.enabled', 'ui.port', 'ui.interceptPrefix', 'ui.baseUrl', 'ui.stripPrefix',
             'ui.globalCookie', 'ui.method', 'ui.path', 'ui.statusCode', 'ui.responseBody', 'ui.delay',
+            'ui.protocol', 'ui.protocol.http', 'ui.protocol.ws',
+            'ui.wsBaseUrl', 'ui.wsInterceptPrefix', 'ui.wsManualPush',
+            'ui.wssEnabled', 'ui.wssKeystorePath', 'ui.wssKeystorePassword',
+            'ui.wsPanel.title', 'ui.wsPanel.rules', 'ui.wsPanel.sendSelected',
+            'ui.wsPanel.target.match', 'ui.wsPanel.target.all', 'ui.wsPanel.target.recent',
+            'ui.wsPanel.customMessage', 'ui.wsPanel.send', 'ui.wsPanel.noRules',
             'ui.yes', 'ui.no', 'ui.notSet',
             // Titles and lists
             'ui.addProxyGroup', 'ui.editProxyGroup', 'ui.addMockApi', 'ui.editMockApi', 'ui.running', 'ui.stopped', 'ui.mockApis',

@@ -21,6 +21,10 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
   }, []);
   const cols = '140px 1fr';
   const modalWidth = Math.max(360, Math.min(560, vw - 24));
+
+  const protocol = draft.protocol || 'HTTP';
+  const wsEnabled = protocol === 'WS';
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)', overflowY: 'auto' }} onClick={onCancel}>
       <div style={{ width: modalWidth, maxWidth: '90vw', margin: '10vh auto', background: 'var(--vscode-editor-background)', padding: 16, borderRadius: 6, position: 'relative' }} onClick={e => e.stopPropagation()}>
@@ -29,6 +33,20 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
         <div style={{ display: 'grid', gridTemplateColumns: cols as any, gap: 8, alignItems: 'center' }}>
           <label>{labels.name}</label>
           <input value={draft.name} onChange={e => onChange({ ...draft, name: e.target.value })} />
+          <label>{labels.protocol}</label>
+          <select
+            value={protocol}
+            onChange={e => {
+              const nextProtocol = e.target.value as 'HTTP' | 'WS';
+              onChange({
+                ...draft,
+                protocol: nextProtocol,
+              });
+            }}
+          >
+            <option value="HTTP">{labels.protocolHttp}</option>
+            <option value="WS">{labels.protocolWs}</option>
+          </select>
           <label>{labels.port}</label>
           <input type="number" value={draft.port} onChange={e => onChange({ ...draft, port: Number(e.target.value) })} />
           <label>{labels.interceptPrefix}</label>
@@ -39,6 +57,76 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
           <input type="checkbox" checked={draft.stripPrefix} onChange={e => onChange({ ...draft, stripPrefix: e.target.checked })} style={{ justifySelf: 'start' }} />
           <label>{labels.globalCookie}</label>
           <input value={draft.globalCookie} onChange={e => onChange({ ...draft, globalCookie: e.target.value })} />
+
+          {wsEnabled && (
+            <>
+              <label>{labels.wsBaseUrl}</label>
+              <input
+                value={draft.wsBaseUrl ?? ''}
+                onChange={e =>
+                  onChange({
+                    ...draft,
+                    wsBaseUrl: e.target.value || null,
+                  })
+                }
+              />
+              <label>{labels.wsInterceptPrefix}</label>
+              <input
+                value={draft.wsInterceptPrefix ?? ''}
+                onChange={e =>
+                  onChange({
+                    ...draft,
+                    wsInterceptPrefix: e.target.value || null,
+                  })
+                }
+              />
+              <label>{labels.wsManualPush}</label>
+              <input
+                type="checkbox"
+                checked={draft.wsManualPush ?? true}
+                onChange={e =>
+                  onChange({
+                    ...draft,
+                    wsManualPush: e.target.checked,
+                  })
+                }
+                style={{ justifySelf: 'start' }}
+              />
+              <label>{labels.wssEnabled}</label>
+              <input
+                type="checkbox"
+                checked={draft.wssEnabled ?? false}
+                onChange={e =>
+                  onChange({
+                    ...draft,
+                    wssEnabled: e.target.checked,
+                  })
+                }
+                style={{ justifySelf: 'start' }}
+              />
+              <label>{labels.wssKeystorePath}</label>
+              <input
+                value={draft.wssKeystorePath ?? ''}
+                onChange={e =>
+                  onChange({
+                    ...draft,
+                    wssKeystorePath: e.target.value || null,
+                  })
+                }
+              />
+              <label>{labels.wssKeystorePassword}</label>
+              <input
+                type="password"
+                value={draft.wssKeystorePassword ?? ''}
+                onChange={e =>
+                  onChange({
+                    ...draft,
+                    wssKeystorePassword: e.target.value || null,
+                  })
+                }
+              />
+            </>
+          )}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
           <button onClick={onCancel}><span className="codicon codicon-close" style={{ marginRight: 6 }} />{labels.cancel}</button>

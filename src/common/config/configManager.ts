@@ -103,6 +103,53 @@ export class ConfigManager {
                 const migratedConfig = this.migrateFromLegacy(config);
                 void this.saveConfig(migratedConfig);
                 console.log('Configuration migrated to v2.0 successfully');
+                return;
+            }
+
+            // Normalize missing WS-related fields for existing configs to match v3 shared schema
+            if (Array.isArray(config.proxyGroups)) {
+                let changed = false;
+                for (const group of config.proxyGroups as ProxyGroup[]) {
+                    if (!group.protocol) {
+                        group.protocol = 'HTTP';
+                        changed = true;
+                    }
+                    if (group.wsBaseUrl === undefined) {
+                        group.wsBaseUrl = null;
+                        changed = true;
+                    }
+                    if (group.wsInterceptPrefix === undefined) {
+                        group.wsInterceptPrefix = null;
+                        changed = true;
+                    }
+                    if (group.wsManualPush === undefined) {
+                        group.wsManualPush = true;
+                        changed = true;
+                    }
+                    if (!group.wsPushRules) {
+                        group.wsPushRules = [];
+                        changed = true;
+                    }
+                    if (group.wssEnabled === undefined) {
+                        group.wssEnabled = false;
+                        changed = true;
+                    }
+                    if (group.wssKeystorePath === undefined) {
+                        group.wssKeystorePath = null;
+                        changed = true;
+                    }
+                    if (group.wssKeystorePassword === undefined) {
+                        group.wssKeystorePassword = null;
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    // 不能调用 saveConfig，否则会提前把 version 改成当前版本，
+                    // 导致 normalizeV2Config 判定 version !== '2.0' 而提前返回，从而破坏现有测试。
+                    const contentToWrite = JSON.stringify(config, null, 4);
+                    fs.writeFileSync(this.configPath, contentToWrite, 'utf-8');
+                    console.log('Configuration normalized with WS defaults');
+                }
             }
         } catch (error) {
             console.error('Error migrating config:', error);
@@ -166,6 +213,14 @@ export class ConfigManager {
             globalCookie: oldConfig.globalCookie || '',
             enabled: true,
             mockApis: Array.isArray(oldConfig.mockApis) ? oldConfig.mockApis : [],
+            protocol: 'HTTP',
+            wsBaseUrl: null,
+            wsInterceptPrefix: null,
+            wsManualPush: true,
+            wsPushRules: [],
+            wssEnabled: false,
+            wssKeystorePath: null,
+            wssKeystorePassword: null,
         };
 
         return {
@@ -185,6 +240,14 @@ export class ConfigManager {
             globalCookie: '',
             enabled: true,
             mockApis: [],
+            protocol: 'HTTP',
+            wsBaseUrl: null,
+            wsInterceptPrefix: null,
+            wsManualPush: true,
+            wsPushRules: [],
+            wssEnabled: false,
+            wssKeystorePath: null,
+            wssKeystorePassword: null,
         };
 
         return {

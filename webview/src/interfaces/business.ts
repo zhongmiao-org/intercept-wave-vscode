@@ -8,6 +8,27 @@ export interface MockApiConfig {
   delay?: number;
 }
 
+export type ProxyProtocol = 'HTTP' | 'WS';
+
+export type WsDirection = 'in' | 'out' | 'both';
+
+export interface WsRule {
+  enabled: boolean;
+  path: string;
+  eventKey?: string;
+  eventValue?: string;
+  direction: WsDirection;
+  intercept?: boolean;
+  mode: WsRuleMode;
+  periodSec?: number;
+  message: string;
+  timeline?: number[];
+  loop?: boolean;
+  onOpenFire?: boolean;
+}
+
+export type WsRuleMode = 'off' | 'periodic' | 'timeline';
+
 export interface ProxyGroup {
   id: string;
   name: string;
@@ -18,6 +39,14 @@ export interface ProxyGroup {
   globalCookie: string;
   enabled: boolean;
   mockApis: MockApiConfig[];
+  protocol?: ProxyProtocol;
+  wsBaseUrl?: string | null;
+  wsInterceptPrefix?: string | null;
+  wsManualPush?: boolean;
+  wsPushRules?: WsRule[];
+  wssEnabled?: boolean;
+  wssKeystorePath?: string | null;
+  wssKeystorePassword?: string | null;
 }
 
 export interface MockConfig {
@@ -31,11 +60,23 @@ export type I18nMap = Record<string, string>;
 
 export type GroupDraft = Pick<
   ProxyGroup,
-  'name' | 'enabled' | 'port' | 'interceptPrefix' | 'baseUrl' | 'stripPrefix' | 'globalCookie'
+  | 'name'
+  | 'enabled'
+  | 'port'
+  | 'interceptPrefix'
+  | 'baseUrl'
+  | 'stripPrefix'
+  | 'globalCookie'
+  | 'protocol'
+  | 'wsBaseUrl'
+  | 'wsInterceptPrefix'
+  | 'wsManualPush'
+  | 'wssEnabled'
+  | 'wssKeystorePath'
+  | 'wssKeystorePassword'
 >;
 
 export type MockApiDraft = Pick<
   MockApiConfig,
   'enabled' | 'method' | 'path' | 'statusCode' | 'delay' | 'mockData'
 >;
-

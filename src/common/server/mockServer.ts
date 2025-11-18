@@ -4,16 +4,20 @@ import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
 import { selectBestMockApiForRequest } from './pathMatcher';
-import type { MockApiConfig, ProxyGroup } from './types';
+import type { MockApiConfig, ProxyGroup, WsRule, WsManualTarget } from './types';
+import { WsServerManager } from './wsServer';
 
 export class MockServerManager {
-    private readonly servers: Map<string, http.Server> = new Map(); // groupId -> server
+    private readonly httpServers: Map<string, http.Server> = new Map(); // groupId -> HTTP server
+    private readonly wsManager: WsServerManager;
     private isRunning: boolean = false;
 
     constructor(
         private readonly configManager: ConfigManager,
         private readonly outputChannel: vscode.OutputChannel
-    ) {}
+    ) {
+        this.wsManager = new WsServerManager(outputChannel);
+    }
 
     async start(): Promise<string> {
         const config = this.configManager.getConfig();
@@ -24,13 +28,17 @@ export class MockServerManager {
         }
 
         // Filter out groups that are already running
-        const groupsToStart = enabledGroups.filter(g => !this.servers.has(g.id));
+        const groupsToStart = enabledGroups.filter(
+            g => !this.httpServers.has(g.id) && !this.wsManager.getGroupStatus(g.id)
+        );
 
         if (groupsToStart.length === 0) {
             throw new Error('All enabled servers are already running');
         }
 
-        const results = await Promise.allSettled(groupsToStart.map(group => this.startGroup(group)));
+        const results = await Promise.allSettled(
+            groupsToStart.map(group => this.startGroup(group))
+        );
         const succeeded: ProxyGroup[] = [];
         const failed: { group: ProxyGroup; error: any }[] = [];
         results.forEach((r, i) => {
@@ -43,7 +51,13 @@ export class MockServerManager {
 
         if (succeeded.length > 0) {
             this.isRunning = true;
-            const urls = succeeded.map(g => `http://localhost:${g.port} (${g.name})`).join(', ');
+            const urls = succeeded
+                .map(g => {
+                    const isWs = (g as ProxyGroup).protocol === 'WS';
+                    const scheme = isWs ? (g.wssEnabled ? 'wss' : 'ws') : 'http';
+                    return `${scheme}://localhost:${g.port} (${g.name})`;
+                })
+                .join(', ');
             this.outputChannel.appendLine(`✅ Mock servers started: ${urls}`);
             if (failed.length > 0) {
                 failed.forEach(f => this.outputChannel.appendLine(`❌ [${f.group.name}] failed to start: ${f.error?.message || f.error}`));
@@ -58,6 +72,13 @@ export class MockServerManager {
     }
 
     private async startGroup(group: ProxyGroup): Promise<void> {
+        if (group.protocol === 'WS') {
+            // Start WebSocket server for this group
+            await this.wsManager.startGroup(group);
+            return;
+        }
+
+        // HTTP group (default)
         return new Promise((resolve, reject) => {
             const server = http.createServer((req, res) => {
                 // Read config on each request to support dynamic updates
@@ -71,7 +92,7 @@ export class MockServerManager {
             });
 
             server.listen(group.port, () => {
-                this.servers.set(group.id, server);
+                this.httpServers.set(group.id, server);
                 this.outputChannel.appendLine(
                     `✅ [${group.name}] started on http://localhost:${group.port}`
                 );
@@ -92,14 +113,14 @@ export class MockServerManager {
 
     async stop(): Promise<void> {
         // Check if there are any servers running
-        if (this.servers.size === 0) {
+        if (this.httpServers.size === 0 && !this.hasAnyWsServer()) {
             return;
         }
 
         // Get config to retrieve group names
         const config = this.configManager.getConfig();
 
-        const stopPromises = Array.from(this.servers.entries()).map(
+        const stopPromises = Array.from(this.httpServers.entries()).map(
             ([groupId, server]) =>
                 new Promise<void>(resolve => {
                     server.close(() => {
@@ -113,7 +134,8 @@ export class MockServerManager {
         );
 
         await Promise.all(stopPromises);
-        this.servers.clear();
+        this.httpServers.clear();
+        await this.wsManager.stopAll();
         this.isRunning = false;
         this.outputChannel.appendLine('🛑 All mock servers stopped');
     }
@@ -123,7 +145,15 @@ export class MockServerManager {
     }
 
     getGroupStatus(groupId: string): boolean {
-        return this.servers.has(groupId);
+        return this.httpServers.has(groupId) || this.wsManager.getGroupStatus(groupId);
+    }
+
+    async manualPushByRule(groupId: string, rule: WsRule, target: WsManualTarget): Promise<void> {
+        await this.wsManager.manualPushByRule(groupId, rule, target);
+    }
+
+    async manualPushCustom(groupId: string, payload: string, target: WsManualTarget): Promise<void> {
+        await this.wsManager.manualPushCustom(groupId, payload, target);
     }
 
     async startGroupById(groupId: string): Promise<string> {
@@ -138,7 +168,7 @@ export class MockServerManager {
             throw new Error(`Group is disabled: ${group.name}`);
         }
 
-        if (this.servers.has(groupId)) {
+        if (this.httpServers.has(groupId) || this.wsManager.getGroupStatus(groupId)) {
             throw new Error(`Server for group "${group.name}" is already running`);
         }
 
@@ -147,7 +177,9 @@ export class MockServerManager {
         // Update isRunning flag when any server is running
         this.isRunning = true;
 
-        const url = `http://localhost:${group.port} (${group.name})`;
+        const isWs = group.protocol === 'WS';
+        const scheme = isWs ? (group.wssEnabled ? 'wss' : 'ws') : 'http';
+        const url = `${scheme}://localhost:${group.port} (${group.name})`;
         this.outputChannel.appendLine(`✅ Mock server started: ${url}`);
         this.outputChannel.show(true);
 
@@ -155,27 +187,30 @@ export class MockServerManager {
     }
 
     async stopGroupById(groupId: string): Promise<void> {
-        const server = this.servers.get(groupId);
-        if (!server) {
-            return;
-        }
-
-        // Get config to retrieve group name
+        const httpServer = this.httpServers.get(groupId);
         const config = this.configManager.getConfig();
         const group = config.proxyGroups.find(g => g.id === groupId);
 
-        await new Promise<void>(resolve => {
-            server.close(() => {
-                const groupInfo = group ? `${group.name}(:${group.port})` : groupId;
-                this.outputChannel.appendLine(`🛑 Server stopped for group: ${groupInfo}`);
-                resolve();
+        if (httpServer) {
+            await new Promise<void>(resolve => {
+                httpServer.close(() => {
+                    const groupInfo = group ? `${group.name}(:${group.port})` : groupId;
+                    this.outputChannel.appendLine(`🛑 Server stopped for group: ${groupInfo}`);
+                    resolve();
+                });
             });
-        });
+            this.httpServers.delete(groupId);
+        }
 
-        this.servers.delete(groupId);
+        // Stop WS server if any
+        if (this.wsManager.getGroupStatus(groupId)) {
+            await this.wsManager.stopGroup(groupId);
+            const groupInfo = group ? `${group.name}(:${group.port})` : groupId;
+            this.outputChannel.appendLine(`🛑 WS server stopped for group: ${groupInfo}`);
+        }
 
         // Update isRunning status
-        if (this.servers.size === 0) {
+        if (this.httpServers.size === 0 && !this.hasAnyWsServer()) {
             this.isRunning = false;
         }
     }
@@ -404,5 +439,11 @@ export class MockServerManager {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.writeHead(statusCode);
         res.end(errorJson);
+    }
+
+    private hasAnyWsServer(): boolean {
+        // WsServerManager does not expose all ids; we simply infer via getGroupStatus across config.
+        const config = this.configManager.getConfig();
+        return config.proxyGroups.some(g => this.wsManager.getGroupStatus(g.id));
     }
 }

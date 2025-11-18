@@ -1,8 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { GroupDraft, MockApiDraft, MockApiConfig, ProxyGroup } from './interfaces/business';
+import { GroupDraft, MockApiDraft, MockApiConfig, ProxyGroup, WsRule } from './interfaces/business';
 import { GroupSummary, InitialState, IWWindow, VsCodeApi } from './interfaces/ui';
 import { GroupModal } from './components/GroupModal';
 import { MockModal } from './components/MockModal';
+import { WsPushPanel, WsManualTarget } from './components/WsPushPanel';
 
 function useVscode(): VsCodeApi {
   try {
@@ -177,6 +178,13 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
       baseUrl: 'http://localhost:8080',
       stripPrefix: true,
       globalCookie: '',
+      protocol: 'HTTP',
+      wsBaseUrl: null,
+      wsInterceptPrefix: null,
+      wsManualPush: true,
+      wssEnabled: false,
+      wssKeystorePath: null,
+      wssKeystorePassword: null,
     } as GroupDraft);
     setShowGroupModal(true);
   };
@@ -271,7 +279,22 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
     const act = state.panelAction?.type;
     if (!act) return;
     if (act === 'addGroup') {
-      setEditingGroup({ name: '', enabled: true, port: 8888, interceptPrefix: '/api', baseUrl: '', stripPrefix: true, globalCookie: '' } as GroupDraft);
+      setEditingGroup({
+        name: '',
+        enabled: true,
+        port: 8888,
+        interceptPrefix: '/api',
+        baseUrl: '',
+        stripPrefix: true,
+        globalCookie: '',
+        protocol: 'HTTP',
+        wsBaseUrl: null,
+        wsInterceptPrefix: null,
+        wsManualPush: true,
+        wssEnabled: false,
+        wssKeystorePath: null,
+        wssKeystorePassword: null,
+      } as GroupDraft);
       setShowGroupModal(false);
     }
     if (act === 'editGroup' && activeGroup) {
@@ -312,6 +335,18 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
   const runningCount = (state.config?.proxyGroups || []).reduce((acc: number, g: ProxyGroup) => acc + (state.groupStatuses?.[g.id] ? 1 : 0), 0);
   const allRunning = totalGroups > 0 && runningCount === totalGroups;
   const noneRunning = runningCount === 0;
+
+  const isWsGroup = !!activeGroup && (activeGroup as ProxyGroup).protocol === 'WS';
+
+  const sendWsByRule = (ruleIndex: number, target: WsManualTarget) => {
+    if (!activeGroup) return;
+    vscode.postMessage({ type: 'wsManualPushByRule', groupId: activeGroup.id, ruleIndex, target });
+  };
+
+  const sendWsCustom = (target: WsManualTarget, payload: string) => {
+    if (!activeGroup) return;
+    vscode.postMessage({ type: 'wsManualPushCustom', groupId: activeGroup.id, target, payload });
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontFamily: 'var(--vscode-font-family, system-ui, Arial)' }}>
@@ -387,6 +422,14 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                   <div>{activeGroup.interceptPrefix}</div>
                   <div>{t('ui.baseUrl') || 'Base URL'}:</div>
                   <div style={{ wordBreak: 'break-all' }}>{activeGroup.baseUrl}</div>
+                  {isWsGroup && (
+                    <>
+                      <div>{t('ui.wsBaseUrl') || 'WebSocket Base URL'}:</div>
+                      <div style={{ wordBreak: 'break-all' }}>{(activeGroup as ProxyGroup).wsBaseUrl || (t('ui.notSet') || '(Not set)')}</div>
+                      <div>{t('ui.wsInterceptPrefix') || 'WS Intercept Prefix'}:</div>
+                      <div>{(activeGroup as ProxyGroup).wsInterceptPrefix || (t('ui.notSet') || '(Not set)')}</div>
+                    </>
+                  )}
                   <div>{t('ui.stripPrefix') || 'Strip Prefix'}:</div>
                   <div>{activeGroup.stripPrefix ? (t('ui.yes') || 'Yes') : (t('ui.no') || 'No')}</div>
                   <div>{t('ui.globalCookie') || 'Global Cookie'}:</div>
@@ -400,35 +443,57 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
             </div>
 
             {/* Mock APIs header */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-              {(() => {
-                const total = (activeGroup.mockApis || []).length;
-                const enabledCount = ((activeGroup.mockApis || []) as MockApiConfig[]).filter(m => m.enabled).length;
-                return <div style={{ fontWeight: 600 }}>{`${t('ui.mockApis') || 'Mock APIs'} (${enabledCount}/${total})`}</div>;
-              })()}
-              <div style={{ flex: 1 }} />
-              <button onClick={onAddMock}><Icon name="add" />{t('ui.addMockApi') || 'Add Mock'}</button>
-            </div>
-
-            {/* Mock APIs list */}
-            <div>
-              {((activeGroup.mockApis as MockApiConfig[]) || []).map((m, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 8, background: 'var(--vscode-editor-background)', borderRadius: 3, borderLeft: `3px solid ${m.enabled ? '#4caf50' : '#9e9e9e'}`, flexWrap: 'nowrap' }}>
-                  <div style={{ minWidth: 42, textAlign: 'center', color: '#fff', background: methodColor(m.method), padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 700 }}>{(m.method || '').toUpperCase()}</div>
-                  <div style={{ flex: '1 1 auto', minWidth: 0, color: m.enabled ? 'var(--vscode-editor-foreground)' : 'var(--vscode-descriptionForeground)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{m.path}</div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                    <button onClick={() => onToggleMock(idx)}>
-                      {m.enabled ? (<><Icon name="circle-slash" />{t('ui.disable') || 'Disable'}</>) : (<><Icon name="check" />{t('ui.enable') || 'Enable'}</>)}
-                    </button>
-                    <button onClick={() => onEditMock(idx)}><Icon name="edit" />{t('ui.edit') || 'Edit'}</button>
-                    <button onClick={() => onDeleteMock(idx)}><Icon name="trash" />{t('ui.delete') || 'Delete'}</button>
-                  </div>
+            {isWsGroup ? (
+              <WsPushPanel
+                rules={((activeGroup as ProxyGroup).wsPushRules || []) as WsRule[]}
+                onSendByRule={sendWsByRule}
+                onSendCustom={sendWsCustom}
+                labels={{
+                  title: t('ui.wsPanel.title') || 'WebSocket Push',
+                  rules: t('ui.wsPanel.rules') || 'Rules',
+                  sendSelected: t('ui.wsPanel.sendSelected') || 'Send Selected',
+                  targetMatch: t('ui.wsPanel.target.match') || 'Match',
+                  targetAll: t('ui.wsPanel.target.all') || 'All',
+                  targetRecent: t('ui.wsPanel.target.recent') || 'Recent',
+                  customMessage: t('ui.wsPanel.customMessage') || 'Custom Message (JSON)',
+                  send: t('ui.wsPanel.send') || 'Send',
+                  noRules: t('ui.wsPanel.noRules') || 'No WS rules configured.',
+                }}
+              />
+            ) : (
+              <>
+                {/* Mock APIs header */}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                  {(() => {
+                    const total = (activeGroup.mockApis || []).length;
+                    const enabledCount = ((activeGroup.mockApis || []) as MockApiConfig[]).filter(m => m.enabled).length;
+                    return <div style={{ fontWeight: 600 }}>{`${t('ui.mockApis') || 'Mock APIs'} (${enabledCount}/${total})`}</div>;
+                  })()}
+                  <div style={{ flex: 1 }} />
+                  <button onClick={onAddMock}><Icon name="add" />{t('ui.addMockApi') || 'Add Mock'}</button>
                 </div>
-              ))}
-              {((activeGroup.mockApis as MockApiConfig[]) || []).length === 0 && (
-                <div style={{ color: 'var(--vscode-descriptionForeground, #888)', fontStyle: 'italic' }}>{t('ui.clickAddToCreate') || 'Click Add to create'}</div>
-              )}
-            </div>
+
+                {/* Mock APIs list */}
+                <div>
+                  {((activeGroup.mockApis as MockApiConfig[]) || []).map((m, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 8, background: 'var(--vscode-editor-background)', borderRadius: 3, borderLeft: `3px solid ${m.enabled ? '#4caf50' : '#9e9e9e'}`, flexWrap: 'nowrap' }}>
+                      <div style={{ minWidth: 42, textAlign: 'center', color: '#fff', background: methodColor(m.method), padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 700 }}>{(m.method || '').toUpperCase()}</div>
+                      <div style={{ flex: '1 1 auto', minWidth: 0, color: m.enabled ? 'var(--vscode-editor-foreground)' : 'var(--vscode-descriptionForeground)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{m.path}</div>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                        <button onClick={() => onToggleMock(idx)}>
+                          {m.enabled ? (<><Icon name="circle-slash" />{t('ui.disable') || 'Disable'}</>) : (<><Icon name="check" />{t('ui.enable') || 'Enable'}</>)}
+                        </button>
+                        <button onClick={() => onEditMock(idx)}><Icon name="edit" />{t('ui.edit') || 'Edit'}</button>
+                        <button onClick={() => onDeleteMock(idx)}><Icon name="trash" />{t('ui.delete') || 'Delete'}</button>
+                      </div>
+                    </div>
+                  ))}
+                  {((activeGroup.mockApis as MockApiConfig[]) || []).length === 0 && (
+                    <div style={{ color: 'var(--vscode-descriptionForeground, #888)', fontStyle: 'italic' }}>{t('ui.clickAddToCreate') || 'Click Add to create'}</div>
+                  )}
+                </div>
+              </>
+            )}
           </>
         ) : (
           <div style={{ color: 'var(--vscode-descriptionForeground, #888)' }}>No active group</div>
@@ -438,7 +503,22 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
       {/* Group Modal */}
       <GroupModal
         open={showGroupModal && !!editingGroup}
-        draft={editingGroup || { name:'', enabled:true, port:8888, interceptPrefix:'/api', baseUrl:'', stripPrefix:true, globalCookie:'' }}
+        draft={editingGroup || {
+          name: '',
+          enabled: true,
+          port: 8888,
+          interceptPrefix: '/api',
+          baseUrl: '',
+          stripPrefix: true,
+          globalCookie: '',
+          protocol: 'HTTP',
+          wsBaseUrl: null,
+          wsInterceptPrefix: null,
+          wsManualPush: true,
+          wssEnabled: false,
+          wssKeystorePath: null,
+          wssKeystorePassword: null,
+        }}
         onChange={setEditingGroup as (d: GroupDraft) => void}
         onSave={onSaveGroup}
         onCancel={() => setShowGroupModal(false)}
@@ -447,11 +527,20 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
           titleAdd: t('ui.addProxyGroup') || 'Add Group',
           titleEdit: t('ui.editProxyGroup') || 'Edit Group',
           name: t('ui.groupName') || 'Name',
+          protocol: t('ui.protocol') || 'Protocol',
+          protocolHttp: t('ui.protocol.http') || 'HTTP',
+          protocolWs: t('ui.protocol.ws') || 'WebSocket',
           port: t('ui.port') || 'Port',
           interceptPrefix: t('ui.interceptPrefix') || 'Intercept Prefix',
           baseUrl: t('ui.baseUrl') || 'Base URL',
           stripPrefix: t('ui.stripPrefix') || 'Strip Prefix',
           globalCookie: t('ui.globalCookie') || 'Global Cookie',
+          wsBaseUrl: t('ui.wsBaseUrl') || 'WS Base URL',
+          wsInterceptPrefix: t('ui.wsInterceptPrefix') || 'WS Intercept Prefix',
+          wsManualPush: t('ui.wsManualPush') || 'Enable Manual Push',
+          wssEnabled: t('ui.wssEnabled') || 'Enable WSS (TLS)',
+          wssKeystorePath: t('ui.wssKeystorePath') || 'WSS Keystore Path',
+          wssKeystorePassword: t('ui.wssKeystorePassword') || 'WSS Keystore Password',
           save: t('ui.save') || 'Save',
           cancel: t('ui.cancel') || 'Cancel',
         }}

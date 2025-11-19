@@ -1,4 +1,4 @@
-import { MockApiConfig, MockConfig } from './server';
+import type { MockApiConfig, MockConfig } from './interfaces';
 
 export type RequestMessage =
     | { type: 'startServer' }
@@ -20,4 +20,3 @@ export type ResponseMessage =
       }
     | { type: 'exportResult'; payload: string }
     | { type: 'error'; message: string };
-

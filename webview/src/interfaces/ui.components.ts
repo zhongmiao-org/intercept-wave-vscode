@@ -50,12 +50,27 @@ export interface GroupModalProps {
   labels: {
     titleAdd: string;
     titleEdit: string;
+    sectionGroup?: string;
+    sectionHttp?: string;
+    sectionWs?: string;
     name: string;
+    enabled: string;
+    protocol: string;
+    protocolHttp: string;
+    protocolWs: string;
     port: string;
     interceptPrefix: string;
     baseUrl: string;
     stripPrefix: string;
     globalCookie: string;
+    wsBaseUrl: string;
+    wsInterceptPrefix: string;
+    wsManualPush: string;
+    wssEnabled: string;
+    wssKeystorePath: string;
+    wssKeystorePassword: string;
+    yesLabel: string;
+    noLabel: string;
     save: string;
     cancel: string;
   };
@@ -84,4 +99,3 @@ export interface MockModalProps {
   };
   isEdit: boolean;
 }
-

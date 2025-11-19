@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import {MockConfig, ProxyGroup} from '../server';
+import {MockConfig, ProxyGroup} from '../interfaces';
 import { parseJsonTolerant, stringifyCompact } from '../utils';
 import * as pkg from '../../../package.json';
 import {v4 as uuidv4} from 'uuid';

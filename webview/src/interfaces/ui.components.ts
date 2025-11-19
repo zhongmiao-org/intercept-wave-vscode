@@ -50,7 +50,11 @@ export interface GroupModalProps {
   labels: {
     titleAdd: string;
     titleEdit: string;
+    sectionGroup?: string;
+    sectionHttp?: string;
+    sectionWs?: string;
     name: string;
+    enabled: string;
     protocol: string;
     protocolHttp: string;
     protocolWs: string;
@@ -65,6 +69,8 @@ export interface GroupModalProps {
     wssEnabled: string;
     wssKeystorePath: string;
     wssKeystorePassword: string;
+    yesLabel: string;
+    noLabel: string;
     save: string;
     cancel: string;
   };

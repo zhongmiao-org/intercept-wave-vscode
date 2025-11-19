@@ -526,7 +526,11 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
         labels={{
           titleAdd: t('ui.addProxyGroup') || 'Add Group',
           titleEdit: t('ui.editProxyGroup') || 'Edit Group',
+          sectionGroup: t('ui.section.group') || '配置组设置',
+          sectionHttp: t('ui.section.http') || 'HTTP 设置',
+          sectionWs: t('ui.section.ws') || 'WebSocket 设置',
           name: t('ui.groupName') || 'Name',
+          enabled: t('ui.enabled') || 'Enabled',
           protocol: t('ui.protocol') || 'Protocol',
           protocolHttp: t('ui.protocol.http') || 'HTTP',
           protocolWs: t('ui.protocol.ws') || 'WebSocket',
@@ -541,6 +545,8 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
           wssEnabled: t('ui.wssEnabled') || 'Enable WSS (TLS)',
           wssKeystorePath: t('ui.wssKeystorePath') || 'WSS Keystore Path',
           wssKeystorePassword: t('ui.wssKeystorePassword') || 'WSS Keystore Password',
+          yesLabel: t('ui.yes') || 'Yes',
+          noLabel: t('ui.no') || 'No',
           save: t('ui.save') || 'Save',
           cancel: t('ui.cancel') || 'Cancel',
         }}

@@ -459,6 +459,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             'ui.protocol', 'ui.protocol.http', 'ui.protocol.ws',
             'ui.wsBaseUrl', 'ui.wsInterceptPrefix', 'ui.wsManualPush',
             'ui.wssEnabled', 'ui.wssKeystorePath', 'ui.wssKeystorePassword',
+            'ui.section.group', 'ui.section.http', 'ui.section.ws',
             'ui.wsPanel.title', 'ui.wsPanel.rules', 'ui.wsPanel.sendSelected',
             'ui.wsPanel.target.match', 'ui.wsPanel.target.all', 'ui.wsPanel.target.recent',
             'ui.wsPanel.customMessage', 'ui.wsPanel.send', 'ui.wsPanel.noRules',

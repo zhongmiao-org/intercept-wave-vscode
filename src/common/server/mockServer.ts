@@ -4,7 +4,8 @@ import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
 import { selectBestMockApiForRequest } from './pathMatcher';
-import type { MockApiConfig, ProxyGroup, WsRule, WsManualTarget } from './types';
+import type { MockApiConfig, ProxyGroup, WsRule } from '../interfaces';
+import type { WsManualTarget } from '../types';
 import { WsServerManager } from './wsServer';
 
 export class MockServerManager {
@@ -149,11 +150,17 @@ export class MockServerManager {
     }
 
     async manualPushByRule(groupId: string, rule: WsRule, target: WsManualTarget): Promise<void> {
-        await this.wsManager.manualPushByRule(groupId, rule, target);
+        const config = this.configManager.getConfig();
+        const group = config.proxyGroups.find(g => g.id === groupId);
+        const allRules = group?.wsPushRules || [];
+        await this.wsManager.manualPushByRule(groupId, rule, target, allRules);
     }
 
     async manualPushCustom(groupId: string, payload: string, target: WsManualTarget): Promise<void> {
-        await this.wsManager.manualPushCustom(groupId, payload, target);
+        const config = this.configManager.getConfig();
+        const group = config.proxyGroups.find(g => g.id === groupId);
+        const allRules = group?.wsPushRules || [];
+        await this.wsManager.manualPushCustom(groupId, payload, target, allRules);
     }
 
     async startGroupById(groupId: string): Promise<string> {

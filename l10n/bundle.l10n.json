@@ -100,5 +100,7 @@
   "error.ws.groupNotFound": "WebSocket group not found",
   "error.ws.ruleNotFound": "WebSocket rule not found",
   "error.ws.invalidMessage": "Invalid WebSocket message payload",
+  "error.ws.manualPushDisabled": "Manual WebSocket push is disabled for this group",
+  "error.ws.noActiveConnection": "No active WebSocket connections for this group",
   "success.ws.manualPushed": "WebSocket message pushed successfully"
 }

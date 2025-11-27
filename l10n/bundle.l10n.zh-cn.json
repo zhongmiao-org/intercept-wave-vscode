@@ -100,5 +100,7 @@
   "error.ws.groupNotFound": "未找到对应的 WebSocket 配置组",
   "error.ws.ruleNotFound": "未找到对应的 WebSocket 规则",
   "error.ws.invalidMessage": "WebSocket 消息内容无效",
+  "error.ws.manualPushDisabled": "当前配置组已禁用 WebSocket 手动推送",
+  "error.ws.noActiveConnection": "当前配置组没有可用的 WebSocket 连接",
   "success.ws.manualPushed": "WebSocket 消息已推送"
 }

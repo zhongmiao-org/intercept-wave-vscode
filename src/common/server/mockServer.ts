@@ -149,18 +149,18 @@ export class MockServerManager {
         return this.httpServers.has(groupId) || this.wsManager.getGroupStatus(groupId);
     }
 
-    async manualPushByRule(groupId: string, rule: WsRule, target: WsManualTarget): Promise<void> {
+    async manualPushByRule(groupId: string, rule: WsRule, target: WsManualTarget): Promise<boolean> {
         const config = this.configManager.getConfig();
         const group = config.proxyGroups.find(g => g.id === groupId);
         const allRules = group?.wsPushRules || [];
-        await this.wsManager.manualPushByRule(groupId, rule, target, allRules);
+        return this.wsManager.manualPushByRule(groupId, rule, target, allRules);
     }
 
-    async manualPushCustom(groupId: string, payload: string, target: WsManualTarget): Promise<void> {
+    async manualPushCustom(groupId: string, payload: string, target: WsManualTarget): Promise<boolean> {
         const config = this.configManager.getConfig();
         const group = config.proxyGroups.find(g => g.id === groupId);
         const allRules = group?.wsPushRules || [];
-        await this.wsManager.manualPushCustom(groupId, payload, target, allRules);
+        return this.wsManager.manualPushCustom(groupId, payload, target, allRules);
     }
 
     async startGroupById(groupId: string): Promise<string> {

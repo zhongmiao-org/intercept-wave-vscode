@@ -1,4 +1,3 @@
-import * as http from 'http';
 import * as https from 'https';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
@@ -54,7 +53,7 @@ export class WsServerManager {
 
         const isWss = !!group.wssEnabled;
         const port = group.port;
-        const path = group.wsInterceptPrefix || '/';
+        const path = this.normalizeWsPath(group.wsInterceptPrefix);
 
         return new Promise((resolve, reject) => {
             try {
@@ -73,8 +72,8 @@ export class WsServerManager {
                     // For now we keep it minimal and rely on Node key/cert files when present.
                     if (group.wssKeystorePath && fs.existsSync(group.wssKeystorePath)) {
                         try {
-                            const pfx = fs.readFileSync(group.wssKeystorePath);
-                            tlsOptions.pfx = pfx;
+
+                            tlsOptions.pfx = fs.readFileSync(group.wssKeystorePath);
                             if (group.wssKeystorePassword) {
                                 tlsOptions.passphrase = group.wssKeystorePassword;
                             }
@@ -233,6 +232,20 @@ export class WsServerManager {
         });
     }
 
+    private normalizeWsPath(raw: string | null | undefined): string {
+        if (!raw) {
+            return '/';
+        }
+        let p = String(raw).trim();
+        if (!p) return '/';
+        if (!p.startsWith('/')) {
+            p = '/' + p;
+        }
+        // collapse multiple slashes
+        p = p.replace(/\/+/g, '/');
+        return p;
+    }
+
     async stopGroup(groupId: string): Promise<void> {
         const entry = this.servers.get(groupId);
         if (!entry) return;
@@ -269,15 +282,28 @@ export class WsServerManager {
         rule: WsRule,
         target: WsManualTarget,
         allRules?: WsRule[]
-    ): Promise<void> {
+    ): Promise<boolean> {
         const entry = this.servers.get(groupId);
-        if (!entry) return;
+        if (!entry) return false;
         const targets = Array.from(entry.connections.values());
-        if (targets.length === 0) return;
+        if (targets.length === 0) return false;
 
-        const selected = this.selectConnections(entry, target, rule, allRules);
+        // 对于 match 目标，仅按当前选中 rule 进行匹配；
+        // 其它目标仍然可以基于完整规则集筛选连接。
+        const rulesForSelection =
+            target === 'match' && rule
+                ? [rule]
+                : allRules && allRules.length > 0
+                ? allRules
+                : rule
+                ? [rule]
+                : [];
+
+        const selected = this.selectConnections(entry, target, rule, rulesForSelection);
+        if (!selected.length) return false;
 
         const payload = rule.message ?? '';
+        let sent = 0;
         for (const conn of selected) {
             this.resetAndRescheduleForConnection(conn, allRules);
             if (conn.socket.readyState === WebSocket.OPEN) {
@@ -287,8 +313,10 @@ export class WsServerManager {
                 this.outputChannel.appendLine(
                     `📤 [WS:${groupId}] MANUAL PUSH path=${rule.path} conn=${conn.id} bytes=${bytes}`
                 );
+                sent++;
             }
         }
+        return sent > 0;
     }
 
     async manualPushCustom(
@@ -296,15 +324,17 @@ export class WsServerManager {
         payload: string,
         target: WsManualTarget,
         allRules?: WsRule[]
-    ): Promise<void> {
+    ): Promise<boolean> {
         const entry = this.servers.get(groupId);
-        if (!entry) return;
+        if (!entry) return false;
         const targets = Array.from(entry.connections.values());
-        if (targets.length === 0) return;
+        if (targets.length === 0) return false;
 
         const selected = this.selectConnections(entry, target, undefined, allRules);
+        if (!selected.length) return false;
 
         const bytes = payload.length;
+        let sent = 0;
         for (const conn of selected) {
             this.resetAndRescheduleForConnection(conn, allRules);
             if (conn.socket.readyState === WebSocket.OPEN) {
@@ -313,8 +343,10 @@ export class WsServerManager {
                 this.outputChannel.appendLine(
                     `📤 [WS:${groupId}] MANUAL CUSTOM PUSH conn=${conn.id} bytes=${bytes}`
                 );
+                sent++;
             }
         }
+        return sent > 0;
     }
 
     private safeBufferToString(buf: Buffer | undefined): string {

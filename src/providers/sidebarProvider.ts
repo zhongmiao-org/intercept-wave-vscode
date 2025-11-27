@@ -114,11 +114,21 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private async handleWsManualPushByRule(groupId: string, ruleIndex: number, target: 'match' | 'all' | 'recent') {
+    private async handleWsManualPushByRule(
+        groupId: string,
+        ruleIndex: number,
+        target: 'match' | 'all' | 'recent'
+    ) {
         const config = this.configManager.getConfig();
         const group = config.proxyGroups.find(g => g.id === groupId);
         if (!group) {
             const msg = vscode.l10n.t('error.ws.groupNotFound');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
+        if (group.wsManualPush === false) {
+            const msg = vscode.l10n.t('error.ws.manualPushDisabled');
             void vscode.window.showErrorMessage(msg);
             await this.notify('error', msg);
             return;
@@ -131,17 +141,33 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             await this.notify('error', msg);
             return;
         }
-        await this.mockServerManager.manualPushByRule(groupId, rule, target);
+        const ok = await this.mockServerManager.manualPushByRule(groupId, rule, target);
+        if (!ok) {
+            const msg = vscode.l10n.t('error.ws.noActiveConnection');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
         const info = vscode.l10n.t('success.ws.manualPushed');
         void vscode.window.showInformationMessage(info);
         await this.notify('info', info);
     }
 
-    private async handleWsManualPushCustom(groupId: string, target: 'match' | 'all' | 'recent', payload: string) {
+    private async handleWsManualPushCustom(
+        groupId: string,
+        target: 'match' | 'all' | 'recent',
+        payload: string
+    ) {
         const config = this.configManager.getConfig();
         const group = config.proxyGroups.find(g => g.id === groupId);
         if (!group) {
             const msg = vscode.l10n.t('error.ws.groupNotFound');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
+        if (group.wsManualPush === false) {
+            const msg = vscode.l10n.t('error.ws.manualPushDisabled');
             void vscode.window.showErrorMessage(msg);
             await this.notify('error', msg);
             return;
@@ -152,7 +178,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             await this.notify('error', msg);
             return;
         }
-        await this.mockServerManager.manualPushCustom(groupId, payload, target);
+        const ok = await this.mockServerManager.manualPushCustom(groupId, payload, target);
+        if (!ok) {
+            const msg = vscode.l10n.t('error.ws.noActiveConnection');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
         const info = vscode.l10n.t('success.ws.manualPushed');
         void vscode.window.showInformationMessage(info);
         await this.notify('info', info);

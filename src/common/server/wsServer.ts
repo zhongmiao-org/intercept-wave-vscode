@@ -84,14 +84,17 @@ export class WsServerManager {
                         }
                     }
                     const httpsServer = https.createServer(tlsOptions);
-                    server = new wsLib.WebSocketServer({ server: httpsServer, path });
+                    // Note: we no longer restrict by `path` at the ws library level,
+                    // so that prefixes like `/ws` can still accept `/ws/echo` etc.
+                    server = new wsLib.WebSocketServer({ server: httpsServer });
                     httpsServer.listen(port, () => {
                         this.outputChannel.appendLine(
                             `✅ [WS:${group.name}] WSS server started on wss://localhost:${port}${path}`
                         );
                     });
                 } else {
-                    server = new wsLib.WebSocketServer({ port, path });
+                    // Do not pass `path` to allow all request paths on this port.
+                    server = new wsLib.WebSocketServer({ port });
                     server.on('listening', () => {
                         this.outputChannel.appendLine(
                             `✅ [WS:${group.name}] WS server started on ws://localhost:${port}${path}`
@@ -106,7 +109,8 @@ export class WsServerManager {
 
                 server.on('connection', (socket, req) => {
                     const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-                    const rawPath = (req.url || '/').split('?')[0] || '/';
+                    const url = req.url || '/';
+                    const rawPath = url.split('?')[0] || '/';
                     const ctx: WsConnectionContext = {
                         id,
                         groupId: group.id,
@@ -127,11 +131,13 @@ export class WsServerManager {
                     // Optional upstream connection if wsBaseUrl is configured
                     if (group.wsBaseUrl && wsLib) {
                         try {
-                            const upstream = new wsLib.WebSocket(group.wsBaseUrl);
+                            // Mirror HTTP behavior: forward to `${wsBaseUrl}${req.url}`
+                            const targetUrl = `${group.wsBaseUrl}${url || '/'}`;
+                            const upstream = new wsLib.WebSocket(targetUrl);
                             ctx.upstream = upstream;
                             upstream.on('open', () => {
                                 this.outputChannel.appendLine(
-                                    `🔗 [WS:${group.name}] Upstream connected for id=${id} -> ${group.wsBaseUrl}`
+                                    `🔗 [WS:${group.name}] Upstream connected for id=${id} -> ${targetUrl}`
                                 );
                             });
                             upstream.on('message', data => {
@@ -503,21 +509,46 @@ export class WsServerManager {
     }
 
     private scheduleTimeline(ctx: WsConnectionContext, rule: WsRule, group: ProxyGroup): void {
-        const timeline = Array.isArray(rule.timeline) ? rule.timeline.slice().sort((a, b) => a - b) : [];
-        if (!timeline.length) return;
+        // Support both legacy numeric timeline (seconds) and new object-based timeline (milliseconds + message)
+        const raw = rule.timeline;
+        let items: Array<{ atMs: number; message: string }> = [];
+
+        if (Array.isArray(raw) && raw.length > 0) {
+            const first: any = raw[0] as any;
+            if (typeof first === 'number') {
+                // Legacy: number[] interpreted as seconds; use rule.message as payload
+                const legacy = raw as unknown as number[];
+                items = legacy
+                    .filter(sec => sec >= 0)
+                    .map(sec => ({ atMs: sec * 1000, message: rule.message ?? '' }));
+            } else if (typeof first === 'object' && first && 'atMs' in first) {
+                const asItems = raw as unknown as Array<{ atMs: unknown; message: unknown }>;
+                items = asItems
+                    .map(it => ({
+                        atMs: typeof it.atMs === 'number' ? it.atMs : 0,
+                        message: typeof it.message === 'string' ? it.message : (rule.message ?? ''),
+                    }))
+                    .filter(it => it.atMs >= 0);
+            }
+        }
+
+        if (!items.length) return;
+
+        // Sort by time ascending
+        items.sort((a, b) => a.atMs - b.atMs);
 
         const scheduleSeries = () => {
-            for (const sec of timeline) {
-                if (sec < 0) continue;
-                const delayMs = sec * 1000;
+            for (const item of items) {
+                const delayMs = item.atMs;
                 const timer = setTimeout(() => {
                     if (ctx.socket.readyState !== WebSocket.OPEN) return;
-                    const payload = rule.message ?? '';
+                    const payload = item.message ?? rule.message ?? '';
+                    if (!payload) return;
                     ctx.socket.send(payload);
                     const bytes = payload.length;
                     this.trackOutboundEvent(ctx, rule, payload);
                     this.outputChannel.appendLine(
-                        `📤 [WS:${group.name}] AUTO timeline rule path=${rule.path} conn=${ctx.id} at=${sec}s bytes=${bytes}`
+                        `📤 [WS:${group.name}] AUTO timeline rule path=${rule.path} conn=${ctx.id} at=${delayMs}ms bytes=${bytes}`
                     );
                 }, delayMs);
                 ctx.timers.push(timer);
@@ -527,19 +558,21 @@ export class WsServerManager {
         if (rule.onOpenFire) {
             if (ctx.socket.readyState === WebSocket.OPEN) {
                 const payload = rule.message ?? '';
-                ctx.socket.send(payload);
-                const bytes = payload.length;
-                this.trackOutboundEvent(ctx, rule, payload);
-                this.outputChannel.appendLine(
-                    `📤 [WS:${group.name}] AUTO timeline(onOpen) path=${rule.path} conn=${ctx.id} bytes=${bytes}`
-                );
+                if (payload) {
+                    ctx.socket.send(payload);
+                    const bytes = payload.length;
+                    this.trackOutboundEvent(ctx, rule, payload);
+                    this.outputChannel.appendLine(
+                        `📤 [WS:${group.name}] AUTO timeline(onOpen) path=${rule.path} conn=${ctx.id} bytes=${bytes}`
+                    );
+                }
             }
         }
 
         scheduleSeries();
 
         if (rule.loop) {
-            const totalMs = (timeline[timeline.length - 1] ?? 0) * 1000;
+            const totalMs = items[items.length - 1]?.atMs ?? 0;
             if (totalMs > 0) {
                 const loopTimer = setInterval(() => {
                     scheduleSeries();

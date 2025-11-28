@@ -1,4 +1,4 @@
-import type { GroupDraft, MockApiConfig, MockApiDraft, ProxyGroup } from './business';
+import type { GroupDraft, MockApiConfig, MockApiDraft, ProxyGroup, WsRule } from './business';
 import type { GroupSummary } from './ui';
 
 export interface GroupListProps {
@@ -76,6 +76,16 @@ export interface GroupModalProps {
   };
   isEdit: boolean;
 }
+
+export interface WsRuleModalPropsLite {
+  open: boolean;
+  draft: WsRule;
+  onChange: (next: WsRule) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  isEdit: boolean;
+}
+
 
 export interface MockModalProps {
   open: boolean;

@@ -12,6 +12,11 @@ export type ProxyProtocol = 'HTTP' | 'WS';
 
 export type WsDirection = 'in' | 'out' | 'both';
 
+export interface WsTimelineItem {
+  atMs: number;
+  message: string;
+}
+
 export interface WsRule {
   enabled: boolean;
   path: string;
@@ -22,7 +27,7 @@ export interface WsRule {
   mode: WsRuleMode;
   periodSec?: number;
   message: string;
-  timeline?: number[];
+  timeline?: WsTimelineItem[];
   loop?: boolean;
   onOpenFire?: boolean;
 }

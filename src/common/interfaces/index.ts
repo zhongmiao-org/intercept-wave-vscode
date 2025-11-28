@@ -1,4 +1,4 @@
-import type { WsDirection, WsManualTarget, WsRuleMode, ProxyProtocol } from '../types';
+import type { WsDirection, WsRuleMode, ProxyProtocol } from '../types';
 
 export interface MockApiConfig {
     path: string;
@@ -14,6 +14,11 @@ export interface MockApiConfig {
     overrides?: Record<string, any>;
 }
 
+export interface WsTimelineItem {
+    atMs: number;
+    message: string;
+}
+
 export interface WsRule {
     enabled: boolean;
     path: string;
@@ -24,7 +29,7 @@ export interface WsRule {
     mode: WsRuleMode;
     periodSec?: number;
     message: string;
-    timeline?: number[];
+    timeline?: WsTimelineItem[];
     loop?: boolean;
     onOpenFire?: boolean;
 }
@@ -72,4 +77,3 @@ export interface MockConfig {
     globalCookie?: string;
     mockApis?: MockApiConfig[];
 }
-

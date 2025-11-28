@@ -115,10 +115,41 @@ export class PanelProvider {
                 case 'wsManualPushCustom':
                     await this.handleWsManualPushCustom(data.groupId, data.target, data.payload);
                     break;
+                case 'updateWsRules':
+                    await this.handleUpdateWsRules(data.groupId, data.rules, data.rulesIndexToDelete);
+                    break;
             }
         } catch (error: any) {
             void vscode.window.showErrorMessage(`Error: ${error.message}`);
         }
+    }
+
+    private async handleUpdateWsRules(
+        groupId: string,
+        rules?: any[],
+        rulesIndexToDelete?: number | null
+    ) {
+        const config = this.configManager.getConfig();
+        const group = config.proxyGroups.find(g => g.id === groupId);
+        if (!group) {
+            const msg = vscode.l10n.t('error.ws.groupNotFound');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
+
+        let nextRules = Array.isArray(group.wsPushRules) ? [...group.wsPushRules] : [];
+
+        if (Array.isArray(rules)) {
+            nextRules = rules as any[];
+        } else if (typeof rulesIndexToDelete === 'number') {
+            if (rulesIndexToDelete >= 0 && rulesIndexToDelete < nextRules.length) {
+                nextRules.splice(rulesIndexToDelete, 1);
+            }
+        }
+
+        await this.configManager.updateProxyGroup(groupId, { wsPushRules: nextRules as any });
+        await this.refresh();
     }
 
     private async handleWsManualPushByRule(
@@ -447,6 +478,17 @@ export class PanelProvider {
             'ui.wsPanel.title', 'ui.wsPanel.rules', 'ui.wsPanel.sendSelected',
             'ui.wsPanel.target.match', 'ui.wsPanel.target.all', 'ui.wsPanel.target.recent',
             'ui.wsPanel.customMessage', 'ui.wsPanel.send', 'ui.wsPanel.noRules',
+            'ui.addWsRule', 'ui.editWsRule',
+            'ui.wsRule.mode', 'ui.wsRule.mode.off', 'ui.wsRule.mode.periodic', 'ui.wsRule.mode.timeline',
+            'ui.wsRule.event.key', 'ui.wsRule.event.value',
+            'ui.wsRule.direction', 'ui.wsRule.direction.both', 'ui.wsRule.direction.in', 'ui.wsRule.direction.out',
+            'ui.wsRule.onOpen', 'ui.wsRule.intercept',
+            'ui.wsRule.period.sec', 'ui.wsRule.timeline.secList', 'ui.wsRule.message',
+            'ui.wsRule.section.basic',
+            'ui.wsRule.timeline.empty', 'ui.wsRule.timeline.add', 'ui.wsRule.timeline.edit', 'ui.wsRule.timeline.delete',
+            'ui.wsRule.timeline.editor.addTitle', 'ui.wsRule.timeline.editor.editTitle',
+            'ui.wsRule.timeline.editor.atMs', 'ui.wsRule.timeline.editor.message',
+            'ui.wsRule.timeline.editor.save', 'ui.wsRule.timeline.editor.cancel',
             'ui.yes', 'ui.no', 'ui.notSet',
             'ui.addProxyGroup', 'ui.editProxyGroup', 'ui.addMockApi', 'ui.editMockApi', 'ui.running', 'ui.stopped', 'ui.mockApis',
             'ui.noMockApis', 'ui.clickAddToCreate',

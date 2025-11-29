@@ -1,8 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { GroupDraft, MockApiDraft, MockApiConfig, ProxyGroup } from './interfaces/business';
+import { GroupDraft, MockApiDraft, MockApiConfig, ProxyGroup, WsRule } from './interfaces/business';
 import { GroupSummary, InitialState, IWWindow, VsCodeApi } from './interfaces/ui';
 import { GroupModal } from './components/GroupModal';
 import { MockModal } from './components/MockModal';
+import { WsPushPanel, WsManualTarget } from './components/WsPushPanel';
+import { WsRuleModal } from './components/WsRuleModal';
 
 function useVscode(): VsCodeApi {
   try {
@@ -156,6 +158,9 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
   const [showMockModal, setShowMockModal] = useState(false);
   const [editingMockIndex, setEditingMockIndex] = useState(null as number | null);
   const [mockDraft, setMockDraft] = useState(null as MockApiDraft | null);
+  const [showWsRuleModal, setShowWsRuleModal] = useState(false);
+  const [editingWsRuleIndex, setEditingWsRuleIndex] = useState<number | null>(null);
+  const [wsRuleDraft, setWsRuleDraft] = useState<WsRule | null>(null);
 
   const startAll = () => vscode.postMessage({ type: 'startServer' });
   const stopAll = () => vscode.postMessage({ type: 'stopServer' });
@@ -177,6 +182,13 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
       baseUrl: 'http://localhost:8080',
       stripPrefix: true,
       globalCookie: '',
+      protocol: 'HTTP',
+      wsBaseUrl: null,
+      wsInterceptPrefix: null,
+      wsManualPush: true,
+      wssEnabled: false,
+      wssKeystorePath: null,
+      wssKeystorePassword: null,
     } as GroupDraft);
     setShowGroupModal(true);
   };
@@ -243,6 +255,87 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
     }
   };
 
+  const ensureWsRuleDefaults = (rule: Partial<WsRule>): WsRule => {
+    return {
+      enabled: rule.enabled ?? true,
+      path: rule.path ?? '',
+      eventKey: rule.eventKey ?? 'action',
+      eventValue: rule.eventValue ?? '',
+      direction: rule.direction ?? 'both',
+      intercept: rule.intercept ?? false,
+      mode: rule.mode ?? 'off',
+      periodSec: rule.periodSec ?? 5,
+      message: rule.message ?? '{}',
+      timeline: Array.isArray(rule.timeline) ? rule.timeline : [],
+      loop: rule.loop ?? false,
+      onOpenFire: rule.onOpenFire ?? false,
+    };
+  };
+
+  const onAddWsRule = () => {
+    const base: Partial<WsRule> = {
+      enabled: true,
+      path: '',
+      eventKey: 'action',
+      eventValue: '',
+      direction: 'both',
+      intercept: false,
+      mode: 'off',
+      periodSec: 5,
+      message: '{}',
+      timeline: [],
+      loop: false,
+      onOpenFire: false,
+    };
+    setEditingWsRuleIndex(null);
+    setWsRuleDraft(ensureWsRuleDefaults(base));
+    setShowWsRuleModal(true);
+  };
+
+  const onEditWsRule = (index: number) => {
+    if (!activeGroup) return;
+    const rules = ((activeGroup as ProxyGroup).wsPushRules || []) as WsRule[];
+    const rule = rules[index];
+    if (!rule) return;
+    setEditingWsRuleIndex(index);
+    setWsRuleDraft(ensureWsRuleDefaults(rule));
+    setShowWsRuleModal(true);
+  };
+
+  const onDeleteWsRule = (index: number) => {
+    if (!activeGroup) return;
+    vscode.postMessage({ type: 'updateWsRules', groupId: activeGroup.id, rulesIndexToDelete: index });
+  };
+
+  const onToggleWsRuleEnabled = (index: number) => {
+    if (!activeGroup) return;
+    const group = activeGroup as ProxyGroup;
+    const existingRules = (group.wsPushRules || []) as WsRule[];
+    const nextRules = existingRules.map((r, idx) =>
+      idx === index ? { ...r, enabled: !r.enabled } : r
+    );
+    vscode.postMessage({ type: 'updateWsRules', groupId: group.id, rules: nextRules });
+  };
+
+  const onSaveWsRule = () => {
+    if (!activeGroup || !wsRuleDraft) return;
+    const group = activeGroup as ProxyGroup;
+    const existingRules = (group.wsPushRules || []) as WsRule[];
+    let nextRules: WsRule[];
+    if (editingWsRuleIndex === null) {
+      nextRules = [...existingRules, ensureWsRuleDefaults(wsRuleDraft)];
+    } else {
+      nextRules = existingRules.map((r, idx) =>
+        idx === editingWsRuleIndex ? ensureWsRuleDefaults(wsRuleDraft) : r
+      );
+    }
+    vscode.postMessage({ type: 'updateWsRules', groupId: group.id, rules: nextRules });
+    setShowWsRuleModal(false);
+    setEditingWsRuleIndex(null);
+    setWsRuleDraft(null);
+  };
+
+
   const formatMock = () => {
     if (!mockDraft) return;
     try {
@@ -271,7 +364,22 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
     const act = state.panelAction?.type;
     if (!act) return;
     if (act === 'addGroup') {
-      setEditingGroup({ name: '', enabled: true, port: 8888, interceptPrefix: '/api', baseUrl: '', stripPrefix: true, globalCookie: '' } as GroupDraft);
+      setEditingGroup({
+        name: '',
+        enabled: true,
+        port: 8888,
+        interceptPrefix: '/api',
+        baseUrl: '',
+        stripPrefix: true,
+        globalCookie: '',
+        protocol: 'HTTP',
+        wsBaseUrl: null,
+        wsInterceptPrefix: null,
+        wsManualPush: true,
+        wssEnabled: false,
+        wssKeystorePath: null,
+        wssKeystorePassword: null,
+      } as GroupDraft);
       setShowGroupModal(false);
     }
     if (act === 'editGroup' && activeGroup) {
@@ -312,6 +420,18 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
   const runningCount = (state.config?.proxyGroups || []).reduce((acc: number, g: ProxyGroup) => acc + (state.groupStatuses?.[g.id] ? 1 : 0), 0);
   const allRunning = totalGroups > 0 && runningCount === totalGroups;
   const noneRunning = runningCount === 0;
+
+  const isWsGroup = !!activeGroup && (activeGroup as ProxyGroup).protocol === 'WS';
+
+  const sendWsByRule = (ruleIndex: number, target: WsManualTarget) => {
+    if (!activeGroup) return;
+    vscode.postMessage({ type: 'wsManualPushByRule', groupId: activeGroup.id, ruleIndex, target });
+  };
+
+  const sendWsCustom = (target: WsManualTarget, payload: string) => {
+    if (!activeGroup) return;
+    vscode.postMessage({ type: 'wsManualPushCustom', groupId: activeGroup.id, target, payload });
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontFamily: 'var(--vscode-font-family, system-ui, Arial)' }}>
@@ -383,14 +503,30 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                 <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', rowGap: 4, columnGap: 8 }}>
                   <div>{t('ui.port') || 'Port'}:</div>
                   <div>{activeGroup.port}</div>
-                  <div>{t('ui.interceptPrefix') || 'Intercept Prefix'}:</div>
-                  <div>{activeGroup.interceptPrefix}</div>
-                  <div>{t('ui.baseUrl') || 'Base URL'}:</div>
-                  <div style={{ wordBreak: 'break-all' }}>{activeGroup.baseUrl}</div>
+                  {!isWsGroup && (
+                    <>
+                      <div>{t('ui.interceptPrefix') || 'Intercept Prefix'}:</div>
+                      <div>{activeGroup.interceptPrefix}</div>
+                      <div>{t('ui.baseUrl') || 'Base URL'}:</div>
+                      <div style={{ wordBreak: 'break-all' }}>{activeGroup.baseUrl}</div>
+                    </>
+                  )}
+                  {isWsGroup && (
+                    <>
+                      <div>{t('ui.wsBaseUrl') || 'WebSocket Base URL'}:</div>
+                      <div style={{ wordBreak: 'break-all' }}>{(activeGroup as ProxyGroup).wsBaseUrl || (t('ui.notSet') || '(Not set)')}</div>
+                      <div>{t('ui.wsInterceptPrefix') || 'WS Intercept Prefix'}:</div>
+                      <div>{(activeGroup as ProxyGroup).wsInterceptPrefix || (t('ui.notSet') || '(Not set)')}</div>
+                    </>
+                  )}
                   <div>{t('ui.stripPrefix') || 'Strip Prefix'}:</div>
                   <div>{activeGroup.stripPrefix ? (t('ui.yes') || 'Yes') : (t('ui.no') || 'No')}</div>
-                  <div>{t('ui.globalCookie') || 'Global Cookie'}:</div>
-                  <div>{(activeGroup.globalCookie && activeGroup.globalCookie.trim()) ? activeGroup.globalCookie : (t('ui.notSet') || '(Not set)')}</div>
+                  {!isWsGroup && (
+                    <>
+                      <div>{t('ui.globalCookie') || 'Global Cookie'}:</div>
+                      <div>{(activeGroup.globalCookie && activeGroup.globalCookie.trim()) ? activeGroup.globalCookie : (t('ui.notSet') || '(Not set)')}</div>
+                    </>
+                  )}
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -399,36 +535,141 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
               </div>
             </div>
 
-            {/* Mock APIs header */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-              {(() => {
-                const total = (activeGroup.mockApis || []).length;
-                const enabledCount = ((activeGroup.mockApis || []) as MockApiConfig[]).filter(m => m.enabled).length;
-                return <div style={{ fontWeight: 600 }}>{`${t('ui.mockApis') || 'Mock APIs'} (${enabledCount}/${total})`}</div>;
-              })()}
-              <div style={{ flex: 1 }} />
-              <button onClick={onAddMock}><Icon name="add" />{t('ui.addMockApi') || 'Add Mock'}</button>
-            </div>
-
-            {/* Mock APIs list */}
-            <div>
-              {((activeGroup.mockApis as MockApiConfig[]) || []).map((m, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 8, background: 'var(--vscode-editor-background)', borderRadius: 3, borderLeft: `3px solid ${m.enabled ? '#4caf50' : '#9e9e9e'}`, flexWrap: 'nowrap' }}>
-                  <div style={{ minWidth: 42, textAlign: 'center', color: '#fff', background: methodColor(m.method), padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 700 }}>{(m.method || '').toUpperCase()}</div>
-                  <div style={{ flex: '1 1 auto', minWidth: 0, color: m.enabled ? 'var(--vscode-editor-foreground)' : 'var(--vscode-descriptionForeground)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{m.path}</div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                    <button onClick={() => onToggleMock(idx)}>
-                      {m.enabled ? (<><Icon name="circle-slash" />{t('ui.disable') || 'Disable'}</>) : (<><Icon name="check" />{t('ui.enable') || 'Enable'}</>)}
-                    </button>
-                    <button onClick={() => onEditMock(idx)}><Icon name="edit" />{t('ui.edit') || 'Edit'}</button>
-                    <button onClick={() => onDeleteMock(idx)}><Icon name="trash" />{t('ui.delete') || 'Delete'}</button>
+            {isWsGroup ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600 }}>
+                    {t('ui.wsPanel.rules') || 'Rules'}
+                    {' '}
+                    ({(((activeGroup as ProxyGroup).wsPushRules || []) as WsRule[]).filter(r => r.enabled).length}
+                    /
+                    {(((activeGroup as ProxyGroup).wsPushRules || []) as WsRule[]).length})
                   </div>
+                  <div style={{ flex: 1 }} />
+                  <button onClick={onAddWsRule}>
+                    <Icon name="add" />
+                    {t('ui.addWsRule') || 'Add WS Rule'}
+                  </button>
                 </div>
-              ))}
-              {((activeGroup.mockApis as MockApiConfig[]) || []).length === 0 && (
-                <div style={{ color: 'var(--vscode-descriptionForeground, #888)', fontStyle: 'italic' }}>{t('ui.clickAddToCreate') || 'Click Add to create'}</div>
-              )}
-            </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  {(((activeGroup as ProxyGroup).wsPushRules || []) as WsRule[]).length === 0 && (
+                    <div style={{ color: 'var(--vscode-descriptionForeground, #888)', fontStyle: 'italic' }}>
+                      {t('ui.wsPanel.noRules') || 'No WS rules configured.'}
+                    </div>
+                  )}
+                  {(((activeGroup as ProxyGroup).wsPushRules || []) as WsRule[]).length > 0 && (
+                    <div
+                      style={{
+                        borderRadius: 3,
+                        border: '1px solid var(--vscode-panel-border)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {(((activeGroup as ProxyGroup).wsPushRules || []) as WsRule[]).map((r, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '32px 120px 80px 1fr auto',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '6px 8px',
+                            borderBottom: '1px solid var(--vscode-panel-border)',
+                            background: 'var(--vscode-editor-background)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={r.enabled}
+                              onChange={() => onToggleWsRuleEnabled(idx)}
+                            />
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--vscode-descriptionForeground)' }}>
+                            {(r.mode || 'off').toUpperCase()}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--vscode-descriptionForeground)' }}>
+                            {r.direction || 'both'}
+                          </div>
+                          <div
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {r.path || (r.eventKey ? `${r.eventKey}=${r.eventValue ?? ''}` : '(*)')}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button onClick={() => onEditWsRule(idx)}>
+                              <Icon name="edit" />
+                              {t('ui.edit') || 'Edit'}
+                            </button>
+                            <button onClick={() => onDeleteWsRule(idx)}>
+                              <Icon name="trash" />
+                              {t('ui.delete') || 'Delete'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <WsPushPanel
+                  rules={((activeGroup as ProxyGroup).wsPushRules || []) as WsRule[]}
+                  onSendByRule={sendWsByRule}
+                  onSendCustom={sendWsCustom}
+                  labels={{
+                    title: t('ui.wsPanel.title') || 'WebSocket Push',
+                    rules: t('ui.wsPanel.rules') || 'Rules',
+                    sendSelected: t('ui.wsPanel.sendSelected') || 'Send Selected',
+                    targetMatch: t('ui.wsPanel.target.match') || 'Match',
+                    targetAll: t('ui.wsPanel.target.all') || 'All',
+                    targetRecent: t('ui.wsPanel.target.recent') || 'Recent',
+                    customMessage: t('ui.wsPanel.customMessage') || 'Custom Message (JSON)',
+                    send: t('ui.wsPanel.send') || 'Send',
+                    noRules: t('ui.wsPanel.noRules') || 'No WS rules configured.',
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                {/* Mock APIs header */}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                  {(() => {
+                    const total = (activeGroup.mockApis || []).length;
+                    const enabledCount = ((activeGroup.mockApis || []) as MockApiConfig[]).filter(m => m.enabled).length;
+                    return <div style={{ fontWeight: 600 }}>{`${t('ui.mockApis') || 'Mock APIs'} (${enabledCount}/${total})`}</div>;
+                  })()}
+                  <div style={{ flex: 1 }} />
+                  <button onClick={onAddMock}><Icon name="add" />{t('ui.addMockApi') || 'Add Mock'}</button>
+                </div>
+
+                {/* Mock APIs list */}
+                <div>
+                  {((activeGroup.mockApis as MockApiConfig[]) || []).map((m, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 8, background: 'var(--vscode-editor-background)', borderRadius: 3, borderLeft: `3px solid ${m.enabled ? '#4caf50' : '#9e9e9e'}`, flexWrap: 'nowrap' }}>
+                      <div style={{ minWidth: 42, textAlign: 'center', color: '#fff', background: methodColor(m.method), padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 700 }}>{(m.method || '').toUpperCase()}</div>
+                      <div style={{ flex: '1 1 auto', minWidth: 0, color: m.enabled ? 'var(--vscode-editor-foreground)' : 'var(--vscode-descriptionForeground)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{m.path}</div>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                        <button onClick={() => onToggleMock(idx)}>
+                          {m.enabled ? (<><Icon name="circle-slash" />{t('ui.disable') || 'Disable'}</>) : (<><Icon name="check" />{t('ui.enable') || 'Enable'}</>)}
+                        </button>
+                        <button onClick={() => onEditMock(idx)}><Icon name="edit" />{t('ui.edit') || 'Edit'}</button>
+                        <button onClick={() => onDeleteMock(idx)}><Icon name="trash" />{t('ui.delete') || 'Delete'}</button>
+                      </div>
+                    </div>
+                  ))}
+                  {((activeGroup.mockApis as MockApiConfig[]) || []).length === 0 && (
+                    <div style={{ color: 'var(--vscode-descriptionForeground, #888)', fontStyle: 'italic' }}>{t('ui.clickAddToCreate') || 'Click Add to create'}</div>
+                  )}
+                </div>
+              </>
+            )}
           </>
         ) : (
           <div style={{ color: 'var(--vscode-descriptionForeground, #888)' }}>No active group</div>
@@ -438,7 +679,22 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
       {/* Group Modal */}
       <GroupModal
         open={showGroupModal && !!editingGroup}
-        draft={editingGroup || { name:'', enabled:true, port:8888, interceptPrefix:'/api', baseUrl:'', stripPrefix:true, globalCookie:'' }}
+        draft={editingGroup || {
+          name: '',
+          enabled: true,
+          port: 8888,
+          interceptPrefix: '/api',
+          baseUrl: '',
+          stripPrefix: true,
+          globalCookie: '',
+          protocol: 'HTTP',
+          wsBaseUrl: null,
+          wsInterceptPrefix: null,
+          wsManualPush: true,
+          wssEnabled: false,
+          wssKeystorePath: null,
+          wssKeystorePassword: null,
+        }}
         onChange={setEditingGroup as (d: GroupDraft) => void}
         onSave={onSaveGroup}
         onCancel={() => setShowGroupModal(false)}
@@ -446,12 +702,27 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
         labels={{
           titleAdd: t('ui.addProxyGroup') || 'Add Group',
           titleEdit: t('ui.editProxyGroup') || 'Edit Group',
+          sectionGroup: t('ui.section.group') || '配置组设置',
+          sectionHttp: t('ui.section.http') || 'HTTP 设置',
+          sectionWs: t('ui.section.ws') || 'WebSocket 设置',
           name: t('ui.groupName') || 'Name',
+          enabled: t('ui.enabled') || 'Enabled',
+          protocol: t('ui.protocol') || 'Protocol',
+          protocolHttp: t('ui.protocol.http') || 'HTTP',
+          protocolWs: t('ui.protocol.ws') || 'WebSocket',
           port: t('ui.port') || 'Port',
           interceptPrefix: t('ui.interceptPrefix') || 'Intercept Prefix',
           baseUrl: t('ui.baseUrl') || 'Base URL',
           stripPrefix: t('ui.stripPrefix') || 'Strip Prefix',
           globalCookie: t('ui.globalCookie') || 'Global Cookie',
+          wsBaseUrl: t('ui.wsBaseUrl') || 'WS Base URL',
+          wsInterceptPrefix: t('ui.wsInterceptPrefix') || 'WS Intercept Prefix',
+          wsManualPush: t('ui.wsManualPush') || 'Enable Manual Push',
+          wssEnabled: t('ui.wssEnabled') || 'Enable WSS (TLS)',
+          wssKeystorePath: t('ui.wssKeystorePath') || 'WSS Keystore Path',
+          wssKeystorePassword: t('ui.wssKeystorePassword') || 'WSS Keystore Password',
+          yesLabel: t('ui.yes') || 'Yes',
+          noLabel: t('ui.no') || 'No',
           save: t('ui.save') || 'Save',
           cancel: t('ui.cancel') || 'Cancel',
         }}
@@ -478,6 +749,57 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
           format: t('ui.format') || 'Format',
           save: t('ui.save') || 'Save',
           cancel: t('ui.cancel') || 'Cancel',
+        }}
+      />
+
+      {/* WS Rule Modal */}
+      <WsRuleModal
+        open={showWsRuleModal && !!wsRuleDraft}
+        draft={
+          wsRuleDraft || ensureWsRuleDefaults({ enabled: true, mode: 'off', direction: 'both', message: '{}' })
+        }
+        onChange={setWsRuleDraft as (r: WsRule) => void}
+        onSave={onSaveWsRule}
+        onCancel={() => {
+          setShowWsRuleModal(false);
+          setEditingWsRuleIndex(null);
+          setWsRuleDraft(null);
+        }}
+        isEdit={editingWsRuleIndex !== null}
+        labels={{
+          titleAdd: t('ui.addWsRule') || 'Add WS Rule',
+          titleEdit: t('ui.editWsRule') || 'Edit WS Rule',
+          enabled: t('ui.enabled') || 'Enabled',
+          path: t('ui.path') || 'Route Path',
+          mode: t('ui.wsRule.mode') || 'Mode',
+          modeOff: t('ui.wsRule.mode.off') || 'Off',
+          modePeriodic: t('ui.wsRule.mode.periodic') || 'Periodic',
+          modeTimeline: t('ui.wsRule.mode.timeline') || 'Timeline',
+          eventKey: t('ui.wsRule.event.key') || 'Event Key',
+          eventValue: t('ui.wsRule.event.value') || 'Event Value',
+          direction: t('ui.wsRule.direction') || 'Direction',
+          directionBoth: t('ui.wsRule.direction.both') || 'Both',
+          directionIn: t('ui.wsRule.direction.in') || 'Inbound',
+          directionOut: t('ui.wsRule.direction.out') || 'Outbound',
+          onOpen: t('ui.wsRule.onOpen') || 'Send on connect',
+          intercept: t('ui.wsRule.intercept') || 'Intercept forwarding',
+          periodSec: t('ui.wsRule.period.sec') || 'Interval (seconds)',
+          timelineSecList: t('ui.wsRule.timeline.secList') || 'Timeline (seconds, comma separated)',
+          message: t('ui.wsRule.message') || 'Message (JSON)',
+          formatJson: t('ui.format') || 'Format',
+          cancel: t('ui.cancel') || 'Cancel',
+          save: t('ui.save') || 'Save',
+          basicSectionTitle: t('ui.wsRule.section.basic') || 'Basic Settings',
+          timelineEmpty: t('ui.wsRule.timeline.empty') || 'No timeline items. Click "Add" to create one.',
+          timelineAdd: t('ui.wsRule.timeline.add') || 'Add',
+          timelineEdit: t('ui.wsRule.timeline.edit') || 'Edit',
+          timelineDelete: t('ui.wsRule.timeline.delete') || 'Delete',
+          timelineEditorAddTitle: t('ui.wsRule.timeline.editor.addTitle') || 'Add timeline item',
+          timelineEditorEditTitle: t('ui.wsRule.timeline.editor.editTitle') || 'Edit timeline item',
+          timelineEditorAtMs: t('ui.wsRule.timeline.editor.atMs') || 'At (ms)',
+          timelineEditorMessage: t('ui.wsRule.timeline.editor.message') || 'Message (JSON)',
+          timelineEditorSave: t('ui.wsRule.timeline.editor.save') || 'Save item',
+          timelineEditorCancel: t('ui.wsRule.timeline.editor.cancel') || 'Cancel',
         }}
       />
     </div>

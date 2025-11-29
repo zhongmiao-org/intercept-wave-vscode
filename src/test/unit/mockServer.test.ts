@@ -1,8 +1,8 @@
-import { describe, it, beforeEach, afterEach } from 'mocha';
+import { afterEach, beforeEach, describe, it } from 'mocha';
 import { expect } from 'chai';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
-import { MockServerManager, MockConfig, ConfigManager } from '../../common';
+import { ConfigManager, MockConfig, MockServerManager, ProxyGroup, WsManualTarget, WsRule, } from '../../common';
 import * as http from 'http';
 import * as net from 'net';
 
@@ -300,6 +300,215 @@ describe('MockServerManager', () => {
             // call with non-existing id must not throw
             await mockServerManager.stopGroupById('unknown');
             expect(mockServerManager.getStatus()).to.be.false;
+        });
+    });
+
+    describe('WS helpers (wsManager delegation)', () => {
+        it('getGroupStatus returns WS manager status when no HTTP server', () => {
+            const wsManagerStub = {
+                getGroupStatus: sinon.stub().withArgs('ws-id').returns(true),
+                stopAll: sinon.stub(),
+            } as any;
+            (mockServerManager as any).wsManager = wsManagerStub;
+
+            expect(mockServerManager.getGroupStatus('ws-id')).to.be.true;
+            expect(wsManagerStub.getGroupStatus.calledWith('ws-id')).to.be.true;
+        });
+
+        it('manualPushByRule passes all WS rules of group to wsManager', async () => {
+            const rule1: WsRule = {
+                enabled: true,
+                path: '/echo',
+                eventKey: 'action',
+                eventValue: 'test',
+                direction: 'out',
+                intercept: true,
+                mode: 'off',
+                periodSec: 0,
+                message: '{"reply":"1"}',
+                timeline: [],
+                loop: false,
+                onOpenFire: false,
+            };
+            const rule2: WsRule = {
+                ...rule1,
+                path: '/other',
+                message: '{"reply":"2"}',
+            };
+
+            const cfg: MockConfig = {
+                ...defaultConfig,
+                proxyGroups: [
+                    {
+                        ...(defaultConfig.proxyGroups[0] as ProxyGroup),
+                        id: 'ws-id',
+                        name: 'WS',
+                        protocol: 'WS',
+                        wsBaseUrl: 'ws://localhost:9003',
+                        wsInterceptPrefix: '/ws',
+                        wsManualPush: true,
+                        wsPushRules: [rule1, rule2],
+                        wssEnabled: false,
+                        wssKeystorePath: null,
+                        wssKeystorePassword: null,
+                    },
+                ],
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+            const manualPushStub = sinon.stub().resolves(true);
+
+            (mockServerManager as any).wsManager = {
+                manualPushByRule: manualPushStub,
+                manualPushCustom: sinon.stub(),
+                getGroupStatus: sinon.stub().returns(false),
+                startGroup: sinon.stub(),
+                stopGroup: sinon.stub(),
+                stopAll: sinon.stub(),
+            } as any;
+
+            const ok = await mockServerManager.manualPushByRule(
+                'ws-id',
+                rule2,
+                'match' as WsManualTarget
+            );
+            expect(ok).to.be.true;
+
+            expect(manualPushStub.calledOnce).to.be.true;
+            const args = manualPushStub.firstCall.args;
+            expect(args[0]).to.equal('ws-id');
+            expect(args[1]).to.equal(rule2);
+            expect(args[2]).to.equal('match');
+            // fourth argument should be all rules of the group
+            expect(args[3]).to.deep.equal([rule1, rule2]);
+        });
+
+        it('manualPushCustom passes all WS rules of group to wsManager', async () => {
+            const rule: WsRule = {
+                enabled: true,
+                path: '/echo',
+                eventKey: undefined,
+                eventValue: undefined,
+                direction: 'both',
+                intercept: false,
+                mode: 'off',
+                periodSec: 0,
+                message: '{"reply":"x"}',
+                timeline: [],
+                loop: false,
+                onOpenFire: false,
+            };
+
+            const cfg: MockConfig = {
+                ...defaultConfig,
+                proxyGroups: [
+                    {
+                        ...(defaultConfig.proxyGroups[0] as ProxyGroup),
+                        id: 'ws-id',
+                        name: 'WS',
+                        protocol: 'WS',
+                        wsBaseUrl: 'ws://localhost:9003',
+                        wsInterceptPrefix: '/ws',
+                        wsManualPush: true,
+                        wsPushRules: [rule],
+                        wssEnabled: false,
+                        wssKeystorePath: null,
+                        wssKeystorePassword: null,
+                    },
+                ],
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+            const manualCustomStub = sinon.stub().resolves(true);
+
+            (mockServerManager as any).wsManager = {
+                manualPushByRule: sinon.stub(),
+                manualPushCustom: manualCustomStub,
+                getGroupStatus: sinon.stub().returns(false),
+                startGroup: sinon.stub(),
+                stopGroup: sinon.stub(),
+                stopAll: sinon.stub(),
+            } as any;
+
+            const ok = await mockServerManager.manualPushCustom(
+                'ws-id',
+                '{"ping":1}',
+                'all' as WsManualTarget
+            );
+            expect(ok).to.be.true;
+            expect(manualCustomStub.calledOnce).to.be.true;
+            const args = manualCustomStub.firstCall.args;
+            expect(args[0]).to.equal('ws-id');
+            expect(args[1]).to.equal('{"ping":1}');
+            expect(args[2]).to.equal('all');
+            expect(args[3]).to.deep.equal([rule]);
+        });
+
+        it('stopGroupById stops WS server when only WS server is running', async () => {
+            const cfg: MockConfig = {
+                ...defaultConfig,
+                proxyGroups: [
+                    {
+                        ...(defaultConfig.proxyGroups[0] as ProxyGroup),
+                        id: 'ws-id',
+                        name: 'WS',
+                        protocol: 'WS',
+                        wsBaseUrl: 'ws://localhost:9003',
+                        wsInterceptPrefix: '/ws',
+                        wsManualPush: true,
+                        wsPushRules: [],
+                        wssEnabled: false,
+                        wssKeystorePath: null,
+                        wssKeystorePassword: null,
+                    },
+                ],
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+            const stopGroupStub = sinon.stub().resolves();
+
+            (mockServerManager as any).wsManager = {
+                manualPushByRule: sinon.stub(),
+                manualPushCustom: sinon.stub(),
+                getGroupStatus: sinon.stub().withArgs('ws-id').returns(true),
+                startGroup: sinon.stub(),
+                stopGroup: stopGroupStub,
+                stopAll: sinon.stub(),
+            } as any;
+
+            // No HTTP servers running; only WS
+            await mockServerManager.stopGroupById('ws-id');
+
+            expect(stopGroupStub.calledOnceWith('ws-id')).to.be.true;
+            const logs = appendLineStub.args.map(a => String(a[0]));
+            expect(
+                logs.some(l => l.includes('WS server stopped for group') && l.includes('WS'))
+            ).to.be.true;
+        });
+
+        it('hasAnyWsServer returns true when any group is active on wsManager', () => {
+            const cfg: MockConfig = {
+                ...defaultConfig,
+                proxyGroups: [
+                    defaultConfig.proxyGroups[0],
+                    {
+                        ...(defaultConfig.proxyGroups[0] as ProxyGroup),
+                        id: 'ws-id',
+                        name: 'WS',
+                    },
+                ],
+            };
+            (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+            (mockServerManager as any).wsManager = {
+                getGroupStatus: sinon
+                    .stub()
+                    .callsFake((id: string) => (id === 'ws-id')),
+                stopAll: sinon.stub(),
+            } as any;
+
+            const hasAny = (mockServerManager as any).hasAnyWsServer() as boolean;
+            expect(hasAny).to.be.true;
         });
     });
     describe('request handling', () => {

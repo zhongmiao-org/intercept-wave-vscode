@@ -1,3 +1,5 @@
+import type { WsDirection, WsRuleMode, ProxyProtocol } from '../types';
+
 export interface MockApiConfig {
     path: string;
     enabled: boolean;
@@ -10,6 +12,26 @@ export interface MockApiConfig {
     headers?: Record<string, string>;
     templateId?: string;
     overrides?: Record<string, any>;
+}
+
+export interface WsTimelineItem {
+    atMs: number;
+    message: string;
+}
+
+export interface WsRule {
+    enabled: boolean;
+    path: string;
+    eventKey?: string;
+    eventValue?: string;
+    direction: WsDirection;
+    intercept?: boolean;
+    mode: WsRuleMode;
+    periodSec?: number;
+    message: string;
+    timeline?: WsTimelineItem[];
+    loop?: boolean;
+    onOpenFire?: boolean;
 }
 
 export interface TLSConfig {
@@ -32,6 +54,16 @@ export interface ProxyGroup {
     // Future extension hooks (no runtime behavior yet)
     tls?: TLSConfig;
     defaultHeaders?: Record<string, string>;
+
+    // v3 shared config fields (must stay in sync with Kotlin project)
+    protocol?: ProxyProtocol; // defaults to 'HTTP' when omitted
+    wsBaseUrl?: string | null;
+    wsInterceptPrefix?: string | null;
+    wsManualPush?: boolean;
+    wsPushRules?: WsRule[];
+    wssEnabled?: boolean;
+    wssKeystorePath?: string | null;
+    wssKeystorePassword?: string | null;
 }
 
 export interface MockConfig {
@@ -45,4 +77,3 @@ export interface MockConfig {
     globalCookie?: string;
     mockApis?: MockApiConfig[];
 }
-

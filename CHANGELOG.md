@@ -6,6 +6,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [3.1.0]
+
 ### Added
 
 - WebSocket proxy groups (`protocol: "WS"`) with per-group WS config (`wsBaseUrl`, `wsInterceptPrefix`, manual push toggle, WSS fields) shared with the JetBrains plugin.

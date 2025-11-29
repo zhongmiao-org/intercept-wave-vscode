@@ -51,7 +51,8 @@ export class WsServerManager {
             return;
         }
 
-        const isWss = !!group.wssEnabled;
+        // WSS(TLS) 暂不支持，这里强制仅使用 WS。
+        const isWss = false;
         const port = group.port;
         const path = this.normalizeWsPath(group.wsInterceptPrefix);
 

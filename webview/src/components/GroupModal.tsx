@@ -171,56 +171,7 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
                 }
               />
 
-              <label>{labels.wsManualPush}</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input
-                  type="checkbox"
-                  checked={draft.wsManualPush ?? true}
-                  onChange={e =>
-                    onChange({
-                      ...draft,
-                      wsManualPush: e.target.checked,
-                    })
-                  }
-                />
-              </div>
-
-              <label>{labels.wssEnabled}</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input
-                  type="checkbox"
-                  checked={draft.wssEnabled ?? false}
-                  onChange={e =>
-                    onChange({
-                      ...draft,
-                      wssEnabled: e.target.checked,
-                    })
-                  }
-                />
-              </div>
-
-              <label>{labels.wssKeystorePath}</label>
-              <input
-                value={draft.wssKeystorePath ?? ''}
-                onChange={e =>
-                  onChange({
-                    ...draft,
-                    wssKeystorePath: e.target.value || null,
-                  })
-                }
-              />
-
-              <label>{labels.wssKeystorePassword}</label>
-              <input
-                type="password"
-                value={draft.wssKeystorePassword ?? ''}
-                onChange={e =>
-                  onChange({
-                    ...draft,
-                    wssKeystorePassword: e.target.value || null,
-                  })
-                }
-              />
+              {/* WSS / TLS 相关配置暂不支持，先隐藏对应 UI 字段 */}
             </>
           ) : (
             <>

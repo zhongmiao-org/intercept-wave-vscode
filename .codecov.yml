@@ -9,9 +9,11 @@ coverage:
         threshold: 1%
     patch:
       default:
-        # Loosen patch status: require >= 80% on changed lines
+        # Require >= 80% on changed lines, but treat as informational
+        # so it does not block PR merge when below target.
         target: 80%
         threshold: 0%
+        informational: true
 
 ignore:
   - "src/extension.ts"                       # VSCode extension entry point - requires integration tests

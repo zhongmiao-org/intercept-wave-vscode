@@ -22,6 +22,12 @@ type WebSocketServer = any;
 // ReadyState constant for "OPEN" in ws library (1).
 const WS_OPEN_STATE = 1;
 
+interface WsMessageEvalResult {
+    intercepted: boolean;
+    matchedRules: WsRule[];
+    interceptRules: WsRule[];
+}
+
 interface WsConnectionContext {
     id: string;
     groupId: string;
@@ -176,17 +182,18 @@ export class WsServerManager {
                                     : this.safeBufferToString(data as Buffer);
                                 const bytes = Buffer.byteLength(text, 'utf-8');
 
-                                const intercepted = this.handleInboundOrOutboundMessage(
+                                // 上游 → 客户端：方向语义与 Kotlin 版保持一致（direction='in'）。
+                                const result = this.handleInboundOrOutboundMessage(
                                     group,
                                     ctx,
-                                    'out',
+                                    'in',
                                     text,
                                     bytes,
                                     'upstream'
                                 );
 
                                 // 对前端统一发送文本帧，保持与直连一致。
-                                if (!intercepted && socket.readyState === WS_OPEN_STATE) {
+                                if (!result.intercepted && socket.readyState === WS_OPEN_STATE) {
                                     socket.send(text);
                                     this.outputChannel.appendLine(
                                         `📤 [WS:${group.name}] FORWARD ← upstream id=${id} bytes=${bytes}`
@@ -218,17 +225,35 @@ export class WsServerManager {
                             : this.safeBufferToString(data as Buffer);
                         const bytes = Buffer.byteLength(text, 'utf-8');
 
-                        const intercepted = this.handleInboundOrOutboundMessage(
+                        // 客户端 → 上游：direction='out'（与 Kotlin 版保持一致）。
+                        const result = this.handleInboundOrOutboundMessage(
                             group,
                             ctx,
-                            'in',
+                            'out',
                             text,
                             bytes,
                             'client'
                         );
 
-                        // 对上游统一发送文本帧，适配 JSON/文本场景。
-                        if (!intercepted && ctx.upstream) {
+                        // 被拦截：不再转发到上游，并按兄弟项目行为立即推送匹配规则的 message（若非空）。
+                        if (result.intercepted) {
+                            const replyRule = result.interceptRules.find(
+                                r => typeof r.message === 'string' && r.message.trim().length > 0
+                            );
+                            if (replyRule && socket.readyState === WS_OPEN_STATE) {
+                                const payload = replyRule.message ?? '';
+                                socket.send(payload);
+                                const replyBytes = Buffer.byteLength(payload, 'utf-8');
+                                this.trackOutboundEvent(ctx, replyRule, payload);
+                                this.outputChannel.appendLine(
+                                    `📤 [WS:${group.name}] AUTO intercept reply path=${replyRule.path} conn=${id} bytes=${replyBytes}`
+                                );
+                            }
+                            return;
+                        }
+
+                        // 未命中拦截规则：对上游统一发送文本帧，适配 JSON/文本场景。
+                        if (ctx.upstream) {
                             if (ctx.upstream.readyState === WS_OPEN_STATE) {
                                 ctx.upstream.send(text);
                                 this.outputChannel.appendLine(
@@ -460,13 +485,13 @@ export class WsServerManager {
         text: string,
         bytes: number,
         source: 'client' | 'upstream'
-    ): boolean {
+    ): WsMessageEvalResult {
         const rules = group.wsPushRules || [];
         if (!rules.length) {
             this.outputChannel.appendLine(
                 `📥 [WS:${group.name}] ${direction.toUpperCase()} id=${ctx.id} bytes=${bytes} (no rules)`
             );
-            return false;
+            return { intercepted: false, matchedRules: [], interceptRules: [] };
         }
 
         const json = this.parseJson(text);
@@ -491,7 +516,8 @@ export class WsServerManager {
             this.matchesRuleForMessage(ctx, r, direction, eventKeyCandidates)
         );
 
-        const hasIntercept = matchedRules.some(r => r.intercept);
+        const interceptRules = matchedRules.filter(r => r.intercept);
+        const hasIntercept = interceptRules.length > 0;
 
         this.outputChannel.appendLine(
             `📥 [WS:${group.name}] ${direction.toUpperCase()} id=${ctx.id} bytes=${bytes} matchedRules=${matchedRules.length} intercepted=${hasIntercept}`
@@ -502,10 +528,9 @@ export class WsServerManager {
             this.outputChannel.appendLine(
                 `🛑 [WS:${group.name}] INTERCEPT(id=${ctx.id}, direction=${direction}, source=${source})`
             );
-            return true;
         }
 
-        return false;
+        return { intercepted: hasIntercept, matchedRules, interceptRules };
     }
 
     private matchesRuleForMessage(

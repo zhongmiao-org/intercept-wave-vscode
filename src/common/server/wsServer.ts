@@ -19,6 +19,9 @@ const wsLib: any = (() => {
 type WebSocket = any;
 type WebSocketServer = any;
 
+// ReadyState constant for "OPEN" in ws library (1).
+const WS_OPEN_STATE = 1;
+
 interface WsConnectionContext {
     id: string;
     groupId: string;
@@ -159,7 +162,7 @@ export class WsServerManager {
                                 );
 
                                 // 对前端统一发送文本帧，保持与直连一致。
-                                if (!intercepted && socket.readyState === WebSocket.OPEN) {
+                                if (!intercepted && socket.readyState === WS_OPEN_STATE) {
                                     socket.send(text);
                                     this.outputChannel.appendLine(
                                         `📤 [WS:${group.name}] FORWARD ← upstream id=${id} bytes=${bytes}`
@@ -201,7 +204,7 @@ export class WsServerManager {
                         );
 
                         // 对上游统一发送文本帧，适配 JSON/文本场景。
-                        if (!intercepted && ctx.upstream && ctx.upstream.readyState === WebSocket.OPEN) {
+                        if (!intercepted && ctx.upstream && ctx.upstream.readyState === WS_OPEN_STATE) {
                             ctx.upstream.send(text);
                             this.outputChannel.appendLine(
                                 `📤 [WS:${group.name}] FORWARD → upstream id=${id} bytes=${bytes}`
@@ -215,7 +218,7 @@ export class WsServerManager {
                         this.outputChannel.appendLine(
                             `🔌 [WS:${group.name}] CLOSE id=${id} code=${code} reason=${reason.toString()}`
                         );
-                        if (ctx.upstream && ctx.upstream.readyState === WebSocket.OPEN) {
+                        if (ctx.upstream && ctx.upstream.readyState === WS_OPEN_STATE) {
                             ctx.upstream.close();
                         }
                     });
@@ -272,7 +275,7 @@ export class WsServerManager {
                 } catch {
                     // ignore
                 }
-                if (conn.upstream && conn.upstream.readyState === WebSocket.OPEN) {
+                if (conn.upstream && conn.upstream.readyState === WS_OPEN_STATE) {
                     try {
                         conn.upstream.close();
                     } catch {
@@ -318,7 +321,7 @@ export class WsServerManager {
         let sent = 0;
         for (const conn of selected) {
             this.resetAndRescheduleForConnection(conn, allRules);
-            if (conn.socket.readyState === WebSocket.OPEN) {
+            if (conn.socket.readyState === WS_OPEN_STATE) {
                 conn.socket.send(payload);
                 const bytes = payload.length;
                 this.trackOutboundEvent(conn, rule, payload);
@@ -349,7 +352,7 @@ export class WsServerManager {
         let sent = 0;
         for (const conn of selected) {
             this.resetAndRescheduleForConnection(conn, allRules);
-            if (conn.socket.readyState === WebSocket.OPEN) {
+            if (conn.socket.readyState === WS_OPEN_STATE) {
                 conn.socket.send(payload);
                 this.trackOutboundCustomEvent(conn, payload);
                 this.outputChannel.appendLine(
@@ -422,11 +425,12 @@ export class WsServerManager {
         this.outputChannel.appendLine(
             `📥 [WS:${group.name}] ${direction.toUpperCase()} id=${ctx.id} bytes=${bytes} matchedRules=${matchedRules.length} intercepted=${hasIntercept}`
         );
+
+        // 当前版本先不阻断真实流量，即使存在拦截规则也仅记录日志，不中断转发。
         if (hasIntercept) {
             this.outputChannel.appendLine(
-                `🛑 [WS:${group.name}] INTERCEPT id=${ctx.id} direction=${direction} source=${source}`
+                `🛑 [WS:${group.name}] INTERCEPT(id=${ctx.id}, direction=${direction}, source=${source}) (logging only; forwarding not blocked)`
             );
-            return true;
         }
 
         return false;
@@ -494,7 +498,7 @@ export class WsServerManager {
         const intervalMs = periodSec * 1000;
 
         const sendOnce = () => {
-            if (ctx.socket.readyState !== WebSocket.OPEN) return;
+            if (ctx.socket.readyState !== WS_OPEN_STATE) return;
             const payload = rule.message ?? '';
             ctx.socket.send(payload);
             const bytes = payload.length;

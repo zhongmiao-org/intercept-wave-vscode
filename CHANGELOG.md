@@ -6,6 +6,35 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+### Added
+
+- WebSocket proxy groups (`protocol: "WS"`) with per-group WS config (`wsBaseUrl`, `wsInterceptPrefix`, manual push toggle, WSS fields) shared with the JetBrains plugin.
+- WebSocket rule model (`WsRule`) and UI for defining WS push/intercept rules, including:
+  - Direction (`in` / `out` / `both`), optional event key/value matching, and intercept flag.
+  - `periodic` rules with `periodSec` and optional `onOpenFire` behavior.
+  - `timeline` rules with millisecond-precision schedule, looping, and per-item messages.
+- WebSocket push panel in the webview:
+  - Target selection: match connections by rule, all connections, or most recent.
+  - Manual push of rule payloads or arbitrary JSON payloads to active WS connections.
+- Node-side WebSocket server runtime (`WsServerManager`) that:
+  - Listens per WS proxy group and optionally forwards to upstream WS (`wsBaseUrl`).
+  - Applies `wsInterceptPrefix` + `stripPrefix` for matching paths (e.g. `/ws/echo` → `/echo`).
+  - Evaluates WS rules on client→upstream and upstream→client traffic, with logging and intercept flags.
+
+### Changed
+
+- When a WS rule with `intercept: true` matches a client→upstream message, the message is no longer forwarded upstream; instead, if the rule defines a non-empty `message`, it is immediately pushed back to the client (mirroring the behavior of the IntelliJ plugin).
+- For upstream connections that are still in `CONNECTING` state, client messages are queued per connection and flushed once the upstream WebSocket transitions to `OPEN` instead of being silently dropped.
+- Webview group configuration modal now supports selecting protocol (`HTTP`/`WS`) and editing WS-specific fields; group summary panel shows WS base URL and intercept prefix for WS groups.
+
+### Testing
+
+- Added focused unit tests for the WS server runtime covering:
+  - Path normalization and prefix stripping for WS groups.
+  - Rule evaluation (path/direction/event key/value), intercept behavior, and event tracking.
+  - Manual push selection (`match`/`all`/`recent`) and periodic/timeline scheduling (including legacy numeric timelines).
+- Extended `MockServerManager` tests to cover WS delegation flows (manual push by rule/custom, WS group status, and WS stop logic), improving coverage of HTTP/WS integration paths.
+
 ## [3.0.1]
 
 ### Fixed

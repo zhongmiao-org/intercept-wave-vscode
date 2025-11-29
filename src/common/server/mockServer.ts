@@ -4,8 +4,8 @@ import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
 import { selectBestMockApiForRequest } from './pathMatcher';
-import type { MockApiConfig, ProxyGroup, WsRule } from '../interfaces';
-import type { WsManualTarget } from '../types';
+import { MockApiConfig, ProxyGroup, WsRule } from '../interfaces';
+import { WsManualTarget } from '../types';
 import { WsServerManager } from './wsServer';
 
 export class MockServerManager {

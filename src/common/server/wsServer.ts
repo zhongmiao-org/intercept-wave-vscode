@@ -120,10 +120,12 @@ export class WsServerManager {
                     const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
                     const url = req.url || '/';
                     const rawPath = url.split('?')[0] || '/';
+                    // Apply WS 拦截前缀与 stripPrefix 语义，得到用于规则匹配的路径。
+                    const effectivePath = this.getEffectiveWsPath(rawPath, group);
                     const ctx: WsConnectionContext = {
                         id,
                         groupId: group.id,
-                        path: rawPath,
+                        path: effectivePath,
                         createdAt: Date.now(),
                         lastActivityAt: Date.now(),
                         socket,
@@ -292,6 +294,42 @@ export class WsServerManager {
         // collapse multiple slashes
         p = p.replace(/\/+/g, '/');
         return p;
+    }
+
+    /**
+     * 根据 wsInterceptPrefix 与 stripPrefix 计算用于规则匹配的路径。
+     *
+     * - 先对原始路径做简单规范化（确保前导 /，去掉多余 / 与查询串）。
+     * - 如果配置了 wsInterceptPrefix 且 stripPrefix=true，则在匹配到前缀时剥离前缀，
+     *   使得规则可以使用相对路径（例如前缀 /ws + 真实路径 /ws/echo，对应规则 path=/echo）。
+     */
+    private getEffectiveWsPath(rawPath: string, group: ProxyGroup): string {
+        const normalize = (p: string): string => {
+            if (!p) return '/';
+            let v = String(p).split('?')[0] || '/';
+            if (!v.startsWith('/')) {
+                v = '/' + v;
+            }
+            v = v.replace(/\/+/g, '/');
+            // 保留末尾的 /，交由上游 matcher 处理；这里只做最小规范化。
+            return v;
+        };
+
+        const path = normalize(rawPath);
+        const prefixRaw = group.wsInterceptPrefix;
+        if (!prefixRaw) {
+            return path;
+        }
+
+        const prefix = normalize(prefixRaw).replace(/\/+$/, '') || '/';
+
+        // 当 stripPrefix=true 且路径以 ws 前缀开头时，剥离该前缀用于规则匹配。
+        if (group.stripPrefix && prefix !== '/' && path.startsWith(prefix)) {
+            const rest = path.slice(prefix.length) || '/';
+            return rest.startsWith('/') ? rest : '/' + rest;
+        }
+
+        return path;
     }
 
     async stopGroup(groupId: string): Promise<void> {

@@ -30,6 +30,11 @@ interface WsConnectionContext {
     lastActivityAt: number;
     socket: WebSocket;
     upstream?: WebSocket;
+    /**
+     * Messages received from client while upstream is still connecting.
+     * These will be flushed once the upstream WebSocket moves to OPEN.
+     */
+    pendingToUpstream?: string[];
     timers: NodeJS.Timeout[];
     lastInEvent?: { key: string; value: unknown };
     lastOutEvent?: { key: string; value: unknown };
@@ -122,6 +127,7 @@ export class WsServerManager {
                         createdAt: Date.now(),
                         lastActivityAt: Date.now(),
                         socket,
+                        pendingToUpstream: [],
                         timers: [],
                     };
                     entry.connections.set(id, ctx);
@@ -143,6 +149,22 @@ export class WsServerManager {
                                 this.outputChannel.appendLine(
                                     `🔗 [WS:${group.name}] Upstream connected for id=${id} -> ${targetUrl}`
                                 );
+
+                                // Flush any messages that were sent by the client while upstream was still connecting.
+                                const queue = ctx.pendingToUpstream || [];
+                                if (queue.length > 0) {
+                                    for (const payload of queue) {
+                                        if (upstream.readyState !== WS_OPEN_STATE) {
+                                            break;
+                                        }
+                                        upstream.send(payload);
+                                        const bytes = Buffer.byteLength(payload, 'utf-8');
+                                        this.outputChannel.appendLine(
+                                            `📤 [WS:${group.name}] FORWARD(queue) → upstream id=${id} bytes=${bytes}`
+                                        );
+                                    }
+                                    ctx.pendingToUpstream = [];
+                                }
                             });
                             upstream.on('message', data => {
                                 ctx.lastActivityAt = Date.now();
@@ -204,11 +226,22 @@ export class WsServerManager {
                         );
 
                         // 对上游统一发送文本帧，适配 JSON/文本场景。
-                        if (!intercepted && ctx.upstream && ctx.upstream.readyState === WS_OPEN_STATE) {
-                            ctx.upstream.send(text);
-                            this.outputChannel.appendLine(
-                                `📤 [WS:${group.name}] FORWARD → upstream id=${id} bytes=${bytes}`
-                            );
+                        if (!intercepted && ctx.upstream) {
+                            if (ctx.upstream.readyState === WS_OPEN_STATE) {
+                                ctx.upstream.send(text);
+                                this.outputChannel.appendLine(
+                                    `📤 [WS:${group.name}] FORWARD → upstream id=${id} bytes=${bytes}`
+                                );
+                            } else {
+                                // Upstream 还在 CONNECTING，先缓存在连接上下文中，待 open 后再发送。
+                                if (!ctx.pendingToUpstream) {
+                                    ctx.pendingToUpstream = [];
+                                }
+                                ctx.pendingToUpstream.push(text);
+                                this.outputChannel.appendLine(
+                                    `⏳ [WS:${group.name}] QUEUE → upstream id=${id} bytes=${bytes} (upstream not OPEN)`
+                                );
+                            }
                         }
                     });
 
@@ -426,11 +459,12 @@ export class WsServerManager {
             `📥 [WS:${group.name}] ${direction.toUpperCase()} id=${ctx.id} bytes=${bytes} matchedRules=${matchedRules.length} intercepted=${hasIntercept}`
         );
 
-        // 当前版本先不阻断真实流量，即使存在拦截规则也仅记录日志，不中断转发。
+        // 命中拦截规则时，阻断该方向的真实流量转发。
         if (hasIntercept) {
             this.outputChannel.appendLine(
-                `🛑 [WS:${group.name}] INTERCEPT(id=${ctx.id}, direction=${direction}, source=${source}) (logging only; forwarding not blocked)`
+                `🛑 [WS:${group.name}] INTERCEPT(id=${ctx.id}, direction=${direction}, source=${source})`
             );
+            return true;
         }
 
         return false;
@@ -551,7 +585,7 @@ export class WsServerManager {
             for (const item of items) {
                 const delayMs = item.atMs;
                 const timer = setTimeout(() => {
-                    if (ctx.socket.readyState !== WebSocket.OPEN) return;
+                    if (ctx.socket.readyState !== WS_OPEN_STATE) return;
                     const payload = item.message ?? rule.message ?? '';
                     if (!payload) return;
                     ctx.socket.send(payload);
@@ -566,7 +600,7 @@ export class WsServerManager {
         };
 
         if (rule.onOpenFire) {
-            if (ctx.socket.readyState === WebSocket.OPEN) {
+            if (ctx.socket.readyState === WS_OPEN_STATE) {
                 const payload = rule.message ?? '';
                 if (payload) {
                     ctx.socket.send(payload);

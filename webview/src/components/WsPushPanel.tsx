@@ -28,8 +28,14 @@ export function WsPushPanel({ rules, onSendByRule, onSendCustom, labels }: WsPus
   React.useEffect(() => {
     if (!rules.length) {
       setSelectedRuleIndex(null);
+      setCustomPayload('');
     } else if (selectedRuleIndex === null || selectedRuleIndex >= rules.length) {
-      setSelectedRuleIndex(0);
+      const nextIndex = 0;
+      setSelectedRuleIndex(nextIndex);
+      const rule = rules[nextIndex];
+      if (rule && typeof rule.message === 'string') {
+        setCustomPayload(rule.message);
+      }
     }
   }, [rules, selectedRuleIndex]);
 
@@ -85,12 +91,22 @@ export function WsPushPanel({ rules, onSendByRule, onSendCustom, labels }: WsPus
               cursor: 'pointer',
               background: selectedRuleIndex === idx ? 'var(--vscode-editor-selectionBackground)' : 'transparent',
             }}
-            onClick={() => setSelectedRuleIndex(idx)}
+            onClick={() => {
+              setSelectedRuleIndex(idx);
+              if (rule && typeof rule.message === 'string') {
+                setCustomPayload(rule.message);
+              }
+            }}
           >
             <input
               type="radio"
               checked={selectedRuleIndex === idx}
-              onChange={() => setSelectedRuleIndex(idx)}
+              onChange={() => {
+                setSelectedRuleIndex(idx);
+                if (rule && typeof rule.message === 'string') {
+                  setCustomPayload(rule.message);
+                }
+              }}
               style={{ justifySelf: 'center' }}
             />
             <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

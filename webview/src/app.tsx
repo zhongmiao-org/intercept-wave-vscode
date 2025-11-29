@@ -532,12 +532,6 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <button onClick={onEditGroup}><Icon name="gear" />{t('ui.settings') || 'Settings'}</button>
                 <button onClick={onDeleteGroup}><Icon name="trash" />{t('ui.delete') || 'Delete'}</button>
-                {isWsGroup && (
-                  <button onClick={onAddWsRule}>
-                    <Icon name="add" />
-                    {t('ui.addWsRule') || 'Add WS Rule'}
-                  </button>
-                )}
               </div>
             </div>
 

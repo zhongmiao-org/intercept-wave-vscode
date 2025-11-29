@@ -142,9 +142,16 @@ export class WsServerManager {
                             });
                             upstream.on('message', data => {
                                 ctx.lastActivityAt = Date.now();
-                                const buf = data as Buffer;
-                                const bytes = buf?.length ?? 0;
-                                const text = this.safeBufferToString(buf);
+                                let text: string;
+                                let bytes: number;
+                                if (typeof data === 'string') {
+                                    text = data;
+                                    bytes = Buffer.byteLength(text, 'utf-8');
+                                } else {
+                                    const buf = data as Buffer;
+                                    bytes = buf?.length ?? 0;
+                                    text = this.safeBufferToString(buf);
+                                }
 
                                 const intercepted = this.handleInboundOrOutboundMessage(
                                     group,
@@ -155,6 +162,7 @@ export class WsServerManager {
                                     'upstream'
                                 );
 
+                                // Transparent proxy: forward exactly what upstream sent.
                                 if (!intercepted && socket.readyState === WebSocket.OPEN) {
                                     socket.send(data);
                                     this.outputChannel.appendLine(
@@ -181,9 +189,16 @@ export class WsServerManager {
 
                     socket.on('message', data => {
                         ctx.lastActivityAt = Date.now();
-                        const buf = data as Buffer;
-                        const bytes = buf?.length ?? 0;
-                        const text = this.safeBufferToString(buf);
+                        let text: string;
+                        let bytes: number;
+                        if (typeof data === 'string') {
+                            text = data;
+                            bytes = Buffer.byteLength(text, 'utf-8');
+                        } else {
+                            const buf = data as Buffer;
+                            bytes = buf?.length ?? 0;
+                            text = this.safeBufferToString(buf);
+                        }
 
                         const intercepted = this.handleInboundOrOutboundMessage(
                             group,
@@ -194,7 +209,7 @@ export class WsServerManager {
                             'client'
                         );
 
-                        // Forward to upstream only when not intercepted
+                        // Transparent proxy: forward exactly what client sent.
                         if (!intercepted && ctx.upstream && ctx.upstream.readyState === WebSocket.OPEN) {
                             ctx.upstream.send(data);
                             this.outputChannel.appendLine(

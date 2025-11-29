@@ -2,6 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect } from 'chai';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
+import * as ws from 'ws';
 import {
     WsServerManager,
     ProxyGroup,
@@ -82,6 +83,66 @@ describe('WsServerManager (unit)', () => {
             ) => string;
 
             expect(fn('/ws/echo', group)).to.equal('/ws/echo');
+        });
+    });
+
+    describe('startGroup / stopGroup (using fake ws server)', () => {
+        class FakeWebSocketServer {
+            public static instances: FakeWebSocketServer[] = [];
+            public handlers: Record<string, Array<(...args: any[]) => void>> = {};
+            public closed = false;
+
+            constructor(public opts: any) {
+                FakeWebSocketServer.instances.push(this);
+            }
+
+            on(event: string, handler: (...args: any[]) => void): void {
+                if (!this.handlers[event]) this.handlers[event] = [];
+                this.handlers[event].push(handler);
+            }
+
+            close(cb?: () => void): void {
+                this.closed = true;
+                if (cb) cb();
+            }
+
+            emit(event: string, ...args: any[]): void {
+                const hs = this.handlers[event] || [];
+                hs.forEach(h => h(...args));
+            }
+        }
+
+        it('startGroup registers WS server and stopGroup removes it', async () => {
+            const originalWSS = (ws as any).WebSocketServer;
+            (ws as any).WebSocketServer = FakeWebSocketServer as any;
+
+            try {
+                const group = createBaseGroup({
+                    id: 'ws-group',
+                    name: 'WS Group',
+                    port: 18080,
+                    protocol: 'WS',
+                });
+
+                const startPromise = wsManager.startGroup(group);
+                // There should be one fake server instance created
+                const fakeServer = FakeWebSocketServer.instances[0];
+                expect(fakeServer).to.exist;
+
+                // Simulate underlying "listening" event to resolve startGroup promise
+                fakeServer.emit('listening');
+                await startPromise;
+
+                expect(wsManager.getGroupStatus('ws-group')).to.be.true;
+
+                // Now stop the group; fake close will toggle flag and resolve
+                await wsManager.stopGroup('ws-group');
+                expect(wsManager.getGroupStatus('ws-group')).to.be.false;
+                expect(fakeServer.closed).to.be.true;
+            } finally {
+                (ws as any).WebSocketServer = originalWSS;
+                FakeWebSocketServer.instances = [];
+            }
         });
     });
 
@@ -345,6 +406,322 @@ describe('WsServerManager (unit)', () => {
             fn(ctx);
 
             expect(ctx.timers).to.deep.equal([]);
+        });
+    });
+
+    describe('rule scheduling and matching', () => {
+        let clock: sinon.SinonFakeTimers;
+
+        beforeEach(() => {
+            clock = sinon.useFakeTimers();
+        });
+
+        afterEach(() => {
+            clock.restore();
+        });
+
+        it('scheduleRulesForConnection schedules periodic rule with onOpenFire', () => {
+            const ctx: any = {
+                id: 'c1',
+                groupId: 'g1',
+                path: '/echo',
+                createdAt: Date.now(),
+                lastActivityAt: Date.now(),
+                socket: {
+                    readyState: 1,
+                    send: sinon.stub(),
+                },
+                timers: [] as NodeJS.Timeout[],
+            };
+
+            const periodicRule: WsRule = {
+                enabled: true,
+                path: '/echo',
+                eventKey: undefined,
+                eventValue: undefined,
+                direction: 'out',
+                intercept: false,
+                mode: 'periodic',
+                periodSec: 1,
+                message: '{"tick":1}',
+                timeline: [],
+                loop: false,
+                onOpenFire: true,
+            };
+
+            const group = createBaseGroup({ wsPushRules: [periodicRule] });
+
+            const scheduleFn = (wsManager as any).scheduleRulesForConnection.bind(
+                wsManager
+            ) as (c: any, g: ProxyGroup) => void;
+
+            scheduleFn(ctx, group);
+
+            // onOpenFire should trigger an immediate send
+            expect(ctx.socket.send.callCount).to.equal(1);
+            expect(ctx.timers.length).to.be.greaterThan(0);
+
+            // Advance time to trigger the interval once
+            clock.tick(1000);
+            expect(ctx.socket.send.callCount).to.be.greaterThan(1);
+        });
+
+        it('schedulePeriodic logs and skips when periodSec <= 0', () => {
+            const ctx: any = {
+                id: 'c1',
+                groupId: 'g1',
+                path: '/echo',
+                createdAt: Date.now(),
+                lastActivityAt: Date.now(),
+                socket: {
+                    readyState: 1,
+                    send: sinon.stub(),
+                },
+                timers: [] as NodeJS.Timeout[],
+            };
+
+            const badRule: WsRule = {
+                enabled: true,
+                path: '/echo',
+                eventKey: undefined,
+                eventValue: undefined,
+                direction: 'out',
+                intercept: false,
+                mode: 'periodic',
+                periodSec: 0,
+                message: '{"tick":1}',
+                timeline: [],
+                loop: false,
+                onOpenFire: false,
+            };
+
+            const group = createBaseGroup({ wsPushRules: [badRule] });
+            const scheduleFn = (wsManager as any).scheduleRulesForConnection.bind(
+                wsManager
+            ) as (c: any, g: ProxyGroup) => void;
+
+            scheduleFn(ctx, group);
+
+            // No timers should be scheduled
+            expect(ctx.timers.length).to.equal(0);
+            // And a warning log should be emitted
+            const logs = appendLineStub.args.map(a => String(a[0]));
+            expect(
+                logs.some(l => l.includes('periodic rule has invalid periodSec'))
+            ).to.be.true;
+        });
+
+        it('scheduleTimeline schedules sends based on atMs', () => {
+            const ctx: any = {
+                id: 'c1',
+                groupId: 'g1',
+                path: '/echo',
+                createdAt: Date.now(),
+                lastActivityAt: Date.now(),
+                socket: {
+                    readyState: 1,
+                    send: sinon.stub(),
+                },
+                timers: [] as NodeJS.Timeout[],
+            };
+
+            const timelineRule: WsRule = {
+                enabled: true,
+                path: '/echo',
+                eventKey: undefined,
+                eventValue: undefined,
+                direction: 'out',
+                intercept: false,
+                mode: 'timeline',
+                periodSec: 0,
+                message: '', // use per-item message
+                timeline: [{ atMs: 100, message: '{"t":1}' }],
+                loop: false,
+                onOpenFire: false,
+            };
+
+            const group = createBaseGroup({ wsPushRules: [timelineRule] });
+            const scheduleFn = (wsManager as any).scheduleRulesForConnection.bind(
+                wsManager
+            ) as (c: any, g: ProxyGroup) => void;
+
+            scheduleFn(ctx, group);
+            expect(ctx.timers.length).to.be.greaterThan(0);
+
+            clock.tick(100); // trigger first timeline item
+            expect(ctx.socket.send.calledOnce).to.be.true;
+            expect(ctx.socket.send.firstCall.args[0]).to.equal('{"t":1}');
+        });
+
+        it('scheduleTimeline supports legacy numeric timeline', () => {
+            const ctx: any = {
+                id: 'c1',
+                groupId: 'g1',
+                path: '/echo',
+                createdAt: Date.now(),
+                lastActivityAt: Date.now(),
+                socket: {
+                    readyState: 1,
+                    send: sinon.stub(),
+                },
+                timers: [] as NodeJS.Timeout[],
+            };
+
+            const legacyRule: WsRule = {
+                enabled: true,
+                path: '/echo',
+                eventKey: undefined,
+                eventValue: undefined,
+                direction: 'out',
+                intercept: false,
+                mode: 'timeline',
+                periodSec: 0,
+                message: '{"legacy":1}',
+                timeline: [1], // seconds
+                loop: false,
+                onOpenFire: false,
+            } as any;
+
+            const group = createBaseGroup({ wsPushRules: [legacyRule] });
+            const scheduleFn = (wsManager as any).scheduleRulesForConnection.bind(
+                wsManager
+            ) as (c: any, g: ProxyGroup) => void;
+
+            scheduleFn(ctx, group);
+            expect(ctx.timers.length).to.be.greaterThan(0);
+
+            // 1 second in legacy timeline means 1000ms
+            clock.tick(1000);
+            expect(ctx.socket.send.calledOnce).to.be.true;
+            expect(ctx.socket.send.firstCall.args[0]).to.equal('{"legacy":1}');
+        });
+
+        it('matchesRuleForConnection checks path and eventKey/value', () => {
+            const ctx: any = {
+                id: 'c1',
+                groupId: 'g1',
+                path: '/echo',
+                createdAt: Date.now(),
+                lastActivityAt: Date.now(),
+                socket: {} as any,
+                timers: [],
+                lastInEvent: { key: 'action', value: 'test' },
+                lastOutEvent: { key: 'other', value: 'x' },
+            };
+
+            const rule: WsRule = {
+                enabled: true,
+                path: '/echo',
+                eventKey: 'action',
+                eventValue: 'test',
+                direction: 'both',
+                intercept: false,
+                mode: 'off',
+                periodSec: 0,
+                message: '',
+                timeline: [],
+                loop: false,
+                onOpenFire: false,
+            };
+
+            const fn = (wsManager as any).matchesRuleForConnection.bind(
+                wsManager
+            ) as (c: any, r: WsRule) => boolean;
+
+            expect(fn(ctx, rule)).to.be.true;
+
+            // Different value should not match
+            const rule2 = { ...rule, eventValue: 'nope' };
+            expect(fn(ctx, rule2)).to.be.false;
+
+            // Different path should not match
+            const rule3 = { ...rule, path: '/other' };
+            expect(fn(ctx, rule3)).to.be.false;
+        });
+
+        it('resetAndRescheduleForConnection clears timers and applies allRules', () => {
+            const ctx: any = {
+                id: 'c1',
+                groupId: 'g1',
+                path: '/echo',
+                createdAt: Date.now(),
+                lastActivityAt: Date.now(),
+                socket: {
+                    readyState: 1,
+                    send: sinon.stub(),
+                },
+                timers: [] as NodeJS.Timeout[],
+            };
+
+            const rule: WsRule = {
+                enabled: true,
+                path: '/echo',
+                eventKey: undefined,
+                eventValue: undefined,
+                direction: 'out',
+                intercept: false,
+                mode: 'periodic',
+                periodSec: 1,
+                message: '{"auto":1}',
+                timeline: [],
+                loop: false,
+                onOpenFire: false,
+            };
+
+            // Pre-populate timers to verify they are cleared
+            ctx.timers.push(setInterval(() => {}, 1000));
+
+            const resetFn = (wsManager as any).resetAndRescheduleForConnection.bind(
+                wsManager
+            ) as (c: any, rules?: WsRule[]) => void;
+
+            resetFn(ctx, [rule]);
+
+            expect(ctx.timers.length).to.be.greaterThan(0);
+
+            // Advance time to trigger periodic send
+            clock.tick(1000);
+            expect(ctx.socket.send.calledOnce).to.be.true;
+        });
+
+        it('trackOutboundEvent and trackOutboundCustomEvent record lastOutEvent', () => {
+            const ctx: any = {
+                id: 'c1',
+                groupId: 'g1',
+                path: '/echo',
+                createdAt: Date.now(),
+                lastActivityAt: Date.now(),
+                socket: {} as any,
+                timers: [],
+            };
+
+            const rule: WsRule = {
+                enabled: true,
+                path: '/echo',
+                eventKey: 'action',
+                eventValue: undefined,
+                direction: 'out',
+                intercept: false,
+                mode: 'off',
+                periodSec: 0,
+                message: '',
+                timeline: [],
+                loop: false,
+                onOpenFire: false,
+            };
+
+            const trackFn = (wsManager as any).trackOutboundEvent.bind(
+                wsManager
+            ) as (c: any, r: WsRule, payload: string) => void;
+            const trackCustomFn = (wsManager as any).trackOutboundCustomEvent.bind(
+                wsManager
+            ) as (c: any, payload: string) => void;
+
+            trackFn(ctx, rule, '{"action":"test"}');
+            expect(ctx.lastOutEvent).to.deep.equal({ key: 'action', value: 'test' });
+
+            trackCustomFn(ctx, '{"foo":"bar"}');
+            expect(ctx.lastOutEvent).to.deep.equal({ key: 'foo', value: 'bar' });
         });
     });
 });

@@ -33,7 +33,7 @@ export function WsPushPanel({ rules, onSendByRule, onSendCustom, labels }: WsPus
       const nextIndex = 0;
       setSelectedRuleIndex(nextIndex);
       const rule = rules[nextIndex];
-      if (rule && typeof rule.message === 'string') {
+      if (rule) {
         setCustomPayload(rule.message);
       }
     }
@@ -93,7 +93,7 @@ export function WsPushPanel({ rules, onSendByRule, onSendCustom, labels }: WsPus
             }}
             onClick={() => {
               setSelectedRuleIndex(idx);
-              if (rule && typeof rule.message === 'string') {
+              if (rule) {
                 setCustomPayload(rule.message);
               }
             }}
@@ -103,7 +103,7 @@ export function WsPushPanel({ rules, onSendByRule, onSendCustom, labels }: WsPus
               checked={selectedRuleIndex === idx}
               onChange={() => {
                 setSelectedRuleIndex(idx);
-                if (rule && typeof rule.message === 'string') {
+                if (rule) {
                   setCustomPayload(rule.message);
                 }
               }}

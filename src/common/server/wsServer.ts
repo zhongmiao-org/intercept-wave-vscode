@@ -143,16 +143,11 @@ export class WsServerManager {
                             });
                             upstream.on('message', data => {
                                 ctx.lastActivityAt = Date.now();
-                                let text: string;
-                                let bytes: number;
-                                if (typeof data === 'string') {
-                                    text = data;
-                                    bytes = Buffer.byteLength(text, 'utf-8');
-                                } else {
-                                    const buf = data as Buffer;
-                                    bytes = buf?.length ?? 0;
-                                    text = this.safeBufferToString(buf);
-                                }
+                                // 上游返回也统一按 UTF-8 文本解析，便于规则匹配与日志。
+                                const text = typeof data === 'string'
+                                    ? data
+                                    : this.safeBufferToString(data as Buffer);
+                                const bytes = Buffer.byteLength(text, 'utf-8');
 
                                 const intercepted = this.handleInboundOrOutboundMessage(
                                     group,
@@ -163,9 +158,9 @@ export class WsServerManager {
                                     'upstream'
                                 );
 
-                                // Transparent proxy: forward exactly what upstream sent.
+                                // 对前端统一发送文本帧，保持与直连一致。
                                 if (!intercepted && socket.readyState === WebSocket.OPEN) {
-                                    socket.send(data);
+                                    socket.send(text);
                                     this.outputChannel.appendLine(
                                         `📤 [WS:${group.name}] FORWARD ← upstream id=${id} bytes=${bytes}`
                                     );
@@ -190,16 +185,11 @@ export class WsServerManager {
 
                     socket.on('message', data => {
                         ctx.lastActivityAt = Date.now();
-                        let text: string;
-                        let bytes: number;
-                        if (typeof data === 'string') {
-                            text = data;
-                            bytes = Buffer.byteLength(text, 'utf-8');
-                        } else {
-                            const buf = data as Buffer;
-                            bytes = buf?.length ?? 0;
-                            text = this.safeBufferToString(buf);
-                        }
+                        // 对 WS 组统一按 UTF-8 文本处理消息，保持与直连一致的行为。
+                        const text = typeof data === 'string'
+                            ? data
+                            : this.safeBufferToString(data as Buffer);
+                        const bytes = Buffer.byteLength(text, 'utf-8');
 
                         const intercepted = this.handleInboundOrOutboundMessage(
                             group,
@@ -210,9 +200,9 @@ export class WsServerManager {
                             'client'
                         );
 
-                        // Transparent proxy: forward exactly what client sent.
+                        // 对上游统一发送文本帧，适配 JSON/文本场景。
                         if (!intercepted && ctx.upstream && ctx.upstream.readyState === WebSocket.OPEN) {
-                            ctx.upstream.send(data);
+                            ctx.upstream.send(text);
                             this.outputChannel.appendLine(
                                 `📤 [WS:${group.name}] FORWARD → upstream id=${id} bytes=${bytes}`
                             );

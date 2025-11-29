@@ -118,7 +118,6 @@ export function WsRuleModal({ open, draft, onChange, onSave, onCancel, isEdit, l
       if (selectedTimelineIndex == null || selectedTimelineIndex < 0 || selectedTimelineIndex >= timeline.length) {
         return;
       }
-      const original = timeline[selectedTimelineIndex];
       next = timeline
         .map((it, idx) => (idx === selectedTimelineIndex ? item : it))
         .sort((a, b) => a.atMs - b.atMs);

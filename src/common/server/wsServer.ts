@@ -16,9 +16,6 @@ const wsLib: any = (() => {
     }
 })();
 
-type WebSocket = any;
-type WebSocketServer = any;
-
 // ReadyState constant for "OPEN" in ws library (1).
 const WS_OPEN_STATE = 1;
 
@@ -47,14 +44,18 @@ interface WsConnectionContext {
 }
 
 interface WsServerEntry {
-    server: WebSocketServer;
+    server: any;
     connections: Map<string, WsConnectionContext>;
 }
 
 export class WsServerManager {
     private readonly servers: Map<string, WsServerEntry> = new Map(); // groupId -> WS server
 
-    constructor(private readonly outputChannel: vscode.OutputChannel) {}
+    // Allow injection of ws module for testing; default to lazy-loaded wsLib.
+    constructor(
+        private readonly outputChannel: vscode.OutputChannel,
+        private readonly wsModule: any = wsLib
+    ) {}
 
     getGroupStatus(groupId: string): boolean {
         return this.servers.has(groupId);
@@ -72,7 +73,7 @@ export class WsServerManager {
 
         return new Promise((resolve, reject) => {
             try {
-                if (!wsLib) {
+                if (!this.wsModule) {
                     this.outputChannel.appendLine(
                         `❌ [WS:${group.name}] ws library not available; WS server not started`
                     );
@@ -80,7 +81,7 @@ export class WsServerManager {
                     return;
                 }
 
-                let server: WebSocketServer;
+                let server: any;
                 if (isWss) {
                     const tlsOptions: https.ServerOptions = {};
                     // If keystore info is available, try to configure basic TLS.
@@ -101,7 +102,7 @@ export class WsServerManager {
                     const httpsServer = https.createServer(tlsOptions);
                     // Note: we no longer restrict by `path` at the ws library level,
                     // so that prefixes like `/ws` can still accept `/ws/echo` etc.
-                    server = new wsLib.WebSocketServer({ server: httpsServer });
+                    server = new this.wsModule.WebSocketServer({ server: httpsServer });
                     httpsServer.listen(port, () => {
                         this.outputChannel.appendLine(
                             `✅ [WS:${group.name}] WSS server started on wss://localhost:${port}${path}`
@@ -109,7 +110,7 @@ export class WsServerManager {
                     });
                 } else {
                     // Do not pass `path` to allow all request paths on this port.
-                    server = new wsLib.WebSocketServer({ port });
+                    server = new this.wsModule.WebSocketServer({ port });
                     server.on('listening', () => {
                         this.outputChannel.appendLine(
                             `✅ [WS:${group.name}] WS server started on ws://localhost:${port}${path}`
@@ -147,11 +148,11 @@ export class WsServerManager {
                     this.scheduleRulesForConnection(ctx, group);
 
                     // Optional upstream connection if wsBaseUrl is configured
-                    if (group.wsBaseUrl && wsLib) {
+                    if (group.wsBaseUrl && this.wsModule) {
                         try {
                             // Mirror HTTP behavior: forward to `${wsBaseUrl}${req.url}`
                             const targetUrl = `${group.wsBaseUrl}${url || '/'}`;
-                            const upstream = new wsLib.WebSocket(targetUrl);
+                            const upstream = new this.wsModule.WebSocket(targetUrl);
                             ctx.upstream = upstream;
                             upstream.on('open', () => {
                                 this.outputChannel.appendLine(

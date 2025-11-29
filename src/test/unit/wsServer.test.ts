@@ -2,7 +2,6 @@ import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect } from 'chai';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
-import * as ws from 'ws';
 import {
     WsServerManager,
     ProxyGroup,
@@ -113,36 +112,34 @@ describe('WsServerManager (unit)', () => {
         }
 
         it('startGroup registers WS server and stopGroup removes it', async () => {
-            const originalWSS = (ws as any).WebSocketServer;
-            (ws as any).WebSocketServer = FakeWebSocketServer as any;
+            const group = createBaseGroup({
+                id: 'ws-group',
+                name: 'WS Group',
+                port: 18080,
+                protocol: 'WS',
+            });
 
-            try {
-                const group = createBaseGroup({
-                    id: 'ws-group',
-                    name: 'WS Group',
-                    port: 18080,
-                    protocol: 'WS',
-                });
+            const wsManagerLocal = new WsServerManager(outputChannel, {
+                WebSocketServer: FakeWebSocketServer,
+            } as any);
 
-                const startPromise = wsManager.startGroup(group);
-                // There should be one fake server instance created
-                const fakeServer = FakeWebSocketServer.instances[0];
-                expect(fakeServer).to.exist;
+            const startPromise = wsManagerLocal.startGroup(group);
+            // There should be one fake server instance created
+            const fakeServer = FakeWebSocketServer.instances[0];
+            expect(fakeServer).to.exist;
 
-                // Simulate underlying "listening" event to resolve startGroup promise
-                fakeServer.emit('listening');
-                await startPromise;
+            // Simulate underlying "listening" event to resolve startGroup promise
+            fakeServer.emit('listening');
+            await startPromise;
 
-                expect(wsManager.getGroupStatus('ws-group')).to.be.true;
+            expect(wsManagerLocal.getGroupStatus('ws-group')).to.be.true;
 
-                // Now stop the group; fake close will toggle flag and resolve
-                await wsManager.stopGroup('ws-group');
-                expect(wsManager.getGroupStatus('ws-group')).to.be.false;
-                expect(fakeServer.closed).to.be.true;
-            } finally {
-                (ws as any).WebSocketServer = originalWSS;
-                FakeWebSocketServer.instances = [];
-            }
+            // Now stop the group; fake close will toggle flag and resolve
+            await wsManagerLocal.stopGroup('ws-group');
+            expect(wsManagerLocal.getGroupStatus('ws-group')).to.be.false;
+            expect(fakeServer.closed).to.be.true;
+
+            FakeWebSocketServer.instances = [];
         });
     });
 
@@ -534,7 +531,7 @@ describe('WsServerManager (unit)', () => {
                 intercept: false,
                 mode: 'timeline',
                 periodSec: 0,
-                message: '', // use per-item message
+                message: '{"t":1}', // non-empty to satisfy scheduleRulesForConnection guard
                 timeline: [{ atMs: 100, message: '{"t":1}' }],
                 loop: false,
                 onOpenFire: false,

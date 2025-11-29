@@ -238,7 +238,7 @@ export class WsServerManager {
                         // 被拦截：不再转发到上游，并按兄弟项目行为立即推送匹配规则的 message（若非空）。
                         if (result.intercepted) {
                             const replyRule = result.interceptRules.find(
-                                r => typeof r.message === 'string' && r.message.trim().length > 0
+                                r => r.message.trim().length > 0
                             );
                             if (replyRule && socket.readyState === WS_OPEN_STATE) {
                                 const payload = replyRule.message ?? '';

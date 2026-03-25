@@ -59,40 +59,43 @@ export function HttpProxySection({
                     flexWrap: 'wrap',
                 }}
             >
-                {proxies.map(p => (
-                    <div
-                        key={p.id}
-                        onClick={() => onSelectProxy(p.id)}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            padding: '4px 10px',
-                            fontSize: 12,
-                            background:
-                                activeProxy?.id === p.id
-                                    ? 'var(--vscode-button-background)'
-                                    : 'var(--vscode-tab-inactiveBackground)',
-                            color:
-                                activeProxy?.id === p.id
-                                    ? 'var(--vscode-button-foreground)'
-                                    : 'var(--vscode-tab-inactiveForeground)',
-                            borderRadius: 3,
-                            cursor: 'pointer',
-                            border:
-                                activeProxy?.id === p.id
-                                    ? '1px solid var(--vscode-button-background)'
-                                    : '1px solid transparent',
-                            opacity: p.enabled ? 1 : 0.6,
-                        }}
-                    >
-                        <span
-                            className={`codicon codicon-${p.enabled ? 'plug' : 'debug-disconnect'}`}
-                            style={{ fontSize: 12 }}
-                        />
-                        <span>{p.name || '(unnamed)'}</span>
-                    </div>
-                ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {proxies.map(p => (
+                        <div
+                            key={p.id}
+                            onClick={() => onSelectProxy(p.id)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                padding: '4px 10px',
+                                fontSize: 12,
+                                background:
+                                    activeProxy?.id === p.id
+                                        ? 'var(--vscode-button-background)'
+                                        : 'var(--vscode-tab-inactiveBackground)',
+                                color:
+                                    activeProxy?.id === p.id
+                                        ? 'var(--vscode-button-foreground)'
+                                        : 'var(--vscode-tab-inactiveForeground)',
+                                borderRadius: 3,
+                                cursor: 'pointer',
+                                border:
+                                    activeProxy?.id === p.id
+                                        ? '1px solid var(--vscode-button-background)'
+                                        : '1px solid transparent',
+                                opacity: p.enabled ? 1 : 0.6,
+                            }}
+                        >
+                            <span
+                                className={`codicon codicon-${p.enabled ? 'plug' : 'debug-disconnect'}`}
+                                style={{ fontSize: 12 }}
+                            />
+                            <span>{p.name || '(unnamed)'}</span>
+                        </div>
+                    ))}
+                </div>
+                <div style={{ flex: 1 }} />
                 <button onClick={onOpenManageModal} style={{ padding: '4px 8px', fontSize: 12 }}>
                     <span className="codicon codicon-list-unordered" style={{ marginRight: 4 }} />
                     {t('ui.manageProxies') || 'Manage Proxies'}
@@ -174,7 +177,10 @@ export function HttpProxySection({
                                 }
                                 style={{ padding: '2px 8px', fontSize: 11 }}
                             >
-                                <span className="codicon codicon-trash" style={{ marginRight: 4 }} />
+                                <span
+                                    className="codicon codicon-trash"
+                                    style={{ marginRight: 4 }}
+                                />
                                 {t('ui.delete') || 'Delete'}
                             </button>
                         </div>
@@ -307,7 +313,8 @@ export function HttpProxySection({
                         textAlign: 'center',
                     }}
                 >
-                    {t('ui.noProxies') || 'No proxies configured. Click "Manage Proxies" to add one.'}
+                    {t('ui.noProxies') ||
+                        'No proxies configured. Click "Manage Proxies" to add one.'}
                 </div>
             )}
         </>

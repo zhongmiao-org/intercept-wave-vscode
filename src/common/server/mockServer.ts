@@ -4,7 +4,7 @@ import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
 import { selectBestMockApiForRequest } from './pathMatcher';
-import { MockApiConfig, ProxyGroup, WsRule } from '../interfaces';
+import { MockApiConfig, ProxyGroup, WsRule, HttpProxy } from '../interfaces';
 import { WsManualTarget } from '../types';
 import { WsServerManager } from './wsServer';
 
@@ -61,14 +61,20 @@ export class MockServerManager {
                 .join(', ');
             this.outputChannel.appendLine(`✅ Mock servers started: ${urls}`);
             if (failed.length > 0) {
-                failed.forEach(f => this.outputChannel.appendLine(`❌ [${f.group.name}] failed to start: ${f.error?.message || f.error}`));
+                failed.forEach(f =>
+                    this.outputChannel.appendLine(
+                        `❌ [${f.group.name}] failed to start: ${f.error?.message || f.error}`
+                    )
+                );
             }
             this.outputChannel.show(true);
             return urls;
         }
 
         // none succeeded
-        const errorMsg = failed.map(f => `${f.group.name}(:${f.group.port}) - ${f.error?.message || f.error}`).join('; ');
+        const errorMsg = failed
+            .map(f => `${f.group.name}(:${f.group.port}) - ${f.error?.message || f.error}`)
+            .join('; ');
         throw new Error(`Failed to start any server: ${errorMsg}`);
     }
 
@@ -149,14 +155,22 @@ export class MockServerManager {
         return this.httpServers.has(groupId) || this.wsManager.getGroupStatus(groupId);
     }
 
-    async manualPushByRule(groupId: string, rule: WsRule, target: WsManualTarget): Promise<boolean> {
+    async manualPushByRule(
+        groupId: string,
+        rule: WsRule,
+        target: WsManualTarget
+    ): Promise<boolean> {
         const config = this.configManager.getConfig();
         const group = config.proxyGroups.find(g => g.id === groupId);
         const allRules = group?.wsPushRules || [];
         return this.wsManager.manualPushByRule(groupId, rule, target, allRules);
     }
 
-    async manualPushCustom(groupId: string, payload: string, target: WsManualTarget): Promise<boolean> {
+    async manualPushCustom(
+        groupId: string,
+        payload: string,
+        target: WsManualTarget
+    ): Promise<boolean> {
         const config = this.configManager.getConfig();
         const group = config.proxyGroups.find(g => g.id === groupId);
         const allRules = group?.wsPushRules || [];
@@ -233,22 +247,6 @@ export class MockServerManager {
         this.outputChannel.appendLine(`📥 [${group.name}] ${method} ${requestPath}`);
 
         // Handle root path - welcome page
-        if (requestPath === '/' || requestPath === '') {
-            this.handleWelcomePage(res, group);
-            return;
-        }
-
-        // Handle prefix welcome page when stripPrefix=true
-        if (group.stripPrefix && group.interceptPrefix) {
-            const prefix = group.interceptPrefix.endsWith('/')
-                ? group.interceptPrefix.slice(0, -1)
-                : group.interceptPrefix;
-            if (requestPath === prefix || requestPath === prefix + '/') {
-                this.handleWelcomePage(res, group);
-                return;
-            }
-        }
-
         // Handle OPTIONS request (CORS preflight)
         if (method === 'OPTIONS') {
             this.sendCorsHeaders(res);
@@ -258,19 +256,50 @@ export class MockServerManager {
             return;
         }
 
-        // Path matching logic
-        const matchPath = this.getMatchPath(requestPath, group);
+        // Try to match httpProxies first (multi-proxy support), sorted by priority
+        const httpProxies = (group.httpProxies || [])
+            .slice()
+            .sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999));
+        let matchedProxy: HttpProxy | null = null;
+        let matchPath = requestPath;
+
+        const enabledProxies = httpProxies.filter(p => p.enabled);
+        const matchingProxies = enabledProxies.filter(p =>
+            requestPath.startsWith(p.interceptPrefix)
+        );
+        if (matchingProxies.length > 0) {
+            matchedProxy = matchingProxies.reduce((best, current) =>
+                current.interceptPrefix.length > best.interceptPrefix.length ? current : best
+            );
+            if (matchedProxy.stripPrefix) {
+                const stripped = requestPath.substring(matchedProxy.interceptPrefix.length);
+                matchPath = stripped || '/';
+            }
+        }
+
+        // If no httpProxy matched, use group-level settings
+        if (!matchedProxy) {
+            matchPath = this.getMatchPath(requestPath, group);
+        }
+
+        // Only show welcome page for root path when no proxy matched and no group-level baseUrl
+        if ((requestPath === '/' || requestPath === '') && !matchedProxy && !group.baseUrl) {
+            this.handleWelcomePage(res, group);
+            return;
+        }
+
         this.outputChannel.appendLine(`   🎯 Match path: ${matchPath}`);
+        if (matchedProxy) {
+            this.outputChannel.appendLine(`   🔀 Using proxy: ${matchedProxy.name}`);
+        }
 
         // Find matching mock API
-        const mockApi = this.findMatchingMockApi(matchPath, method, group);
+        const mockApi = this.findMatchingMockApi(matchPath, method, group, matchedProxy);
 
         if (mockApi && mockApi.enabled) {
-            // Use mock data
-            await this.handleMockResponse(res, mockApi, group);
+            await this.handleMockResponse(res, mockApi, group, matchedProxy);
         } else {
-            // Forward to original server
-            this.forwardToOriginalServer(req, res, group);
+            this.forwardToOriginalServer(req, res, group, matchedProxy, matchPath);
         }
     }
 
@@ -287,12 +316,22 @@ export class MockServerManager {
     private findMatchingMockApi(
         requestPath: string,
         method: string,
-        group: ProxyGroup
+        group: ProxyGroup,
+        matchedProxy: HttpProxy | null = null
     ): MockApiConfig | undefined {
-        // Strip query parameters from request path for matching
         const pathWithoutQuery = requestPath.split('?')[0];
 
-        // Use wildcard-aware matcher with prioritization
+        // First check proxy-level mockApis
+        if (matchedProxy && matchedProxy.mockApis && matchedProxy.mockApis.length > 0) {
+            const proxyMock = selectBestMockApiForRequest(
+                matchedProxy.mockApis,
+                pathWithoutQuery,
+                method
+            );
+            if (proxyMock) return proxyMock;
+        }
+
+        // Fall back to group-level mockApis
         return selectBestMockApiForRequest(group.mockApis, pathWithoutQuery, method);
     }
 
@@ -339,7 +378,8 @@ export class MockServerManager {
     private async handleMockResponse(
         res: http.ServerResponse,
         mockApi: MockApiConfig,
-        group: ProxyGroup
+        group: ProxyGroup,
+        matchedProxy: HttpProxy | null = null
     ): Promise<void> {
         this.outputChannel.appendLine(`   📝 Mock API found: ${JSON.stringify(mockApi)}`);
 
@@ -350,11 +390,14 @@ export class MockServerManager {
 
         // Set headers
         this.sendCorsHeaders(res);
+        // const contentType = mockApi.contentType || 'application/json';
+        // res.setHeader('Content-Type', `${contentType}; charset=utf-8`);
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
-        // Set cookie if enabled
-        if (mockApi.useCookie && group.globalCookie) {
-            res.setHeader('Set-Cookie', group.globalCookie);
+        // Set cookie if enabled (prefer proxy-level cookie, fallback to group-level)
+        const globalCookie = matchedProxy?.globalCookie || group.globalCookie;
+        if (mockApi.useCookie && globalCookie) {
+            res.setHeader('Set-Cookie', globalCookie);
         }
 
         // mockData is always a string (JetBrains plugin compatible format)
@@ -373,9 +416,23 @@ export class MockServerManager {
     private forwardToOriginalServer(
         req: http.IncomingMessage,
         res: http.ServerResponse,
-        group: ProxyGroup
+        group: ProxyGroup,
+        matchedProxy: HttpProxy | null,
+        matchPath: string
     ): void {
-        const targetUrl = group.baseUrl + req.url;
+        const baseUrl = matchedProxy?.baseUrl || group.baseUrl;
+
+        let targetPath: string;
+        if (matchPath.includes('?')) {
+            targetPath = matchPath;
+        } else {
+            const queryString = req.url?.split('?')[1] || '';
+            targetPath = queryString ? `${matchPath}?${queryString}` : matchPath;
+        }
+
+        const targetUrl = baseUrl + targetPath;
+        this.outputChannel.appendLine(`   🔍 DEBUG   targetPath: "${targetPath}"`);
+        this.outputChannel.appendLine(`   🔍 DEBUG   targetUrl: "${targetUrl}"`);
         this.outputChannel.appendLine(`   ⏩ Forwarding to: ${targetUrl}`);
 
         try {

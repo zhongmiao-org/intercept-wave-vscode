@@ -45,7 +45,21 @@ export function MockModal({ open, draft, onChange, onSave, onFormat, onCancel, l
           <input type="number" value={draft.delay ?? 0} onChange={e => onChange({ ...draft, delay: Number(e.target.value) })} />
 
         <label>{labels.responseBody}</label>
-        <button onClick={onFormat}><span className="codicon codicon-wand" style={{ marginRight: 6 }} />{labels.format}</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select 
+            value={draft.contentType || 'application/json'} 
+            onChange={e => onChange({ ...draft, contentType: e.target.value })}
+            style={{ minWidth: 140 }}
+          >
+            <option value="application/json">JSON</option>
+            <option value="text/html">HTML</option>
+            <option value="text/plain">Text</option>
+            <option value="application/javascript">JavaScript</option>
+            <option value="text/css">CSS</option>
+            <option value="application/xml">XML</option>
+          </select>
+          <button onClick={onFormat}><span className="codicon codicon-wand" style={{ marginRight: 6 }} />{labels.format}</button>
+        </div>
         </div>
         <div style={{ marginTop: 8 }}>
           <textarea style={{ width: '96%', height: 220, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} value={draft.mockData} onChange={e => onChange({ ...draft, mockData: e.target.value })} />

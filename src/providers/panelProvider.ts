@@ -62,7 +62,9 @@ export class PanelProvider {
             await this.panel.webview.postMessage(payload);
         } else {
             // small delay to allow webview to boot; then send
-            setTimeout(() => { this.panel?.webview.postMessage(payload) }, 50);
+            setTimeout(() => {
+                this.panel?.webview.postMessage(payload);
+            }, 50);
         }
     }
 
@@ -116,7 +118,14 @@ export class PanelProvider {
                     await this.handleWsManualPushCustom(data.groupId, data.target, data.payload);
                     break;
                 case 'updateWsRules':
-                    await this.handleUpdateWsRules(data.groupId, data.rules, data.rulesIndexToDelete);
+                    await this.handleUpdateWsRules(
+                        data.groupId,
+                        data.rules,
+                        data.rulesIndexToDelete
+                    );
+                    break;
+                case 'updateHttpProxies':
+                    await this.handleUpdateHttpProxies(data.groupId, data.httpProxies);
                     break;
             }
         } catch (error: any) {
@@ -149,6 +158,20 @@ export class PanelProvider {
         }
 
         await this.configManager.updateProxyGroup(groupId, { wsPushRules: nextRules as any });
+        await this.refresh();
+    }
+
+    private async handleUpdateHttpProxies(groupId: string, httpProxies?: any[]) {
+        const config = this.configManager.getConfig();
+        const group = config.proxyGroups.find(g => g.id === groupId);
+        if (!group) {
+            const msg = vscode.l10n.t('error.ws.groupNotFound');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
+
+        await this.configManager.updateProxyGroup(groupId, { httpProxies: httpProxies || [] });
         await this.refresh();
     }
 
@@ -236,7 +259,9 @@ export class PanelProvider {
             await this.refresh();
         } catch (error: any) {
             this.outputChannel?.appendLine(`[Panel] startServer → error: ${error?.message}`);
-            void vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStart', error.message));
+            void vscode.window.showErrorMessage(
+                vscode.l10n.t('error.failedToStart', error.message)
+            );
             await this.notify('error', vscode.l10n.t('error.failedToStart', error.message));
             await this.refresh();
         }
@@ -262,7 +287,9 @@ export class PanelProvider {
             void vscode.window.showInformationMessage(vscode.l10n.t('success.serversStarted', url));
             await this.refresh();
         } catch (error: any) {
-            void vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStart', error.message));
+            void vscode.window.showErrorMessage(
+                vscode.l10n.t('error.failedToStart', error.message)
+            );
             await this.notify('error', vscode.l10n.t('error.failedToStart', error.message));
         }
     }
@@ -274,7 +301,9 @@ export class PanelProvider {
             await this.mockServerManager.stopGroupById(groupId);
             if (group) {
                 const serverInfo = `${group.name}(:${group.port})`;
-                void vscode.window.showInformationMessage(vscode.l10n.t('success.groupStopped', serverInfo));
+                void vscode.window.showInformationMessage(
+                    vscode.l10n.t('success.groupStopped', serverInfo)
+                );
             } else {
                 void vscode.window.showInformationMessage(vscode.l10n.t('success.serversStopped'));
             }
@@ -317,7 +346,9 @@ export class PanelProvider {
         if (this.panel) {
             await this.panel.webview.postMessage({ type: 'closeGroupForm' });
         }
-        void vscode.window.showInformationMessage(vscode.l10n.t('success.groupAdded', newGroup.name));
+        void vscode.window.showInformationMessage(
+            vscode.l10n.t('success.groupAdded', newGroup.name)
+        );
     }
 
     private async handleUpdateGroup(groupId: string, data: any) {
@@ -365,8 +396,10 @@ export class PanelProvider {
         if (group) {
             const newPath = String(data.path || '').trim();
             const newMethod = String(data.method || '').toUpperCase();
-            const exists = (group.mockApis || []).some(m =>
-                String(m.path || '').trim() === newPath && String((m as any).method || '').toUpperCase() === newMethod
+            const exists = (group.mockApis || []).some(
+                m =>
+                    String(m.path || '').trim() === newPath &&
+                    String((m as any).method || '').toUpperCase() === newMethod
             );
             if (exists) {
                 const msg = vscode.l10n.t('error.mockRouteExists', newMethod, newPath);
@@ -390,8 +423,11 @@ export class PanelProvider {
         if (group) {
             const newPath = String(data.path || '').trim();
             const newMethod = String(data.method || '').toUpperCase();
-            const exists = (group.mockApis || []).some((m, i) =>
-                i !== index && String(m.path || '').trim() === newPath && String((m as any).method || '').toUpperCase() === newMethod
+            const exists = (group.mockApis || []).some(
+                (m, i) =>
+                    i !== index &&
+                    String(m.path || '').trim() === newPath &&
+                    String((m as any).method || '').toUpperCase() === newMethod
             );
             if (exists) {
                 const msg = vscode.l10n.t('error.mockRouteExists', newMethod, newPath);
@@ -467,35 +503,102 @@ export class PanelProvider {
         const nonce = this.getNonce();
 
         const i18nKeys = [
-            'ui.startAll', 'ui.stopAll', 'ui.startServer', 'ui.stopServer', 'ui.settings',
-            'ui.add', 'ui.edit', 'ui.delete', 'ui.enable', 'ui.disable', 'ui.save', 'ui.cancel',
-            'ui.format', 'ui.validate',
-            'ui.groupName', 'ui.enabled', 'ui.port', 'ui.interceptPrefix', 'ui.baseUrl', 'ui.stripPrefix',
-            'ui.globalCookie', 'ui.method', 'ui.path', 'ui.statusCode', 'ui.responseBody', 'ui.delay',
-            'ui.protocol', 'ui.protocol.http', 'ui.protocol.ws',
-            'ui.wsBaseUrl', 'ui.wsInterceptPrefix', 'ui.wsManualPush',
-            'ui.wssEnabled', 'ui.wssKeystorePath', 'ui.wssKeystorePassword',
-            'ui.wsPanel.title', 'ui.wsPanel.rules', 'ui.wsPanel.sendSelected',
-            'ui.wsPanel.target.match', 'ui.wsPanel.target.all', 'ui.wsPanel.target.recent',
-            'ui.wsPanel.customMessage', 'ui.wsPanel.send', 'ui.wsPanel.noRules',
-            'ui.addWsRule', 'ui.editWsRule',
-            'ui.wsRule.mode', 'ui.wsRule.mode.off', 'ui.wsRule.mode.periodic', 'ui.wsRule.mode.timeline',
-            'ui.wsRule.event.key', 'ui.wsRule.event.value',
-            'ui.wsRule.direction', 'ui.wsRule.direction.both', 'ui.wsRule.direction.in', 'ui.wsRule.direction.out',
-            'ui.wsRule.onOpen', 'ui.wsRule.intercept',
-            'ui.wsRule.period.sec', 'ui.wsRule.timeline.secList', 'ui.wsRule.message',
+            'ui.startAll',
+            'ui.stopAll',
+            'ui.startServer',
+            'ui.stopServer',
+            'ui.settings',
+            'ui.add',
+            'ui.edit',
+            'ui.delete',
+            'ui.enable',
+            'ui.disable',
+            'ui.save',
+            'ui.cancel',
+            'ui.format',
+            'ui.validate',
+            'ui.groupName',
+            'ui.enabled',
+            'ui.port',
+            'ui.interceptPrefix',
+            'ui.baseUrl',
+            'ui.stripPrefix',
+            'ui.globalCookie',
+            'ui.method',
+            'ui.path',
+            'ui.statusCode',
+            'ui.responseBody',
+            'ui.delay',
+            'ui.protocol',
+            'ui.protocol.http',
+            'ui.protocol.ws',
+            'ui.wsBaseUrl',
+            'ui.wsInterceptPrefix',
+            'ui.wsManualPush',
+            'ui.wssEnabled',
+            'ui.wssKeystorePath',
+            'ui.wssKeystorePassword',
+            'ui.wsPanel.title',
+            'ui.wsPanel.rules',
+            'ui.wsPanel.sendSelected',
+            'ui.wsPanel.target.match',
+            'ui.wsPanel.target.all',
+            'ui.wsPanel.target.recent',
+            'ui.wsPanel.customMessage',
+            'ui.wsPanel.send',
+            'ui.wsPanel.noRules',
+            'ui.addWsRule',
+            'ui.editWsRule',
+            'ui.wsRule.mode',
+            'ui.wsRule.mode.off',
+            'ui.wsRule.mode.periodic',
+            'ui.wsRule.mode.timeline',
+            'ui.wsRule.event.key',
+            'ui.wsRule.event.value',
+            'ui.wsRule.direction',
+            'ui.wsRule.direction.both',
+            'ui.wsRule.direction.in',
+            'ui.wsRule.direction.out',
+            'ui.wsRule.onOpen',
+            'ui.wsRule.intercept',
+            'ui.wsRule.period.sec',
+            'ui.wsRule.timeline.secList',
+            'ui.wsRule.message',
             'ui.wsRule.section.basic',
-            'ui.wsRule.timeline.empty', 'ui.wsRule.timeline.add', 'ui.wsRule.timeline.edit', 'ui.wsRule.timeline.delete',
-            'ui.wsRule.timeline.editor.addTitle', 'ui.wsRule.timeline.editor.editTitle',
-            'ui.wsRule.timeline.editor.atMs', 'ui.wsRule.timeline.editor.message',
-            'ui.wsRule.timeline.editor.save', 'ui.wsRule.timeline.editor.cancel',
-            'ui.yes', 'ui.no', 'ui.notSet',
-            'ui.addProxyGroup', 'ui.editProxyGroup', 'ui.addMockApi', 'ui.editMockApi', 'ui.running', 'ui.stopped', 'ui.mockApis',
-            'ui.noMockApis', 'ui.clickAddToCreate',
-            'ui.deleteProxyGroup', 'ui.deleteMockApi',
-            'ui.jsonFormatted', 'ui.jsonValid', 'ui.jsonInvalid',
-            'ui.groupNamePlaceholder', 'ui.baseUrlPlaceholder', 'ui.pathPlaceholder', 'ui.responsePlaceholder', 'ui.globalCookiePlaceholder',
-            'noWorkspace.title', 'noWorkspace.message',
+            'ui.wsRule.timeline.empty',
+            'ui.wsRule.timeline.add',
+            'ui.wsRule.timeline.edit',
+            'ui.wsRule.timeline.delete',
+            'ui.wsRule.timeline.editor.addTitle',
+            'ui.wsRule.timeline.editor.editTitle',
+            'ui.wsRule.timeline.editor.atMs',
+            'ui.wsRule.timeline.editor.message',
+            'ui.wsRule.timeline.editor.save',
+            'ui.wsRule.timeline.editor.cancel',
+            'ui.yes',
+            'ui.no',
+            'ui.notSet',
+            'ui.addProxyGroup',
+            'ui.editProxyGroup',
+            'ui.addMockApi',
+            'ui.editMockApi',
+            'ui.running',
+            'ui.stopped',
+            'ui.mockApis',
+            'ui.noMockApis',
+            'ui.clickAddToCreate',
+            'ui.deleteProxyGroup',
+            'ui.deleteMockApi',
+            'ui.jsonFormatted',
+            'ui.jsonValid',
+            'ui.jsonInvalid',
+            'ui.groupNamePlaceholder',
+            'ui.baseUrlPlaceholder',
+            'ui.pathPlaceholder',
+            'ui.responsePlaceholder',
+            'ui.globalCookiePlaceholder',
+            'noWorkspace.title',
+            'noWorkspace.message',
         ];
         const i18n = Object.fromEntries(i18nKeys.map(k => [k, vscode.l10n.t(k as any)]));
 
@@ -529,7 +632,9 @@ export class PanelProvider {
         // Unique group name
         const name = String(data.name).trim();
         const config = this.configManager.getConfig();
-        const sameName = config.proxyGroups.find(g => g.name.trim() === name && g.id !== editingGroupId);
+        const sameName = config.proxyGroups.find(
+            g => g.name.trim() === name && g.id !== editingGroupId
+        );
         if (sameName) {
             return vscode.l10n.t('error.duplicateGroupName', name);
         }

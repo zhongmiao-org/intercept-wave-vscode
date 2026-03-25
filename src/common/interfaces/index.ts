@@ -8,10 +8,23 @@ export interface MockApiConfig {
     statusCode: number;
     useCookie?: boolean;
     delay?: number;
+    // contentType?: string;
     // Future extension hooks (no runtime behavior yet)
     headers?: Record<string, string>;
     templateId?: string;
     overrides?: Record<string, any>;
+}
+
+export interface HttpProxy {
+    id: string;
+    name: string;
+    enabled: boolean;
+    interceptPrefix: string;
+    baseUrl: string;
+    stripPrefix: boolean;
+    globalCookie: string;
+    mockApis?: MockApiConfig[];
+    priority?: number;
 }
 
 export interface WsTimelineItem {
@@ -51,6 +64,7 @@ export interface ProxyGroup {
     globalCookie: string;
     enabled: boolean;
     mockApis: MockApiConfig[];
+    httpProxies?: HttpProxy[];
     // Future extension hooks (no runtime behavior yet)
     tls?: TLSConfig;
     defaultHeaders?: Record<string, string>;

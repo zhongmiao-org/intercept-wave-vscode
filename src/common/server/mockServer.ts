@@ -2,6 +2,8 @@ import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ConfigManager } from '../config';
 import { selectBestMockApiForRequest } from './pathMatcher';
 import { MockApiConfig, ProxyGroup, WsRule, HttpProxy } from '../interfaces';
@@ -390,9 +392,30 @@ export class MockServerManager {
 
         // Set headers
         this.sendCorsHeaders(res);
-        // const contentType = mockApi.contentType || 'application/json';
-        // res.setHeader('Content-Type', `${contentType}; charset=utf-8`);
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        const isFileMode = mockApi.contentType === '__FILE__' && mockApi.responseFile;
+        let contentType = 'application/json';
+
+        if (isFileMode && mockApi.responseFile) {
+            const ext = path.extname(mockApi.responseFile).toLowerCase();
+            const mimeMap: Record<string, string> = {
+                '.json': 'application/json',
+                '.html': 'text/html',
+                '.htm': 'text/html',
+                '.txt': 'text/plain',
+                '.js': 'application/javascript',
+                '.css': 'text/css',
+                '.xml': 'application/xml',
+                '.svg': 'image/svg+xml',
+                '.png': 'image/png',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif',
+            };
+            contentType = mimeMap[ext] || 'application/octet-stream';
+        } else if (mockApi.contentType && mockApi.contentType !== '__FILE__') {
+            contentType = mockApi.contentType;
+        }
+        res.setHeader('Content-Type', `${contentType}; charset=utf-8`);
 
         // Set cookie if enabled (prefer proxy-level cookie, fallback to group-level)
         const globalCookie = matchedProxy?.globalCookie || group.globalCookie;
@@ -400,9 +423,43 @@ export class MockServerManager {
             res.setHeader('Set-Cookie', globalCookie);
         }
 
-        // mockData is always a string (JetBrains plugin compatible format)
-        const responseData = mockApi.mockData;
-        this.outputChannel.appendLine(`   📤 Response data length: ${responseData.length}`);
+        // Get response data: prefer responseFile over mockData
+        let responseData: string;
+        if (mockApi.responseFile) {
+            try {
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                if (!workspaceFolder) {
+                    this.outputChannel.appendLine(
+                        `   ❌ No workspace folder found for response file`
+                    );
+                    responseData = mockApi.mockData || '{"error": "No workspace folder"}';
+                } else {
+                    const filePath = path.isAbsolute(mockApi.responseFile)
+                        ? mockApi.responseFile
+                        : path.join(workspaceFolder.uri.fsPath, mockApi.responseFile);
+
+                    try {
+                        await fs.promises.access(filePath, fs.constants.R_OK);
+                        responseData = await fs.promises.readFile(filePath, 'utf-8');
+                        this.outputChannel.appendLine(
+                            `   📄 Response loaded from file: ${mockApi.responseFile}`
+                        );
+                    } catch {
+                        this.outputChannel.appendLine(
+                            `   ⚠️ Response file not found: ${filePath}, using mockData`
+                        );
+                        responseData = mockApi.mockData || '';
+                    }
+                }
+            } catch (err) {
+                this.outputChannel.appendLine(`   ❌ Error reading response file: ${err}`);
+                responseData = mockApi.mockData || '';
+            }
+        } else {
+            responseData = mockApi.mockData;
+        }
+
+        this.outputChannel.appendLine(`   📤 Response data length: ${responseData?.length || 0}`);
 
         // Send response
         res.writeHead(mockApi.statusCode);

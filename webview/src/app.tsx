@@ -279,7 +279,10 @@ export function App({
 
     // Mock operations (now associated with active proxy)
     const onAddMock = () => {
-        if (!activeGroup || !activeProxy) return;
+        if (!activeGroup || !activeProxy) {
+            alert(t('ui.selectProxyFirst') || 'Please select a proxy first');
+            return;
+        }
         setEditingMockIndex(null);
         setMockDraft({
             enabled: true,
@@ -293,20 +296,29 @@ export function App({
         setShowMockModal(true);
     };
     const onEditMock = (index: number) => {
-        if (!activeGroup || !activeProxy) return;
+        if (!activeGroup || !activeProxy) {
+            alert(t('ui.selectProxyFirst') || 'Please select a proxy first');
+            return;
+        }
         const mocks = (activeProxy.mockApis || []) as MockApiConfig[];
         const m = mocks[index];
         if (!m) return;
         setEditingMockIndex(index);
         let response = m.mockData;
-        try {
-            response = JSON.stringify(JSON.parse(m.mockData), null, 2);
-        } catch {}
+        const contentType = m.contentType || 'application/json';
+        if (contentType === 'application/json') {
+            try {
+                response = JSON.stringify(JSON.parse(m.mockData), null, 2);
+            } catch {}
+        }
         setMockDraft({ ...m, mockData: response });
         setShowMockModal(true);
     };
     const onDeleteMock = (index: number) => {
-        if (!activeGroup || !activeProxy) return;
+        if (!activeGroup || !activeProxy) {
+            alert(t('ui.selectProxyFirst') || 'Please select a proxy first');
+            return;
+        }
         const proxies = [...httpProxies];
         const proxyIdx = httpProxies.findIndex(p => p.id === activeProxy.id);
         if (proxyIdx === -1) return;
@@ -320,7 +332,10 @@ export function App({
         });
     };
     const onToggleMock = (index: number) => {
-        if (!activeGroup || !activeProxy) return;
+        if (!activeGroup || !activeProxy) {
+            alert(t('ui.selectProxyFirst') || 'Please select a proxy first');
+            return;
+        }
         const proxies = [...httpProxies];
         const proxyIdx = httpProxies.findIndex(p => p.id === activeProxy.id);
         if (proxyIdx === -1) return;
@@ -336,33 +351,38 @@ export function App({
     };
     const onSaveMock = () => {
         if (!activeGroup || !activeProxy || !mockDraft) return;
-        try {
-            const parsed = parseJsonSmart(mockDraft.mockData ?? '');
-            const compact = JSON.stringify(parsed);
-            const payload = { ...mockDraft, mockData: compact };
-            const proxies = [...httpProxies];
-            const proxyIdx = httpProxies.findIndex(p => p.id === activeProxy.id);
-            if (proxyIdx === -1) return;
-            const existingMocks = (activeProxy.mockApis || []) as MockApiConfig[];
-            let nextMocks: MockApiConfig[];
-            if (editingMockIndex !== null) {
-                nextMocks = existingMocks.map((m, i) => (i === editingMockIndex ? payload : m));
-            } else {
-                nextMocks = [...existingMocks, payload];
+        const contentType = mockDraft.contentType || 'application/json';
+        let mockData = mockDraft.mockData;
+        if (contentType === 'application/json') {
+            try {
+                const parsed = parseJsonSmart(mockDraft.mockData ?? '');
+                mockData = JSON.stringify(parsed);
+            } catch (e) {
+                const msg = (e as Error)?.message || String(e);
+                alert((state.i18n?.['ui.jsonInvalid'] || 'Invalid JSON') + ': ' + msg);
+                return;
             }
-            proxies[proxyIdx] = { ...proxies[proxyIdx], mockApis: nextMocks };
-            vscode.postMessage({
-                type: 'updateHttpProxies',
-                groupId: activeGroup.id,
-                httpProxies: proxies,
-            });
-            setShowMockModal(false);
-            setEditingMockIndex(null);
-            setMockDraft(null);
-        } catch (e) {
-            const msg = (e as Error)?.message || String(e);
-            alert((state.i18n?.['ui.jsonInvalid'] || 'Invalid JSON') + ': ' + msg);
         }
+        const payload = { ...mockDraft, mockData };
+        const proxies = [...httpProxies];
+        const proxyIdx = httpProxies.findIndex(p => p.id === activeProxy.id);
+        if (proxyIdx === -1) return;
+        const existingMocks = (activeProxy.mockApis || []) as MockApiConfig[];
+        let nextMocks: MockApiConfig[];
+        if (editingMockIndex !== null) {
+            nextMocks = existingMocks.map((m, i) => (i === editingMockIndex ? payload : m));
+        } else {
+            nextMocks = [...existingMocks, payload];
+        }
+        proxies[proxyIdx] = { ...proxies[proxyIdx], mockApis: nextMocks };
+        vscode.postMessage({
+            type: 'updateHttpProxies',
+            groupId: activeGroup.id,
+            httpProxies: proxies,
+        });
+        setShowMockModal(false);
+        setEditingMockIndex(null);
+        setMockDraft(null);
     };
 
     const ensureWsRuleDefaults = (rule: Partial<WsRule>): WsRule => {
@@ -601,6 +621,20 @@ export function App({
         return () => window.removeEventListener('iw:closeGroupForm', handler);
     }, [state.viewKind, setState, state]);
 
+    // Handle response file selection result
+    React.useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            const data = event.data;
+            if (data.type === 'responseFileSelected' && data.path) {
+                if (mockDraft) {
+                    setMockDraft({ ...mockDraft, responseFile: data.path });
+                }
+            }
+        };
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+    }, [mockDraft]);
+
     // When a panelAction arrives (from sidebar), prepare local drafts
     React.useEffect(() => {
         const act = state.panelAction?.type;
@@ -834,12 +868,14 @@ export function App({
                         statusCode: 200,
                         delay: 0,
                         mockData: '{"ok":true}',
+                        contentType: 'application/json',
                     }
                 }
                 onChange={setMockDraft as (d: MockApiDraft) => void}
                 onSave={onSaveMock}
                 onFormat={formatMock}
                 onCancel={() => setShowMockModal(false)}
+                onSelectFile={() => vscode.postMessage({ type: 'selectResponseFile' })}
                 isEdit={editingMockIndex !== null}
                 labels={{
                     titleAdd: t('ui.addMockApi') || 'Add Mock',
@@ -849,6 +885,7 @@ export function App({
                     path: t('ui.path') || 'Path',
                     statusCode: t('ui.statusCode') || 'Status',
                     delay: t('ui.delay') || 'Delay',
+                    responseFile: t('ui.responseFile') || 'Response File',
                     responseBody: t('ui.responseBody') || 'Response Body (JSON)',
                     format: t('ui.format') || 'Format',
                     save: t('ui.save') || 'Save',

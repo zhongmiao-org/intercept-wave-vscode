@@ -8,13 +8,26 @@ export interface MockApiConfig {
     statusCode: number;
     useCookie?: boolean;
     delay?: number;
-    // contentType?: string;
+    contentType?: string; // Response content type (application/json, text/html, etc.)
+    responseFile?: string; // Relative path to a file in workspace for response content (takes precedence over mockData)
     // Future extension hooks (no runtime behavior yet)
     headers?: Record<string, string>;
     templateId?: string;
     overrides?: Record<string, any>;
 }
 
+/**
+ * HTTP Proxy configuration
+ * - id: Unique identifier for the proxy
+ * - name: Display name for the proxy
+ * - enabled: Whether the proxy is active
+ * - interceptPrefix: URL prefix to intercept (e.g., "/api")
+ * - baseUrl: Target server URL to forward requests to
+ * - stripPrefix: Whether to remove the interceptPrefix from forwarded requests
+ * - globalCookie: Cookie string to include in forwarded requests
+ * - mockApis: List of mock API configurations for this proxy
+ * - priority: Matching priority (lower value = higher priority). When multiple proxies match the same path, the one with the lowest priority value is selected.
+ */
 export interface HttpProxy {
     id: string;
     name: string;

@@ -41,6 +41,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             webviewView.webview.onDidReceiveMessage(async data => {
                 await this.handleMessage(data, webviewView);
             });
+
+            webviewView.onDidChangeVisibility(() => {
+                if (webviewView.visible) {
+                    webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
+                }
+            });
         } catch (error: any) {
             void vscode.window.showErrorMessage(
                 `Failed to load Intercept Wave view: ${error.message}`
@@ -118,6 +124,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 case 'updateHttpProxies':
                     await this.handleUpdateHttpProxies(data.groupId, data.httpProxies);
                     break;
+                case 'selectResponseFile':
+                    await this.handleSelectResponseFile(webviewView);
+                    break;
             }
         } catch (error: any) {
             void vscode.window.showErrorMessage(`Error: ${error.message}`);
@@ -164,6 +173,37 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         await this.configManager.updateProxyGroup(groupId, { httpProxies: httpProxies || [] });
         await this.refreshWebview();
+    }
+
+    private async handleSelectResponseFile(webviewView: vscode.WebviewView) {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            void vscode.window.showErrorMessage('No workspace folder found');
+            return;
+        }
+
+        const files = await vscode.window.showOpenDialog({
+            defaultUri: workspaceFolder.uri,
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            filters: {
+                'All Files': ['*'],
+                JSON: ['json'],
+                HTML: ['html', 'htm'],
+                JavaScript: ['js'],
+                CSS: ['css'],
+                XML: ['xml'],
+            },
+        });
+
+        if (files && files[0]) {
+            const relativePath = vscode.workspace.asRelativePath(files[0]);
+            await webviewView.webview.postMessage({
+                type: 'responseFileSelected',
+                path: relativePath,
+            });
+        }
     }
 
     private async handleWsManualPushByRule(

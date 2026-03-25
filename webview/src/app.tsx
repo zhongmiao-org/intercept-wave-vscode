@@ -952,6 +952,13 @@ export function App({
                         t('ui.wsRule.timeline.editor.message') || 'Message (JSON)',
                     timelineEditorSave: t('ui.wsRule.timeline.editor.save') || 'Save item',
                     timelineEditorCancel: t('ui.wsRule.timeline.editor.cancel') || 'Cancel',
+                    timelineInvalidAtMs:
+                        t('ui.wsRule.timeline.invalidAtMs') ||
+                        'Timeline point must be a non-negative integer (milliseconds)',
+                    jsonFormatError: t('ui.wsRule.jsonFormatError') || 'JSON format error: {0}',
+                    selectTimelineItem:
+                        t('ui.wsRule.selectTimelineItem') ||
+                        'Select a timeline item to edit its message content (JSON)',
                 }}
             />
 
@@ -1014,6 +1021,13 @@ export function App({
                     add: t('ui.addHttpProxy') || 'Add Proxy',
                     close: t('ui.close') || 'Close',
                     noProxies: t('ui.noProxies') || 'No proxies configured',
+                    enable: t('ui.enable') || 'Enable',
+                    disable: t('ui.disable') || 'Disable',
+                    prefix: t('ui.prefix') || 'Prefix',
+                    base: t('ui.base') || 'Base',
+                    priorityHint:
+                        t('ui.priorityHint') ||
+                        'Priority from high to low: proxies at the top of the list match requests first',
                 }}
             />
         </div>

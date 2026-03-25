@@ -127,13 +127,13 @@ export function HttpProxySection({
                             }}
                         >
                             <span style={{ color: 'var(--vscode-descriptionForeground)' }}>
-                                Prefix:
+                                {t('ui.prefix') || 'Prefix'}:
                             </span>
                             <span style={{ wordBreak: 'break-all' }}>
                                 {activeProxy.interceptPrefix}
                             </span>
                             <span style={{ color: 'var(--vscode-descriptionForeground)' }}>
-                                Base:
+                                {t('ui.base') || 'Base'}:
                             </span>
                             <span style={{ wordBreak: 'break-all' }}>{activeProxy.baseUrl}</span>
                         </div>

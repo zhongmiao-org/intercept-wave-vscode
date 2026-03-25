@@ -760,7 +760,6 @@ export function App({
                         <GroupSection
                             group={activeGroup as ProxyGroup}
                             isRunning={!!state.groupStatuses?.[activeGroup.id]}
-                            isWsGroup={isWsGroup}
                             onStart={() => startGroup(activeGroup.id)}
                             onStop={() => stopGroup(activeGroup.id)}
                             onEdit={onEditGroup}

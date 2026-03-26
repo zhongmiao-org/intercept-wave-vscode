@@ -165,7 +165,6 @@ export function MockModal({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <textarea
                             style={{
-                                width: '100%',
                                 minHeight: 60,
                                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                                 fontSize: 12,
@@ -195,7 +194,6 @@ export function MockModal({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <textarea
                             style={{
-                                width: '100%',
                                 minHeight: 60,
                                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                                 fontSize: 12,

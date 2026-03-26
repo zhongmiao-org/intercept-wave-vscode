@@ -90,12 +90,14 @@ export function HttpProxySection({
         });
     };
 
-    const expandAll = () => {
-        setExpandedGroups(new Set(groupedMocks.keys()));
-    };
+    const allExpanded = expandedGroups.size === groupedMocks.size && groupedMocks.size > 0;
 
-    const collapseAll = () => {
-        setExpandedGroups(new Set());
+    const toggleExpandAll = () => {
+        if (allExpanded) {
+            setExpandedGroups(new Set());
+        } else {
+            setExpandedGroups(new Set(groupedMocks.keys()));
+        }
     };
     return (
         <>
@@ -256,20 +258,14 @@ export function HttpProxySection({
                         })()}
                         <div style={{ flex: 1 }} />
                         {groupedMocks.size > 1 && (
-                            <>
-                                <button
-                                    onClick={expandAll}
-                                    style={{ marginRight: 4, fontSize: 11, padding: '2px 8px' }}
-                                >
-                                    {t('ui.expandAll') || 'Expand All'}
-                                </button>
-                                <button
-                                    onClick={collapseAll}
-                                    style={{ marginRight: 8, fontSize: 11, padding: '2px 8px' }}
-                                >
-                                    {t('ui.collapseAll') || 'Collapse All'}
-                                </button>
-                            </>
+                            <button
+                                onClick={toggleExpandAll}
+                                style={{ fontSize: 11, padding: '2px 8px', marginRight: '8px' }}
+                            >
+                                {allExpanded
+                                    ? t('ui.collapseAll') || 'Collapse All'
+                                    : t('ui.expandAll') || 'Expand All'}
+                            </button>
                         )}
                         <button onClick={onAddMock}>
                             <span className="codicon codicon-add" style={{ marginRight: 4 }} />
@@ -286,6 +282,7 @@ export function HttpProxySection({
                             style={{
                                 width: '100%',
                                 padding: '4px 8px',
+                                boxSizing: 'border-box',
                                 fontSize: 12,
                                 background: 'var(--vscode-input-background)',
                                 color: 'var(--vscode-input-foreground)',

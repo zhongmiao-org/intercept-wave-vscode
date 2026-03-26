@@ -3,14 +3,15 @@ import type { WsDirection, WsRuleMode, ProxyProtocol } from '../types';
 export interface MockApiConfig {
     path: string;
     enabled: boolean;
-    mockData: string; // JSON string (compatible with JetBrains plugin)
+    mockData: string;
     method: string;
     statusCode: number;
     useCookie?: boolean;
     delay?: number;
-    contentType?: string; // Response content type (application/json, text/html, etc.)
-    responseFile?: string; // Relative path to a file in workspace for response content (takes precedence over mockData)
-    // Future extension hooks (no runtime behavior yet)
+    contentType?: string;
+    responseFile?: string;
+    queryParams?: string;
+    requestBody?: string;
     headers?: Record<string, string>;
     templateId?: string;
     overrides?: Record<string, any>;

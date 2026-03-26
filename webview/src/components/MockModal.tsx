@@ -161,6 +161,66 @@ export function MockModal({
                         onChange={e => onChange({ ...draft, delay: Number(e.target.value) })}
                     />
 
+                    <label>{labels.queryParams}</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <textarea
+                            style={{
+                                width: '100%',
+                                minHeight: 60,
+                                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                                fontSize: 12,
+                            }}
+                            value={draft.queryParams || ''}
+                            onChange={e =>
+                                onChange({ ...draft, queryParams: e.target.value || undefined })
+                            }
+                            onBlur={e => {
+                                const val = e.target.value;
+                                if (val && val.includes('%')) {
+                                    try {
+                                        const decoded = decodeURIComponent(val);
+                                        if (decoded !== val) {
+                                            onChange({ ...draft, queryParams: decoded });
+                                        }
+                                    } catch {
+                                        // ignore
+                                    }
+                                }
+                            }}
+                            placeholder={labels.queryParamsHint}
+                        />
+                    </div>
+
+                    <label>{labels.requestBody}</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <textarea
+                            style={{
+                                width: '100%',
+                                minHeight: 60,
+                                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                                fontSize: 12,
+                            }}
+                            value={draft.requestBody || ''}
+                            onChange={e =>
+                                onChange({ ...draft, requestBody: e.target.value || undefined })
+                            }
+                            onBlur={e => {
+                                const val = e.target.value;
+                                if (val && val.includes('%')) {
+                                    try {
+                                        const decoded = decodeURIComponent(val);
+                                        if (decoded !== val) {
+                                            onChange({ ...draft, requestBody: decoded });
+                                        }
+                                    } catch {
+                                        // ignore
+                                    }
+                                }
+                            }}
+                            placeholder={labels.requestBodyHint}
+                        />
+                    </div>
+
                     <label>{labels.responseBody}</label>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <select

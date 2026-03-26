@@ -889,6 +889,14 @@ export function App({
                     format: t('ui.format') || 'Format',
                     save: t('ui.save') || 'Save',
                     cancel: t('ui.cancel') || 'Cancel',
+                    queryParams: t('ui.queryParams') || 'Query Params (Optional)',
+                    queryParamsHint:
+                        t('ui.queryParamsHint') ||
+                        'JSON object to match against URL query params (partial match supported)',
+                    requestBody: t('ui.requestBody') || 'Request Body (Optional)',
+                    requestBodyHint:
+                        t('ui.requestBodyHint') ||
+                        'JSON object to match against request body (partial match supported)',
                 }}
             />
 

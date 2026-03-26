@@ -104,10 +104,14 @@ export interface MockModalProps {
     statusCode: string;
     delay: string;
     responseBody: string;
-    responseFile?: string;
+    responseFile: string;
     format: string;
-    cancel?: string;
     save: string;
+    cancel: string;
+    queryParams: string;
+    queryParamsHint: string;
+    requestBody: string;
+    requestBodyHint: string;
   };
   isEdit: boolean;
 }

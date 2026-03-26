@@ -7,7 +7,9 @@ export interface MockApiConfig {
     useCookie?: boolean;
     delay?: number;
     contentType?: string;
-    responseFile?: string; // Relative path to a file in workspace for response content
+    responseFile?: string;
+    queryParams?: string;
+    requestBody?: string;
 }
 
 export interface HttpProxy {
@@ -106,6 +108,8 @@ export type MockApiDraft = Pick<
     | 'mockData'
     | 'contentType'
     | 'responseFile'
+    | 'queryParams'
+    | 'requestBody'
 >;
 
 export type HttpProxyDraft = Pick<

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
 import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';

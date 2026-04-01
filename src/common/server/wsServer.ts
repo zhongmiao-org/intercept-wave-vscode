@@ -6,10 +6,8 @@ import type { WsManualTarget } from '../types';
 import { matchPathPattern } from './pathMatcher';
 
 // Lazy require to avoid hard dependency at type-check time.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const wsLib: any = (() => {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         return require('ws');
     } catch {
         return null;

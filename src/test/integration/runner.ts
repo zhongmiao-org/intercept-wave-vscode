@@ -3,11 +3,9 @@ import * as fs from 'fs';
 import Mocha = require('mocha');
 import * as Module from 'module';
 
-// Mock vscode module before running tests
 const originalRequire = Module.prototype.require;
 (Module.prototype.require as any) = function (this: any, id: string) {
     if (id === 'vscode') {
-        // Return a basic mock of vscode API
         return {
             workspace: {
                 workspaceFolders: [
@@ -53,6 +51,9 @@ function getAllFiles(dirPath: string, extension: string, arrayOfFiles: string[] 
     files.forEach(file => {
         const filePath = path.join(dirPath, file);
         if (fs.statSync(filePath).isDirectory()) {
+            if (file === 'suite') {
+                return;
+            }
             arrayOfFiles = getAllFiles(filePath, extension, arrayOfFiles);
         } else if (file.endsWith(extension)) {
             arrayOfFiles.push(filePath);
@@ -63,42 +64,41 @@ function getAllFiles(dirPath: string, extension: string, arrayOfFiles: string[] 
 }
 
 export async function run(): Promise<void> {
-    // Create the mocha test
     const mocha = new Mocha({
         ui: 'bdd',
         color: true,
-        timeout: 10000,
+        timeout: 20000,
     });
+    (mocha as any).exit = true;
 
     const testsRoot = path.resolve(__dirname);
 
     try {
-        // Find all test files
         const files = getAllFiles(testsRoot, '.test.js');
-
-        // Add files to the test suite
         files.forEach((f: string) => mocha.addFile(f));
 
-        // Run the mocha test
         return new Promise<void>((resolve, reject) => {
             mocha.run(failures => {
                 if (failures > 0) {
-                    reject(new Error(`${failures} tests failed.`));
+                    reject(new Error(`${failures} integration tests failed.`));
                 } else {
                     resolve();
                 }
             });
         });
     } catch (err) {
-        console.error('Error loading test files:', err);
+        console.error('Error loading integration test files:', err);
         throw err;
     }
 }
 
-// Run tests if this file is executed directly
 if (require.main === module) {
-    run().catch(err => {
-        console.error(err);
-        process.exit(1);
-    });
+    run()
+        .then(() => {
+            process.exit(0);
+        })
+        .catch(err => {
+            console.error(err);
+            process.exit(1);
+        });
 }

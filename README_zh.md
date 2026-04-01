@@ -220,6 +220,31 @@ fetch('http://localhost:8888/api/posts')
 
 配置不同的状态码(404、500 等)来测试前端错误处理逻辑。
 
+## 测试
+
+运行单元测试:
+
+```bash
+npm run test:unit
+```
+
+运行基于 Docker upstream 的集成测试:
+
+```bash
+docker compose -f docker/docker-compose.upstream.yml up -d upstream
+npm run test:integration
+```
+
+集成测试默认使用:
+- `IW_UPSTREAM_HTTP=http://localhost:9000`
+- `IW_UPSTREAM_WS=ws://localhost:9003`
+
+如果你还想运行 VS Code 扩展宿主环境的 smoke tests:
+
+```bash
+npm run test:vscode-integration
+```
+
 ## 命令
 
 - **Intercept Wave: Start Mock Server** - 启动 Mock 服务器

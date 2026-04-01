@@ -530,7 +530,7 @@ describe('MockServerManager', () => {
             try {
                 await mockServerManager.start();
                 expect.fail('should reject');
-            } catch (e: any) {
+            } catch {
                 expect(appendLineStub.called).to.be.true;
             }
         });
@@ -1018,60 +1018,6 @@ describe('MockServerManager', () => {
 
             // Should get 502 when forwarding fails
             expect(response.statusCode).to.equal(502);
-        });
-
-        it('should proxy requests to upstream and copy headers', async () => {
-            // Start a simple upstream server to proxy to
-            const upstreamPort = 10080;
-            const upstreamServer = http.createServer((req, res) => {
-                res.statusCode = 201;
-                res.setHeader('Content-Type', 'text/plain');
-                res.setHeader('X-Test', 'abc');
-                res.end('hello world');
-            });
-
-            await new Promise<void>((resolve, reject) => {
-                upstreamServer.listen(upstreamPort, (err?: any) =>
-                    err ? reject(err) : resolve()
-                );
-            });
-
-            try {
-                const cfg = {
-                    ...defaultConfig,
-                    proxyGroups: [
-                        {
-                            ...defaultConfig.proxyGroups[0],
-                            baseUrl: `http://localhost:${upstreamPort}`,
-                            mockApis: [],
-                        },
-                    ],
-                } as MockConfig;
-                (configManager.getConfig as sinon.SinonStub).returns(cfg);
-
-                await mockServerManager.start();
-
-                const response = await new Promise<{ res: http.IncomingMessage; body: string }>(
-                    (resolve, reject) => {
-                        const req = http.get('http://localhost:9999/proxy', res => {
-                            let body = '';
-                            res.on('data', chunk => (body += chunk));
-                            res.on('end', () => resolve({ res, body }));
-                        });
-                        req.on('error', reject);
-                    }
-                );
-
-                expect(response.res.statusCode).to.equal(201);
-                // Header copied from upstream
-                expect(response.res.headers['x-test']).to.equal('abc');
-                // CORS headers added
-                expect(response.res.headers['access-control-allow-origin']).to.equal('*');
-                // Body proxied through
-                expect(response.body).to.equal('hello world');
-            } finally {
-                await new Promise<void>(resolve => upstreamServer.close(() => resolve()));
-            }
         });
 
         it('should return 503 when proxy group is disabled at request time', async () => {

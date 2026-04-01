@@ -219,6 +219,31 @@ Set delay time in mock configuration (e.g., 1000ms) to simulate slow network env
 
 Configure different status codes (404, 500, etc.) to test frontend error handling logic.
 
+## Testing
+
+Run unit tests:
+
+```bash
+npm run test:unit
+```
+
+Run Docker-backed integration tests against `intercept-wave-upstream`:
+
+```bash
+docker compose -f docker/docker-compose.upstream.yml up -d upstream
+npm run test:integration
+```
+
+The integration suite uses these defaults:
+- `IW_UPSTREAM_HTTP=http://localhost:9000`
+- `IW_UPSTREAM_WS=ws://localhost:9003`
+
+If you also want to run the VS Code extension-host smoke tests:
+
+```bash
+npm run test:vscode-integration
+```
+
 ## Commands
 
 - **Intercept Wave: Start Mock Server** - Start the mock server

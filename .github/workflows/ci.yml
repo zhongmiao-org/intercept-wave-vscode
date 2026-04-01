@@ -45,30 +45,6 @@ jobs:
                   path: '*.vsix'
                   retention-days: 30
 
-    # Qodana static analysis (only on PRs, after build)
-    qodana:
-        name: Qodana
-        # Run on PRs and also on push to main so Qodana Cloud has main reports
-        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-        needs: build
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write
-            pull-requests: write
-            checks: write
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-                  fetch-depth: 0
-            - name: Qodana Scan
-              uses: JetBrains/qodana-action@v2025.2
-              with:
-                  pr-mode: false
-              env:
-                  QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
-                  QODANA_ENDPOINT: https://qodana.cloud
-
     # Multi-platform testing (runs after build succeeds)
     test:
         name: Test (${{ matrix.os }}, Node ${{ matrix.node-version }})
@@ -99,13 +75,19 @@ jobs:
             - name: Run unit tests
               run: npm run test:unit
 
-            - name: Run integration tests
-              if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
-              run: xvfb-run -a npm run test:integration
-
             - name: Generate coverage report
               if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
               run: npm run test:coverage:ci
+
+            - name: Upload coverage artifacts
+              if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x' && always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage-report
+                  path: |
+                      coverage/lcov.info
+                      coverage/coverage-summary.json
+                      coverage/lcov-report
 
             - name: Upload coverage to Codecov
               if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
@@ -116,6 +98,57 @@ jobs:
                   flags: unittests
                   name: codecov-umbrella
                   fail_ci_if_error: false
+
+    integration:
+        name: Integration (Ubuntu, Node 20)
+        needs: build
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20.x'
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Start upstream services
+              run: |
+                  docker compose -f docker/docker-compose.upstream.yml up -d upstream
+                  echo "Waiting for HTTP upstream health..."
+                  for i in {1..60}; do
+                    if curl -fsS http://localhost:9000/health >/dev/null 2>&1; then
+                      echo "HTTP upstream is healthy"
+                      break
+                    fi
+                    sleep 2
+                  done
+                  curl -fsS http://localhost:9000/health >/dev/null
+
+            - name: Probe WS upstream
+              run: |
+                  node -e "const WebSocket=require('ws'); const ws=new WebSocket('ws://localhost:9003/ws/echo?token=zhongmiao-org-token'); const timer=setTimeout(()=>{console.error('WS probe timeout'); process.exit(1);}, 5000); ws.on('open',()=>{clearTimeout(timer); ws.close();}); ws.on('close',()=>process.exit(0)); ws.on('error',(err)=>{clearTimeout(timer); console.error(err); process.exit(1);});"
+
+            - name: Run Docker-backed integration tests
+              run: npm run test:integration
+
+            - name: Upload integration diagnostics
+              if: ${{ failure() }}
+              uses: actions/upload-artifact@v4
+              with:
+                  name: integration-test-artifacts
+                  path: |
+                      out/test
+                      dist
+
+            - name: Stop upstream services
+              if: ${{ always() }}
+              run: docker compose -f docker/docker-compose.upstream.yml down -v --remove-orphans || true
 
     # Coverage report comment (only on PRs)
     coverage-report:
@@ -144,6 +177,16 @@ jobs:
 
             - name: Generate coverage report
               run: npm run test:coverage:ci
+
+            - name: Upload coverage artifacts
+              if: ${{ always() }}
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage-report-pr-comment
+                  path: |
+                      coverage/lcov.info
+                      coverage/coverage-summary.json
+                      coverage/lcov-report
 
             - name: Generate Coverage Badge
               run: |

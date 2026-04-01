@@ -1,10 +1,31 @@
 # Intercept Wave For VSCode Changelog
 
-All notable changes to the **Intercept Wave** extension will be documented in this file.
-
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+>English Changelog | [中文更新日志](./CHANGELOG_zh.md)
 
 ## [Unreleased]
+
+### Added
+
+- Docker-backed upstream integration test stack under `docker/docker-compose.upstream.yml` using `ghcr.io/zhongmiao-org/intercept-wave-upstream:v0.3.2`.
+- Dedicated integration test suite for real upstream verification:
+  - HTTP forwarding coverage for status/body/header/CORS passthrough, strip-prefix routing, method/body forwarding, cookie/header forwarding, and multi-service routing.
+  - WebSocket forwarding coverage for upstream bridge connectivity, token-authenticated handshake, intercept rules, and queued message flush behavior.
+- New integration test helpers and runner for Node-based CI execution without the VS Code extension host.
+- Downloadable coverage artifacts in CI (`lcov.info`, `coverage-summary.json`, and HTML report) so reports can be inspected offline after each run.
+- Chinese changelog file (`CHANGELOG_zh.md`) with cross-links between English and Chinese release notes.
+
+### Changed
+
+- Split test entry points in `package.json`:
+  - `test:unit` remains focused on unit coverage.
+  - `test:integration` now runs Docker-backed upstream integration tests.
+  - `test:vscode-integration` keeps the VS Code extension-host smoke tests.
+- Moved the former "real upstream" proxy assertion out of unit tests into the integration suite, keeping unit tests focused on local logic.
+- CI workflow now separates cross-platform unit testing from the Ubuntu Docker integration job.
+- CI now uploads coverage artifacts for download and forces JavaScript-based GitHub Actions onto Node 24 compatible runtime paths.
+- Removed Qodana from the workflow.
+- Replaced `glob` usage in the integration suite with `fs` recursion and removed the `glob` dependency.
+- Upgraded ESLint tooling to the modern flat-config setup and newer dependency versions to address dependency advisories.
 
 ## [3.1.0]
 

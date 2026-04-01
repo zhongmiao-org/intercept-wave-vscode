@@ -132,7 +132,17 @@ jobs:
 
             - name: Probe WS upstream
               run: |
-                  node -e "const WebSocket=require('ws'); const ws=new WebSocket('ws://localhost:9003/ws/echo?token=zhongmiao-org-token'); const timer=setTimeout(()=>{console.error('WS probe timeout'); process.exit(1);}, 5000); ws.on('open',()=>{clearTimeout(timer); ws.close();}); ws.on('close',()=>process.exit(0)); ws.on('error',(err)=>{clearTimeout(timer); console.error(err); process.exit(1);});"
+                  echo "Waiting for WS upstream..."
+                  for i in {1..30}; do
+                    if node -e "const WebSocket=require('ws'); const ws=new WebSocket('ws://localhost:9003/ws/echo?token=zhongmiao-org-token'); const timer=setTimeout(()=>{console.error('WS probe timeout'); process.exit(1);}, 3000); ws.on('open',()=>{clearTimeout(timer); ws.close();}); ws.on('close',()=>process.exit(0)); ws.on('error',(err)=>{clearTimeout(timer); console.error(err.message || err); process.exit(1);});" >/dev/null 2>&1; then
+                      echo "WS upstream is ready"
+                      exit 0
+                    fi
+                    sleep 2
+                  done
+                  echo "WS upstream failed to become ready"
+                  docker compose -f docker/docker-compose.upstream.yml logs --no-log-prefix upstream || true
+                  exit 1
 
             - name: Run Docker-backed integration tests
               run: npm run test:integration

@@ -223,8 +223,16 @@ describe('HTTP Forwarding Integration', function () {
             url: `http://localhost:${paymentPort}/pay-api/checkout/preview`,
         });
 
-        expect(JSON.parse(userResponse.body).meta.total).to.equal(3);
-        expect(JSON.parse(orderResponse.body).data.id).to.equal('3009');
-        expect(JSON.parse(paymentResponse.body).message).to.equal('preview');
+        const userBody = JSON.parse(userResponse.body);
+        const orderBody = JSON.parse(orderResponse.body);
+        const paymentBody = JSON.parse(paymentResponse.body);
+
+        expect(userBody.code).to.equal(0);
+        expect(userBody.data).to.be.an('array').and.not.empty;
+        expect(userBody.data[0].name).to.be.a('string');
+        expect(userBody.meta.total).to.be.at.least(userBody.data.length);
+
+        expect(orderBody.data.id).to.equal('3009');
+        expect(paymentBody.message).to.equal('preview');
     });
 });

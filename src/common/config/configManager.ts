@@ -41,7 +41,7 @@ export class ConfigManager {
             if (parts.length >= 2) {
                 return `${parts[0]}.${parts[1]}`;
             }
-        } catch (_) {
+        } catch {
             // ignore
         }
         // fallback
@@ -186,7 +186,7 @@ export class ConfigManager {
                             api.mockData = compact;
                             changed = true;
                         }
-                    } catch (e) {
+                    } catch {
                         // Keep original when not valid JSON; user can fix via UI
                     }
                 }

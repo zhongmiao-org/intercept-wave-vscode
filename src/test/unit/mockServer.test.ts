@@ -530,7 +530,7 @@ describe('MockServerManager', () => {
             try {
                 await mockServerManager.start();
                 expect.fail('should reject');
-            } catch (e: any) {
+            } catch {
                 expect(appendLineStub.called).to.be.true;
             }
         });

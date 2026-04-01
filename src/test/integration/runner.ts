@@ -4,7 +4,6 @@ import Mocha = require('mocha');
 import * as Module from 'module';
 
 const originalRequire = Module.prototype.require;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (Module.prototype.require as any) = function (this: any, id: string) {
     if (id === 'vscode') {
         return {
@@ -43,7 +42,6 @@ const originalRequire = Module.prototype.require;
             },
         };
     }
-    // eslint-disable-next-line prefer-rest-params
     return originalRequire.apply(this, arguments as any);
 };
 

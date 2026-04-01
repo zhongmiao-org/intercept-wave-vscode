@@ -1,5 +1,8 @@
 name: CI
 
+env:
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
     push:
         branches: [main]
@@ -19,10 +22,10 @@ jobs:
 
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v5
               with:
                   node-version: '20.x'
                   cache: 'npm'
@@ -39,7 +42,7 @@ jobs:
                   vsce package
 
             - name: Upload extension package
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v5
               with:
                   name: vscode-extension
                   path: '*.vsix'
@@ -58,10 +61,10 @@ jobs:
 
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
 
             - name: Setup Node.js ${{ matrix.node-version }}
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v5
               with:
                   node-version: ${{ matrix.node-version }}
                   cache: 'npm'
@@ -81,7 +84,7 @@ jobs:
 
             - name: Upload coverage artifacts
               if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x' && always()
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v5
               with:
                   name: coverage-report
                   path: |
@@ -106,10 +109,10 @@ jobs:
 
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v5
               with:
                   node-version: '20.x'
                   cache: 'npm'
@@ -149,9 +152,10 @@ jobs:
 
             - name: Upload integration diagnostics
               if: ${{ failure() }}
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v5
               with:
                   name: integration-test-artifacts
+                  if-no-files-found: ignore
                   path: |
                       out/test
                       dist
@@ -172,12 +176,12 @@ jobs:
 
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
               with:
                   fetch-depth: 0
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v5
               with:
                   node-version: '20.x'
                   cache: 'npm'
@@ -190,7 +194,7 @@ jobs:
 
             - name: Upload coverage artifacts
               if: ${{ always() }}
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v5
               with:
                   name: coverage-report-pr-comment
                   path: |
@@ -208,7 +212,7 @@ jobs:
                   echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
 
             - name: Comment coverage on PR
-              uses: actions/github-script@v7
+              uses: actions/github-script@v8
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   script: |

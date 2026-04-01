@@ -68,6 +68,7 @@ export async function run(): Promise<void> {
         ui: 'bdd',
         color: true,
         timeout: 20000,
+        exit: true,
     });
 
     const testsRoot = path.resolve(__dirname);

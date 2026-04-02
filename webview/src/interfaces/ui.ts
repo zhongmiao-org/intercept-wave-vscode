@@ -3,11 +3,12 @@ import type { GroupStatusMap, I18nMap, MockConfig } from './business';
 export interface InitialState {
   config: MockConfig;
   activeGroupId?: string;
+  activeRouteId?: string;
   isRunning: boolean;
   groupStatuses: GroupStatusMap;
   i18n: I18nMap;
   viewKind?: 'sidebar' | 'panel';
-  panelAction?: { type: string; groupId?: string; index?: number } | null;
+  panelAction?: { type: string; groupId?: string; routeId?: string; index?: number } | null;
 }
 
 export interface GroupSummary {

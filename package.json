@@ -2,7 +2,7 @@
     "name": "intercept-wave",
     "displayName": "%displayName%",
     "description": "%description%",
-    "version": "3.1.0",
+    "version": "4.0.0",
     "publisher": "Ark65",
     "icon": "resources/logo.png",
     "repository": {
@@ -127,7 +127,7 @@
         "test:vscode-integration": "npm run compile && npm run package && node ./out/test/integration/runTest.js",
         "test:coverage": "c8 npm run test:unit",
         "test:coverage:ci": "c8 --reporter=lcov --reporter=text --reporter=json-summary --reporter=html npm run test:unit",
-        "build:local": "npm run webview:build && npm run package && npx -y @vscode/vsce package --allow-star-activation --allow-missing-repository"
+        "build:local": "rm -rf *.vsix && npm run webview:build && npm run package && npx -y @vscode/vsce package --allow-star-activation --allow-missing-repository"
     },
     "devDependencies": {
         "@types/react": "^18.3.12",

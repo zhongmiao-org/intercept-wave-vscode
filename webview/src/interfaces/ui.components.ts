@@ -1,4 +1,4 @@
-import type { GroupDraft, MockApiConfig, MockApiDraft, ProxyGroup, WsRule } from './business';
+import type { GroupDraft, HttpRoute, MockApiConfig, MockApiDraft, ProxyGroup, RouteDraft, WsRule } from './business';
 import type { GroupSummary } from './ui';
 
 export interface GroupListProps {
@@ -41,6 +41,25 @@ export interface MockListProps {
   };
 }
 
+export interface RouteListProps {
+  routes: HttpRoute[];
+  activeRouteId?: string;
+  onSelect: (routeId: string) => void;
+  onAdd: () => void;
+  onEdit: (routeId: string) => void;
+  onDelete: (routeId: string) => void;
+  labels: {
+    title: string;
+    addRoute: string;
+    edit: string;
+    delete: string;
+    emptyText: string;
+    enableMock: string;
+    disableMock: string;
+    mocksLabel?: string;
+  };
+}
+
 export interface GroupModalProps {
   open: boolean;
   draft: GroupDraft;
@@ -50,6 +69,10 @@ export interface GroupModalProps {
   labels: {
     titleAdd: string;
     titleEdit: string;
+    chromeTitle?: string;
+    hint?: string;
+    listenerExtras?: string;
+    close?: string;
     sectionGroup?: string;
     sectionHttp?: string;
     sectionWs?: string;
@@ -59,8 +82,6 @@ export interface GroupModalProps {
     protocolHttp: string;
     protocolWs: string;
     port: string;
-    interceptPrefix: string;
-    baseUrl: string;
     stripPrefix: string;
     globalCookie: string;
     wsBaseUrl: string;
@@ -97,6 +118,8 @@ export interface MockModalProps {
   labels: {
     titleAdd: string;
     titleEdit: string;
+    hint?: string;
+    close?: string;
     enabled: string;
     method: string;
     path: string;
@@ -106,6 +129,30 @@ export interface MockModalProps {
     format: string;
     cancel?: string;
     save: string;
+  };
+  isEdit: boolean;
+}
+
+export interface RouteModalProps {
+  open: boolean;
+  draft: RouteDraft;
+  onChange: (next: RouteDraft) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  labels: {
+    titleAdd: string;
+    titleEdit: string;
+    chromeTitle?: string;
+    hint?: string;
+    name: string;
+    pathPrefix: string;
+    targetBaseUrl: string;
+    stripPrefix: string;
+    enableMock: string;
+    yesLabel: string;
+    noLabel: string;
+    save: string;
+    cancel: string;
   };
   isEdit: boolean;
 }

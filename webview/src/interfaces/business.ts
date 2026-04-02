@@ -8,6 +8,16 @@ export interface MockApiConfig {
   delay?: number;
 }
 
+export interface HttpRoute {
+  id: string;
+  name: string;
+  pathPrefix: string;
+  targetBaseUrl: string;
+  stripPrefix: boolean;
+  enableMock: boolean;
+  mockApis: MockApiConfig[];
+}
+
 export type ProxyProtocol = 'HTTP' | 'WS';
 
 export type WsDirection = 'in' | 'out' | 'both';
@@ -38,11 +48,12 @@ export interface ProxyGroup {
   id: string;
   name: string;
   port: number;
-  interceptPrefix: string;
-  baseUrl: string;
+  routes?: HttpRoute[];
   stripPrefix: boolean;
   globalCookie: string;
   enabled: boolean;
+  interceptPrefix: string;
+  baseUrl: string;
   mockApis: MockApiConfig[];
   protocol?: ProxyProtocol;
   wsBaseUrl?: string | null;
@@ -68,8 +79,6 @@ export type GroupDraft = Pick<
   | 'name'
   | 'enabled'
   | 'port'
-  | 'interceptPrefix'
-  | 'baseUrl'
   | 'stripPrefix'
   | 'globalCookie'
   | 'protocol'
@@ -84,4 +93,9 @@ export type GroupDraft = Pick<
 export type MockApiDraft = Pick<
   MockApiConfig,
   'enabled' | 'method' | 'path' | 'statusCode' | 'delay' | 'mockData'
+>;
+
+export type RouteDraft = Pick<
+  HttpRoute,
+  'name' | 'pathPrefix' | 'targetBaseUrl' | 'stripPrefix' | 'enableMock'
 >;

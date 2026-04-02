@@ -4,9 +4,15 @@ import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
 import { selectBestMockApiForRequest } from './pathMatcher';
-import { MockApiConfig, ProxyGroup, WsRule } from '../interfaces';
+import { HttpRoute, MockApiConfig, ProxyGroup, WsRule } from '../interfaces';
 import { WsManualTarget } from '../types';
 import { WsServerManager } from './wsServer';
+import {
+    computeHttpForwardPath,
+    computeHttpMatchPath,
+    selectHttpRoute,
+    shouldServeRouteWelcomePage,
+} from './httpRouteUtils';
 
 export class MockServerManager {
     private readonly httpServers: Map<string, http.Server> = new Map(); // groupId -> HTTP server
@@ -18,6 +24,23 @@ export class MockServerManager {
         private readonly outputChannel: vscode.OutputChannel
     ) {
         this.wsManager = new WsServerManager(outputChannel);
+    }
+
+    private getHttpRoutes(group: ProxyGroup): HttpRoute[] {
+        if (Array.isArray(group.routes) && group.routes.length > 0) {
+            return group.routes;
+        }
+        return [
+            {
+                id: `${group.id}-legacy-route`,
+                name: 'API',
+                pathPrefix: group.interceptPrefix || '/api',
+                targetBaseUrl: group.baseUrl || 'http://localhost:8080',
+                stripPrefix: group.stripPrefix,
+                enableMock: true,
+                mockApis: group.mockApis || [],
+            },
+        ];
     }
 
     async start(): Promise<string> {
@@ -97,10 +120,10 @@ export class MockServerManager {
                 this.outputChannel.appendLine(
                     `✅ [${group.name}] started on http://localhost:${group.port}`
                 );
-                this.outputChannel.appendLine(`   📋 Intercept Prefix: ${group.interceptPrefix}`);
-                this.outputChannel.appendLine(`   🔗 Base URL: ${group.baseUrl}`);
+                const routes = this.getHttpRoutes(group);
+                this.outputChannel.appendLine(`   🧭 Routes: ${routes.length}`);
                 this.outputChannel.appendLine(
-                    `   📊 Mock APIs: ${group.mockApis.filter(api => api.enabled).length}/${group.mockApis.length} enabled`
+                    `   📊 Mock APIs: ${routes.reduce((acc, route) => acc + route.mockApis.filter(api => api.enabled).length, 0)}/${routes.reduce((acc, route) => acc + route.mockApis.length, 0)} enabled`
                 );
                 resolve();
             });
@@ -238,17 +261,6 @@ export class MockServerManager {
             return;
         }
 
-        // Handle prefix welcome page when stripPrefix=true
-        if (group.stripPrefix && group.interceptPrefix) {
-            const prefix = group.interceptPrefix.endsWith('/')
-                ? group.interceptPrefix.slice(0, -1)
-                : group.interceptPrefix;
-            if (requestPath === prefix || requestPath === prefix + '/') {
-                this.handleWelcomePage(res, group);
-                return;
-            }
-        }
-
         // Handle OPTIONS request (CORS preflight)
         if (method === 'OPTIONS') {
             this.sendCorsHeaders(res);
@@ -258,59 +270,64 @@ export class MockServerManager {
             return;
         }
 
-        // Path matching logic
-        const matchPath = this.getMatchPath(requestPath, group);
+        const route = selectHttpRoute({ ...group, routes: this.getHttpRoutes(group) }, requestPath);
+        if (!route) {
+            this.sendErrorResponse(res, 502, 'Bad Gateway: No matching route configured');
+            return;
+        }
+
+        if (shouldServeRouteWelcomePage(route, requestPath)) {
+            this.handleWelcomePage(res, group);
+            return;
+        }
+
+        const matchPath = computeHttpMatchPath(route, requestPath);
         this.outputChannel.appendLine(`   🎯 Match path: ${matchPath}`);
 
-        // Find matching mock API
-        const mockApi = this.findMatchingMockApi(matchPath, method, group);
+        const mockApi = this.findMatchingMockApi(matchPath, method, route);
 
-        if (mockApi && mockApi.enabled) {
-            // Use mock data
+        if (route.enableMock && mockApi && mockApi.enabled) {
             await this.handleMockResponse(res, mockApi, group);
         } else {
-            // Forward to original server
-            this.forwardToOriginalServer(req, res, group);
+            this.forwardToOriginalServer(req, res, route);
         }
-    }
-
-    private getMatchPath(requestPath: string, group: ProxyGroup): string {
-        if (group.stripPrefix && group.interceptPrefix) {
-            if (requestPath.startsWith(group.interceptPrefix)) {
-                const stripped = requestPath.substring(group.interceptPrefix.length);
-                return stripped || '/';
-            }
-        }
-        return requestPath;
     }
 
     private findMatchingMockApi(
         requestPath: string,
         method: string,
-        group: ProxyGroup
+        route: HttpRoute
     ): MockApiConfig | undefined {
-        // Strip query parameters from request path for matching
         const pathWithoutQuery = requestPath.split('?')[0];
-
-        // Use wildcard-aware matcher with prioritization
-        return selectBestMockApiForRequest(group.mockApis, pathWithoutQuery, method);
+        return selectBestMockApiForRequest(route.mockApis, pathWithoutQuery, method);
     }
 
     private handleWelcomePage(res: http.ServerResponse, group: ProxyGroup): void {
-        // Only list enabled mock APIs and attach example links
-        const enabledApis = group.mockApis.filter(api => api.enabled);
-        const normalizedPrefix = group.interceptPrefix.endsWith('/')
-            ? group.interceptPrefix.slice(0, -1)
-            : group.interceptPrefix;
+        const routes = this.getHttpRoutes(group).map(route => {
+            const enabledApis = route.mockApis.filter(api => api.enabled);
+            const prefix = route.pathPrefix === '/' ? '' : route.pathPrefix.replace(/\/$/, '');
+            const apis = enabledApis.map(api => {
+                const normalizedPath = api.path.startsWith('/') ? api.path : `/${api.path}`;
+                return {
+                    path: api.path,
+                    method: api.method,
+                    enabled: true,
+                    example: `${prefix}${normalizedPath}` || '/',
+                };
+            });
 
-        const apis = enabledApis.map(api => {
-            const normalizedPath = api.path.startsWith('/') ? api.path : `/${api.path}`;
-            const examplePath = `${normalizedPrefix}${normalizedPath}`;
             return {
-                path: api.path,
-                method: api.method,
-                enabled: true,
-                example: examplePath,
+                id: route.id,
+                name: route.name,
+                pathPrefix: route.pathPrefix,
+                targetBaseUrl: route.targetBaseUrl,
+                stripPrefix: route.stripPrefix,
+                enableMock: route.enableMock,
+                mockApis: {
+                    total: route.mockApis.length,
+                    enabled: enabledApis.length,
+                },
+                apis,
             };
         });
 
@@ -320,15 +337,18 @@ export class MockServerManager {
             group: {
                 name: group.name,
                 port: group.port,
-                baseUrl: group.baseUrl,
-                interceptPrefix: group.interceptPrefix,
                 serverUrl: `http://localhost:${group.port}`,
             },
-            mockApis: {
-                total: group.mockApis.length,
-                enabled: enabledApis.length,
+            routes: {
+                total: routes.length,
+                enabledMock: routes.reduce((acc, route) => acc + route.mockApis.enabled, 0),
             },
-            apis,
+            routeList: routes,
+            mockApis: {
+                total: routes.reduce((acc, route) => acc + route.mockApis.total, 0),
+                enabled: routes.reduce((acc, route) => acc + route.mockApis.enabled, 0),
+            },
+            apis: routes.flatMap(route => route.apis),
         };
 
         this.sendCorsHeaders(res);
@@ -373,66 +393,78 @@ export class MockServerManager {
     private forwardToOriginalServer(
         req: http.IncomingMessage,
         res: http.ServerResponse,
-        group: ProxyGroup
+        route: HttpRoute
     ): void {
-        const targetUrl = group.baseUrl + req.url;
+        const requestUrl = req.url || '/';
+        const [requestPath, queryString] = requestUrl.split('?', 2);
+        const forwardPath = computeHttpForwardPath(route, requestPath || '/');
+        const targetUrl = `${route.targetBaseUrl.replace(/\/$/, '')}${forwardPath}${queryString ? `?${queryString}` : ''}`;
         this.outputChannel.appendLine(`   ⏩ Forwarding to: ${targetUrl}`);
 
+        let url: URL;
         try {
-            const url = new URL(targetUrl);
-            const isHttps = url.protocol === 'https:';
-            const httpModule = isHttps ? https : http;
-
-            const headers = { ...req.headers };
-            delete headers.host;
-
-            const options: https.RequestOptions = {
-                method: req.method,
-                headers: headers,
-                hostname: url.hostname,
-                port: url.port || (isHttps ? 443 : 80),
-                path: url.pathname + url.search,
-            };
-
-            const proxyReq = httpModule.request(options, proxyRes => {
-                // Copy response headers (excluding problematic ones)
-                Object.keys(proxyRes.headers).forEach(key => {
-                    if (
-                        key.toLowerCase() !== 'transfer-encoding' &&
-                        key.toLowerCase() !== 'content-length'
-                    ) {
-                        const value = proxyRes.headers[key];
-                        if (value) {
-                            res.setHeader(key, value);
-                        }
-                    }
-                });
-
-                // Add CORS headers
-                this.sendCorsHeaders(res);
-
-                // Send response
-                res.writeHead(proxyRes.statusCode || 200);
-                proxyRes.pipe(res);
-
-                this.outputChannel.appendLine(`   ✅ Proxied response [${proxyRes.statusCode}]`);
-            });
-
-            proxyReq.on('error', error => {
-                this.outputChannel.appendLine(
-                    `   ❌ Proxy error: ${error.message || error.toString()}`
-                );
-                this.outputChannel.appendLine(`   ❌ Error details: ${JSON.stringify(error)}`);
-                this.outputChannel.appendLine(`   ❌ Target was: ${targetUrl}`);
-                this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to reach original server');
-            });
-
-            // Forward request body
-            req.pipe(proxyReq);
+            url = new URL(targetUrl);
         } catch (error: any) {
             this.outputChannel.appendLine(`   ❌ URL parse error: ${error.message}`);
             this.sendErrorResponse(res, 500, `Internal Server Error: ${error.message}`);
+            return;
         }
+
+        if (!url.hostname) {
+            this.outputChannel.appendLine('   ❌ URL parse error: Invalid target URL');
+            this.sendErrorResponse(res, 500, 'Internal Server Error: Invalid target URL');
+            return;
+        }
+
+        const isHttps = url.protocol === 'https:';
+        const httpModule = isHttps ? https : http;
+
+        const headers = { ...req.headers };
+        delete headers.host;
+
+        const options: https.RequestOptions = {
+            method: req.method,
+            headers: headers,
+            hostname: url.hostname,
+            port: url.port || (isHttps ? 443 : 80),
+            path: url.pathname + url.search,
+        };
+
+        const proxyReq = httpModule.request(options, proxyRes => {
+            // Copy response headers (excluding problematic ones)
+            Object.keys(proxyRes.headers).forEach(key => {
+                if (
+                    key.toLowerCase() !== 'transfer-encoding' &&
+                    key.toLowerCase() !== 'content-length'
+                ) {
+                    const value = proxyRes.headers[key];
+                    if (value) {
+                        res.setHeader(key, value);
+                    }
+                }
+            });
+
+            // Add CORS headers
+            this.sendCorsHeaders(res);
+
+            // Send response
+            res.writeHead(proxyRes.statusCode || 200);
+            proxyRes.pipe(res);
+
+            this.outputChannel.appendLine(`   ✅ Proxied response [${proxyRes.statusCode}]`);
+        });
+
+        proxyReq.on('error', error => {
+            this.outputChannel.appendLine(
+                `   ❌ Proxy error: ${error.message || error.toString()}`
+            );
+            this.outputChannel.appendLine(`   ❌ Error details: ${JSON.stringify(error)}`);
+            this.outputChannel.appendLine(`   ❌ Target was: ${targetUrl}`);
+            this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to reach original server');
+        });
+
+        // Forward request body
+        req.pipe(proxyReq);
     }
 
     private sendCorsHeaders(res: http.ServerResponse): void {

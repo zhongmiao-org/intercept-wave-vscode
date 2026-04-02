@@ -23,6 +23,7 @@ function Root() {
           ...s,
           config: msg.config,
           activeGroupId: msg.activeGroupId ?? s.activeGroupId,
+          activeRouteId: msg.activeRouteId ?? s.activeRouteId,
           groupStatuses: msg.groupStatuses ?? s.groupStatuses,
           isRunning: !!msg.isRunning,
         }));

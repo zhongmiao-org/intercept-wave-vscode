@@ -6,6 +6,23 @@
 
 ### 新增
 
+- 新增与兄弟项目 `intercept-wave` 对齐的 4.0 多规则 HTTP 模型，同一大版本下可直接共用配置文件结构。
+- 新增基于路由的 HTTP 配置结构，每个代理组下支持：
+  - `routes: HttpRoute[]`
+  - 每条 route 独立配置 `pathPrefix`、`targetBaseUrl`、`stripPrefix`、`enableMock`、`mockApis`
+- 新增滚动升级到 `4.0` 的配置迁移能力，支持将旧版平铺 HTTP 配置和 `3.1` 配置组自动迁移为 route 模型。
+- 新增 route 作用域下的 provider/webview 消息流：
+  - 新增、编辑、删除 route
+  - route 级 mock 的新增、编辑、删除、启停切换
+- 新增面向 4.0 工作流的 VS Code Webview UI 升级：
+  - 左侧 sidebar 负责 group / route 导航
+  - 右侧 panel 作为 group、route、mock、WS 的完整编辑工作台
+  - 支持 route master-detail 布局与 mock 预览工作区
+- 新增面向 4.0 模型的单元测试，覆盖：
+  - 配置迁移与保存结构
+  - route CRUD
+  - route 级 mock 持久化
+  - sidebar / panel 在新 route 模型下的选中同步
 - 新增基于 Docker 的 upstream 集成测试环境：`docker/docker-compose.upstream.yml`，使用 `ghcr.io/zhongmiao-org/intercept-wave-upstream:v0.3.2`。
 - 新增独立的真实 upstream 集成测试套件：
   - HTTP：覆盖状态码/响应体/响应头/CORS 透传、`stripPrefix` 路由、请求方法与请求体转发、Header/Cookie 透传、多服务路由。
@@ -16,6 +33,22 @@
 
 ### 变更
 
+- HTTP 请求处理改为基于 route 的转发模型：
+  - 按最长路径前缀选择最佳 `HttpRoute`
+  - `enableMock=true` 时优先命中该 route 下的 mock
+  - 未命中 mock 或未启用 mock 时，回退转发到该 route 的 `targetBaseUrl`
+- 默认配置和新增代理组时会自动生成一条默认 route，以满足 4.0 共享配置约定。
+- 组级旧 HTTP 字段（`interceptPrefix`、`baseUrl`、`mockApis`）现在仅作为兼容读取和迁移输入，不再作为主要运行时来源。
+- Webview 交互升级为更符合 VS Code 的“导航器 + 编辑器工作台”模式：
+  - 左侧 sidebar 负责轻量导航
+  - 右侧 panel 负责 group、route、mock、WS 的完整编辑
+- HTTP 编辑体验改为 `Group -> Route -> Mock` 模型，围绕 route 列表、route 详情和 route 级 mock 管理展开。
+- sidebar 导航现在更接近 Explorer 树结构，支持 group 折叠、route 子节点、hover 操作，以及与右侧 panel 的同步打开和选中。
+- 右侧 panel 重新整理为更明确的工作台布局：
+  - 顶部摘要与操作
+  - 中部 route master-detail
+  - 底部 mock 列表与预览区
+- 扩大了 4.0 新 UI 的国际化覆盖范围，包括导航文案、route 标签、route 校验错误和弹窗说明文本。
 - 调整 `package.json` 中的测试入口：
   - `test:unit` 继续只跑单元测试。
   - `test:integration` 专门运行基于 Docker upstream 的集成测试。
@@ -26,6 +59,15 @@
 - 从工作流中移除了 Qodana。
 - integration suite 不再使用 `glob`，改为 `fs` 递归扫描，并移除了 `glob` 依赖。
 - ESLint 工具链升级为 flat config 方案，并同步升级相关依赖版本以处理依赖安全告警。
+
+### 修复
+
+- 修复主面板中 route 列表渲染导致 `Route Detail` 掉出预期 grid 区域的问题。
+- 修复 route 列表项中编辑/删除图标未居中、影响列表观感的问题。
+- 修复 sidebar hover 时操作图标撑开行高、导致列表抖动的问题。
+- 修复 mock 卡片在窄宽度下可能把 `/test` 这类路径挤成竖排显示的问题。
+- 修复 group tab 行在滚动条出现/消失时导致头部高度不稳定、页面来回跳动的问题。
+- 修复 route detail 被整列拉伸后，目标基础地址看起来脱离详情区域的问题。
 
 ## [3.1.0]
 
@@ -85,4 +127,3 @@
 - 在 Webview 中一起打包 `@vscode/codicons` CSS 与字体，确保图标稳定渲染
 
 > 注：旧版 v2.0 相关发布说明已从 README 中精简，历史记录仍保留在本文件中。
-

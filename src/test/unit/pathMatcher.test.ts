@@ -75,4 +75,22 @@ describe('Wildcard path matcher', () => {
         const chosen = selectBestMockApiForRequest(apis as any, '/any/path', 'GET');
         expect(chosen).to.exist;
     });
+
+    it('normalizes empty paths, missing leading slash and query strings', () => {
+        expect(matchPathPattern('', '/').matched).to.be.true;
+        expect(matchPathPattern('users/*', '/users/42?tab=detail').matched).to.be.true;
+    });
+
+    it('supports a single trailing ** after exact prefix', () => {
+        expect(matchPathPattern('/files/**', '/files/a/b').matched).to.be.true;
+        expect(matchPathPattern('/files/**', '/files').matched).to.be.false;
+    });
+
+    it('returns undefined when candidates are disabled or method mismatched', () => {
+        const apis = [
+            { path: '/x', method: 'POST', enabled: true },
+            { path: '/x', method: 'GET', enabled: false },
+        ];
+        expect(selectBestMockApiForRequest(apis as any, '/x', 'GET')).to.equal(undefined);
+    });
 });

@@ -248,4 +248,56 @@ describe('ConfigManager 4.0', () => {
             enableMock: false,
         });
     });
+
+    it('returns default config when stored json is invalid', () => {
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.writeFileSync(configPath, '{broken json', 'utf-8');
+
+        const cm = createManager();
+        const cfg = cm.getConfig();
+
+        expect(cfg.version).to.equal('4.0');
+        expect(cfg.proxyGroups).to.have.length(1);
+    });
+
+    it('normalizes v2 mockData and ignores invalid tolerant json', () => {
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.writeFileSync(configPath, JSON.stringify({
+            version: '2.0',
+            proxyGroups: [
+                {
+                    id: 'g1',
+                    name: 'G1',
+                    mockApis: [
+                        { path: '/ok', mockData: "{ foo: 'bar', }" },
+                        { path: '/bad', mockData: '{bad}' },
+                    ],
+                },
+            ],
+        }, null, 2), 'utf-8');
+
+        createManager();
+
+        const saved = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        expect(saved.proxyGroups[0].mockApis[0].mockData).to.equal('{"foo":"bar"}');
+        expect(saved.proxyGroups[0].mockApis[1].mockData).to.equal('{bad}');
+    });
+
+    it('normalizes ws groups and private route helpers fall back safely', async () => {
+        const cm = createManager();
+        const normalizeRoutes = (cm as any).normalizeRoutes.bind(cm) as (group: any) => any[];
+        const findRoute = (cm as any).findRoute.bind(cm) as (config: any, groupId: string, routeId?: string) => any;
+
+        expect(normalizeRoutes({ protocol: 'WS' })).to.deep.equal([]);
+        expect(normalizeRoutes({ protocol: 'WS', routes: [{ id: 'r1', name: 'WS', pathPrefix: '/ws', targetBaseUrl: 'ws://upstream', stripPrefix: false, enableMock: false, mockApis: [] }] })).to.have.length(1);
+
+        const cfg = cm.getConfig();
+        await cm.toggleProxyGroupEnabled('missing');
+        await cm.updateRoute('missing', 'route', { name: 'x' });
+        await cm.removeRoute('missing', 'route');
+        await cm.updateMockApi('missing', 'route', 0, { path: '/x', enabled: true, mockData: '{}', method: 'GET', statusCode: 200 });
+        await cm.removeMockApi('missing', 'route', 0);
+
+        expect(findRoute(cfg, cfg.proxyGroups[0].id, 'missing-route')).to.equal(cfg.proxyGroups[0].routes?.[0]);
+    });
 });

@@ -7,8 +7,6 @@
         "out/templates/**",
         "out/templateLoader.js",
         "out/common/utils/webviewHtml.js",
-        "out/extension.js",
-        "out/providers/**",
         "**/*.d.ts"
     ],
     "reporter": ["text", "lcov", "json-summary", "cobertura"],

@@ -141,6 +141,104 @@ describe('WsServerManager (unit)', () => {
 
             FakeWebSocketServer.instances = [];
         });
+
+        it('resolves without starting when ws module is unavailable', async () => {
+            const group = createBaseGroup({ id: 'ws-none', name: 'No WS' });
+            const manager = new WsServerManager(outputChannel, null as any);
+
+            await manager.startGroup(group);
+
+            expect(manager.getGroupStatus('ws-none')).to.equal(false);
+            expect(appendLineStub.args.some(args => String(args[0]).includes('ws library not available'))).to.equal(true);
+        });
+
+        it('handles connection lifecycle, queued upstream messages and intercept replies', async () => {
+            class FakeSocket {
+                public handlers: Record<string, Array<(...args: any[]) => void>> = {};
+                public readyState = 1;
+                public send = sinon.stub();
+                public close = sinon.stub();
+
+                on(event: string, handler: (...args: any[]) => void): void {
+                    if (!this.handlers[event]) this.handlers[event] = [];
+                    this.handlers[event].push(handler);
+                }
+
+                emit(event: string, ...args: any[]): void {
+                    const hs = this.handlers[event] || [];
+                    hs.forEach(h => h(...args));
+                }
+            }
+
+            class FakeUpstreamSocket extends FakeSocket {
+                public static instances: FakeUpstreamSocket[] = [];
+
+                constructor(public readonly targetUrl: string) {
+                    super();
+                    this.readyState = 0;
+                    FakeUpstreamSocket.instances.push(this);
+                }
+            }
+
+            const group = createBaseGroup({
+                id: 'ws-live',
+                name: 'WS Live',
+                wsBaseUrl: 'ws://upstream',
+                wsInterceptPrefix: '/ws',
+                stripPrefix: true,
+                wsPushRules: [
+                    {
+                        enabled: true,
+                        path: '/echo',
+                        direction: 'out',
+                        intercept: true,
+                        mode: 'off',
+                        periodSec: 0,
+                        eventKey: 'action',
+                        eventValue: 'intercept',
+                        message: '{"reply":"ok"}',
+                        timeline: [],
+                        loop: false,
+                        onOpenFire: false,
+                    } as WsRule,
+                ],
+            });
+
+            const manager = new WsServerManager(outputChannel, {
+                WebSocketServer: FakeWebSocketServer,
+                WebSocket: FakeUpstreamSocket,
+            } as any);
+
+            const startPromise = manager.startGroup(group);
+            const server = FakeWebSocketServer.instances[FakeWebSocketServer.instances.length - 1];
+            server.emit('listening');
+            await startPromise;
+
+            const clientSocket = new FakeSocket();
+            server.emit('connection', clientSocket, { url: '/ws/echo?x=1' });
+
+            const upstream = FakeUpstreamSocket.instances[0];
+            expect(upstream.targetUrl).to.equal('ws://upstream/ws/echo?x=1');
+
+            clientSocket.emit('message', '{"action":"passthrough"}');
+            expect(upstream.send.called).to.equal(false);
+
+            upstream.readyState = 1;
+            upstream.emit('open');
+            expect(upstream.send.calledWith('{"action":"passthrough"}')).to.equal(true);
+
+            upstream.emit('message', '{"server":"push"}');
+            expect(clientSocket.send.calledWith('{"server":"push"}')).to.equal(true);
+
+            clientSocket.emit('message', '{"action":"intercept"}');
+            expect(clientSocket.send.calledWith('{"reply":"ok"}')).to.equal(true);
+
+            clientSocket.emit('close', 1000, Buffer.from('bye'));
+            expect(upstream.close.calledOnce).to.equal(true);
+
+            FakeWebSocketServer.instances = [];
+            FakeUpstreamSocket.instances = [];
+        });
     });
 
     describe('handleInboundOrOutboundMessage (private)', () => {
@@ -358,6 +456,36 @@ describe('WsServerManager (unit)', () => {
             expect(newConn.socket.send.calledOnce).to.be.true;
             expect(oldConn.socket.send.called).to.be.false;
         });
+
+        it('manual push returns false when there are no active connections', async () => {
+            const entry: any = {
+                server: {} as any,
+                connections: new Map<string, any>(),
+            };
+            const servers: Map<string, any> = (wsManager as any).servers;
+            servers.set('g4', entry);
+
+            expect(await wsManager.manualPushCustom('g4', '{}', 'all' as WsManualTarget, [])).to.equal(false);
+            expect(
+                await wsManager.manualPushByRule(
+                    'g4',
+                    {
+                        enabled: true,
+                        path: '/echo',
+                        direction: 'out',
+                        intercept: false,
+                        mode: 'off',
+                        periodSec: 0,
+                        message: '{}',
+                        timeline: [],
+                        loop: false,
+                        onOpenFire: false,
+                    } as WsRule,
+                    'match' as WsManualTarget,
+                    []
+                )
+            ).to.equal(false);
+        });
     });
 
     describe('utility helpers', () => {
@@ -376,6 +504,13 @@ describe('WsServerManager (unit)', () => {
             ) => any;
             expect(fn('{"a":1}')).to.deep.equal({ a: 1 });
             expect(fn('invalid')).to.be.undefined;
+        });
+
+        it('normalizeWsPath normalizes blanks and missing leading slash', () => {
+            const fn = (wsManager as any).normalizeWsPath.bind(wsManager) as (raw?: string | null) => string;
+            expect(fn(undefined)).to.equal('/');
+            expect(fn('')).to.equal('/');
+            expect(fn('ws//echo')).to.equal('/ws/echo');
         });
 
         it('clearConnectionTimers cancels all timers', () => {
@@ -719,6 +854,42 @@ describe('WsServerManager (unit)', () => {
 
             trackCustomFn(ctx, '{"foo":"bar"}');
             expect(ctx.lastOutEvent).to.deep.equal({ key: 'foo', value: 'bar' });
+        });
+
+        it('scheduleRulesForConnection skips disabled and unmatched rules', () => {
+            const ctx: any = {
+                id: 'c1',
+                groupId: 'g1',
+                path: '/other',
+                createdAt: Date.now(),
+                lastActivityAt: Date.now(),
+                socket: {
+                    readyState: 1,
+                    send: sinon.stub(),
+                },
+                timers: [] as NodeJS.Timeout[],
+            };
+
+            const group = createBaseGroup({
+                wsPushRules: [
+                    {
+                        enabled: false,
+                        path: '/echo',
+                        direction: 'out',
+                        intercept: false,
+                        mode: 'periodic',
+                        periodSec: 1,
+                        message: '{}',
+                        timeline: [],
+                        loop: false,
+                        onOpenFire: false,
+                    } as WsRule,
+                ],
+            });
+
+            const scheduleFn = (wsManager as any).scheduleRulesForConnection.bind(wsManager) as (c: any, g: ProxyGroup) => void;
+            scheduleFn(ctx, group);
+            expect(ctx.timers).to.have.length(0);
         });
     });
 });

@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
                     outputChannel.appendLine('[EmptyProvider] No-workspace HTML set successfully');
                 } catch (err: any) {
                     outputChannel.appendLine(`[EmptyProvider] Failed to load template: ${err?.message || err}`);
-                    webviewView.webview.html = `<html><body><h3>${vscode.l10n.t('noWorkspace.title')}</h3><p>${vscode.l10n.t('noWorkspace.message')}</p></body></html>`;
+                    webviewView.webview.html = `<html lang="en"><body><h3>${vscode.l10n.t('noWorkspace.title')}</h3><p>${vscode.l10n.t('noWorkspace.message')}</p></body></html>`;
                 }
             },
         };
@@ -78,6 +78,7 @@ export function activate(context: vscode.ExtensionContext) {
             configManager,
             panelProvider
         );
+        panelProvider.attachSidebarBridge(sidebarProvider);
         outputChannel.appendLine('✓ SidebarProvider created');
 
         context.subscriptions.push(

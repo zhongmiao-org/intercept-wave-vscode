@@ -6,6 +6,23 @@
 
 ### Added
 
+- 4.0 multi-route HTTP model aligned with the sibling `intercept-wave` project, so both projects can share the same major-version config file shape.
+- Route-based HTTP config schema under each proxy group:
+  - `routes: HttpRoute[]`
+  - per-route `pathPrefix`, `targetBaseUrl`, `stripPrefix`, `enableMock`, and `mockApis`
+- Rolling config migration support up to schema `4.0`, including automatic migration of legacy flat HTTP config and `3.1` proxy groups into route-based groups.
+- New route-scoped CRUD flows in the provider/webview message layer:
+  - add, update, delete route
+  - route-scoped mock add, update, delete, toggle
+- Upgraded VS Code webview UI for the 4.0 workflow:
+  - sidebar navigator for groups and routes
+  - full panel editor workspace for group, route, mock, and WS editing
+  - route master-detail layout and mock preview workspace
+- New unit tests for the 4.0 model:
+  - config migration and save shape
+  - route CRUD
+  - route-scoped mock persistence
+  - sidebar/panel selection sync for the new route model
 - Docker-backed upstream integration test stack under `docker/docker-compose.upstream.yml` using `ghcr.io/zhongmiao-org/intercept-wave-upstream:v0.3.2`.
 - Dedicated integration test suite for real upstream verification:
   - HTTP forwarding coverage for status/body/header/CORS passthrough, strip-prefix routing, method/body forwarding, cookie/header forwarding, and multi-service routing.
@@ -16,6 +33,22 @@
 
 ### Changed
 
+- HTTP request handling is now route-driven:
+  - selects the best `HttpRoute` by longest path-prefix match
+  - serves mock data from the matched route first when `enableMock=true`
+  - falls back to forwarding to that route's `targetBaseUrl` when mock is disabled or not matched
+- Saved config defaults and new group creation now generate a default route automatically, matching the 4.0 shared config contract.
+- Group-level legacy HTTP fields (`interceptPrefix`, `baseUrl`, `mockApis`) are now treated as compatibility/migration inputs instead of the primary runtime source.
+- Webview UX has been reworked into a VS Code-style navigator + editor workspace:
+  - sidebar focuses on lightweight navigation
+  - right-side panel becomes the main editor for group, route, mock, and WS details
+- HTTP editing UI now uses a `Group -> Route -> Mock` interaction model, with route list, route detail, and route-scoped mock management.
+- Sidebar navigation now behaves more like an Explorer tree, including collapsible groups, route children, hover actions, and synchronized opening in the full panel.
+- Right-side panel layout has been refined into a stronger workbench structure:
+  - top summary and actions
+  - middle route master-detail
+  - bottom mock list + preview area
+- Expanded i18n coverage for the new 4.0 UI, including navigator text, route labels, route validation errors, and modal helper copy.
 - Split test entry points in `package.json`:
   - `test:unit` remains focused on unit coverage.
   - `test:integration` now runs Docker-backed upstream integration tests.
@@ -26,6 +59,15 @@
 - Removed Qodana from the workflow.
 - Replaced `glob` usage in the integration suite with `fs` recursion and removed the `glob` dependency.
 - Upgraded ESLint tooling to the modern flat-config setup and newer dependency versions to address dependency advisories.
+
+### Fixed
+
+- Fixed route list rendering in the main panel so route detail no longer drops out of the intended grid cell.
+- Fixed route action icons to remain centered and no longer distort list item height.
+- Fixed sidebar hover actions so icons no longer cause row-height jitter.
+- Fixed mock cards where narrow widths could force mock paths such as `/test` into vertical wrapping.
+- Fixed panel tab/header instability caused by scrollbars appearing and disappearing in the group tab row.
+- Fixed route detail panel stretching that visually detached the target base URL block from the rest of the detail card.
 
 ## [3.1.0]
 

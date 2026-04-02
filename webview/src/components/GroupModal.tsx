@@ -10,10 +10,14 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
         e.preventDefault();
         onCancel();
       }
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        onSave();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+  }, [onCancel, onSave]);
 
   const [vw, setVw] = React.useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
   React.useEffect(() => {
@@ -35,7 +39,8 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
           margin: '6vh auto',
           background: 'var(--vscode-editor-background)',
           padding: 20,
-          borderRadius: 6,
+          borderRadius: 10,
+          border: '1px solid var(--vscode-panel-border)',
           boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
           position: 'relative',
           display: 'flex',
@@ -45,8 +50,8 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
         onClick={e => e.stopPropagation()}
       >
         <button
-          aria-label="Close"
-          title="Close"
+          aria-label={labels.close || labels.cancel}
+          title={labels.close || labels.cancel}
           onClick={onCancel}
           style={{
             position: 'absolute',
@@ -71,8 +76,14 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
         </button>
 
         {/* Title */}
-        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: 'var(--vscode-descriptionForeground)' }}>
+          {labels.chromeTitle || labels.sectionHttp}
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
           {isEdit ? labels.titleEdit : labels.titleAdd}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--vscode-descriptionForeground)', marginBottom: 2 }}>
+          {labels.hint}
         </div>
 
         {/* Group settings section */}
@@ -89,7 +100,7 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
           }}
         >
           <label>{labels.name}</label>
-          <input value={draft.name} onChange={e => onChange({ ...draft, name: e.target.value })} />
+          <input autoFocus value={draft.name} onChange={e => onChange({ ...draft, name: e.target.value })} />
 
           <label>{labels.protocol}</label>
           <select
@@ -136,7 +147,7 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
 
         {/* HTTP or WebSocket specific section */}
         <div style={{ fontWeight: 600, marginTop: 10, marginBottom: 4 }}>
-          {isWs ? (labels.sectionWs || 'WebSocket 设置') : (labels.sectionHttp || 'HTTP 设置')}
+          {isWs ? labels.sectionWs : (labels.listenerExtras || labels.sectionHttp)}
         </div>
         <div
           style={{
@@ -175,18 +186,6 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
             </>
           ) : (
             <>
-              <label>{labels.baseUrl}</label>
-              <input
-                value={draft.baseUrl}
-                onChange={e => onChange({ ...draft, baseUrl: e.target.value })}
-              />
-
-              <label>{labels.interceptPrefix}</label>
-              <input
-                value={draft.interceptPrefix}
-                onChange={e => onChange({ ...draft, interceptPrefix: e.target.value })}
-              />
-
               <label>{labels.globalCookie}</label>
               <input
                 value={draft.globalCookie}
@@ -202,7 +201,7 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
             <span className="codicon codicon-close" style={{ marginRight: 6 }} />
             {labels.cancel}
           </button>
-          <button onClick={onSave}>
+          <button onClick={onSave} style={{ fontWeight: 600 }}>
             <span className="codicon codicon-check" style={{ marginRight: 6 }} />
             {labels.save}
           </button>

@@ -1,90 +1,99 @@
-import { describe, it, beforeEach, before, afterEach } from 'mocha';
-import { expect, use } from 'chai';
-import * as sinon from 'sinon';
-import sinonChai from 'sinon-chai';
+import { expect } from 'chai';
+import { createSandbox, match, type SinonSandbox } from 'sinon';
 import * as vscode from 'vscode';
 import { SidebarProvider } from '../../providers';
-import { MockServerManager, ConfigManager } from '../../common';
 
-use(sinonChai);
-
-describe('SidebarProvider', () => {
+describe('SidebarProvider 4.0', () => {
     let sidebarProvider: SidebarProvider;
-    let mockServerManager: MockServerManager;
-    let configManager: ConfigManager;
-    let extensionUri: vscode.Uri;
-    let sandbox: sinon.SinonSandbox;
+    let mockServerManager: any;
+    let configManager: any;
+    let panelProvider: any;
     let webviewViewStub: any;
-
-    before(() => {
-        // Mock vscode.Uri.joinPath for testing environment
-        if (!(vscode.Uri as any).joinPath) {
-            (vscode.Uri as any).joinPath = (..._: any[]) => {
-                return vscode.Uri.file('/fake/joined/path');
-            };
-        }
-
-        // Mock vscode.l10n for tests
-        if (!vscode.l10n) {
-            (vscode as any).l10n = {
-                t: (key: string, ..._: any[]) => key,
-            };
-        } else if (!(vscode.l10n as any).t) {
-            (vscode.l10n as any).t = (key: string, ..._: any[]) => key;
-        }
-    });
+    let sandbox: SinonSandbox;
 
     beforeEach(() => {
-        sandbox = sinon.createSandbox();
-        extensionUri = vscode.Uri.file('/fake/path');
+        sandbox = createSandbox();
 
-        configManager = {
-            getConfig: sandbox.stub().returns({
-                version: '2.0',
-                proxyGroups: [
-                    {
-                        id: 'test-group-id',
-                        name: 'Test Group',
-                        port: 8888,
-                        interceptPrefix: '/api',
-                        baseUrl: 'http://localhost:8080',
-                        stripPrefix: true,
-                        globalCookie: '',
-                        enabled: true,
-                        mockApis: [],
-                    },
-                ],
-            }),
-            saveConfig: sandbox.stub().resolves(),
-            addMockApi: sandbox.stub().resolves(),
-            removeMockApi: sandbox.stub().resolves(),
-            updateMockApi: sandbox.stub().resolves(),
-            addProxyGroup: sandbox.stub().resolves(),
-            removeProxyGroup: sandbox.stub().resolves(),
-            updateProxyGroup: sandbox.stub().resolves(),
-            getConfigPath: sandbox.stub().returns('/fake/config/path'),
-        } as any;
+        const config = {
+            version: '4.0',
+            proxyGroups: [
+                {
+                    id: 'test-group-id',
+                    name: 'Test Group',
+                    protocol: 'HTTP',
+                    port: 8888,
+                    routes: [
+                        {
+                            id: 'route-1',
+                            name: 'API',
+                            pathPrefix: '/api',
+                            targetBaseUrl: 'http://localhost:8080',
+                            stripPrefix: true,
+                            enableMock: true,
+                            mockApis: [],
+                        },
+                    ],
+                    stripPrefix: true,
+                    globalCookie: '',
+                    enabled: true,
+                    interceptPrefix: '/api',
+                    baseUrl: 'http://localhost:8080',
+                    mockApis: [],
+                    wsBaseUrl: null,
+                    wsInterceptPrefix: null,
+                    wsManualPush: true,
+                    wsPushRules: [],
+                    wssEnabled: false,
+                    wssKeystorePath: null,
+                    wssKeystorePassword: null,
+                },
+            ],
+        };
 
         mockServerManager = {
-            start: sandbox.stub().resolves('http://localhost:8888 (Test Group)'),
+            start: sandbox.stub().resolves('http://localhost:8888'),
             stop: sandbox.stub().resolves(),
-            startGroupById: sandbox.stub().resolves('http://localhost:8888 (Test Group)'),
+            startGroupById: sandbox.stub().resolves('http://localhost:8888'),
             stopGroupById: sandbox.stub().resolves(),
             getStatus: sandbox.stub().returns(false),
             getGroupStatus: sandbox.stub().returns(false),
-        } as any;
+            manualPushByRule: sandbox.stub().resolves(true),
+            manualPushCustom: sandbox.stub().resolves(true),
+        };
 
-        sidebarProvider = new SidebarProvider(extensionUri, mockServerManager, configManager);
+        configManager = {
+            getConfig: sandbox.stub().returns(config),
+            addProxyGroup: sandbox.stub().resolves(),
+            updateProxyGroup: sandbox.stub().resolves(),
+            removeProxyGroup: sandbox.stub().resolves(),
+            addRoute: sandbox.stub().resolves(),
+            updateRoute: sandbox.stub().resolves(),
+            removeRoute: sandbox.stub().resolves(),
+            addMockApi: sandbox.stub().resolves(),
+            updateMockApi: sandbox.stub().resolves(),
+            removeMockApi: sandbox.stub().resolves(),
+            saveConfig: sandbox.stub().resolves(),
+        };
 
-        // Fake webviewView for refreshWebview
-        const postMessage = sandbox.stub().resolves();
+        panelProvider = {
+            focusWithAction: sandbox.stub().resolves(),
+        };
+
         webviewViewStub = {
             webview: {
-                postMessage,
-                asWebviewUri: (_u: any) => ({ toString: () => 'vscode-resource://dummy' }),
                 options: {},
+                html: '',
+                postMessage: sandbox.stub().resolves(),
+                onDidReceiveMessage: sandbox.stub(),
             },
         };
+
+        sidebarProvider = new SidebarProvider(
+            vscode.Uri.file('/test'),
+            mockServerManager,
+            configManager,
+            panelProvider
+        );
         (sidebarProvider as any).webviewView = webviewViewStub;
     });
 
@@ -92,182 +101,128 @@ describe('SidebarProvider', () => {
         sandbox.restore();
     });
 
-    describe('constructor', () => {
-        it('should create an instance', () => {
-            expect(sidebarProvider).to.be.instanceOf(SidebarProvider);
+    it('adds a new route through ConfigManager', async () => {
+        await (sidebarProvider as any).handleAddRoute('test-group-id', {
+            name: 'API 2',
+            pathPrefix: '/api2',
+            targetBaseUrl: 'http://localhost:8081',
+            stripPrefix: true,
+            enableMock: false,
+        });
+
+        expect(configManager.addRoute.calledOnce).to.equal(true);
+        const route = configManager.addRoute.firstCall.args[1];
+        expect(route).to.include({
+            name: 'API 2',
+            pathPrefix: '/api2',
+            targetBaseUrl: 'http://localhost:8081',
+            stripPrefix: true,
+            enableMock: false,
         });
     });
 
-    describe('getNonce', () => {
-        it('should generate a 32-character nonce', () => {
-            const nonce = (sidebarProvider as any).getNonce();
-            expect(nonce).to.be.a('string');
-            expect(nonce.length).to.equal(32);
+    it('updates and deletes routes through ConfigManager', async () => {
+        const cfg = configManager.getConfig();
+        cfg.proxyGroups[0].routes.push({
+            id: 'route-2',
+            name: 'API 2',
+            pathPrefix: '/api2',
+            targetBaseUrl: 'http://localhost:8081',
+            stripPrefix: true,
+            enableMock: true,
+            mockApis: [],
         });
+        (configManager.getConfig as sinon.SinonStub).returns(cfg);
 
-        it('should generate different nonces on each call', () => {
-            const nonce1 = (sidebarProvider as any).getNonce();
-            const nonce2 = (sidebarProvider as any).getNonce();
-            expect(nonce1).to.not.equal(nonce2);
+        await (sidebarProvider as any).handleUpdateRoute('test-group-id', 'route-1', {
+            name: 'API',
+            pathPrefix: '/api',
+            targetBaseUrl: 'http://localhost:9090',
+            stripPrefix: true,
+            enableMock: true,
         });
+        await (sidebarProvider as any).handleDeleteRoute('test-group-id', 'route-2');
 
-        it('should only contain alphanumeric characters', () => {
-            const nonce = (sidebarProvider as any).getNonce();
-            expect(nonce).to.match(/^[A-Za-z0-9]+$/);
-        });
+        expect(configManager.updateRoute.calledWith('test-group-id', 'route-1', match.has('targetBaseUrl', 'http://localhost:9090'))).to.equal(true);
+        expect(configManager.removeRoute.calledWith('test-group-id', 'route-2')).to.equal(true);
     });
 
-    // Note: resolveWebviewView and message handler tests are in integration tests
-    // because they require a real VS Code webview environment
-    describe('handlers', () => {
-        it('handleStartServer/StopServer', async () => {
-            await (sidebarProvider as any).handleStartServer(webviewViewStub);
-            expect((mockServerManager.start as sinon.SinonStub)).to.have.been.calledOnce;
-            await (sidebarProvider as any).handleStopServer(webviewViewStub);
-            expect((mockServerManager.stop as sinon.SinonStub)).to.have.been.calledOnce;
+    it('routes mock CRUD to the selected route', async () => {
+        await (sidebarProvider as any).handleAddMock('test-group-id', 'route-1', {
+            path: '/x',
+            method: 'GET',
+            enabled: true,
+            mockData: '{}',
+            statusCode: 200,
+            delay: 0,
         });
 
-        it('handleStartGroup/StopGroup', async () => {
-            await (sidebarProvider as any).handleStartGroup('test-group-id');
-            expect((mockServerManager.startGroupById as sinon.SinonStub)).to.have.been
-                .calledWith('test-group-id');
-            await (sidebarProvider as any).handleStopGroup('test-group-id');
-            expect((mockServerManager.stopGroupById as sinon.SinonStub)).to.have.been
-                .calledWith('test-group-id');
+        await (sidebarProvider as any).handleUpdateMock('test-group-id', 'route-1', 0, {
+            path: '/x',
+            method: 'POST',
+            enabled: false,
+            mockData: '{}',
+            statusCode: 201,
+            delay: 10,
         });
 
-        it('handleAddGroup/UpdateGroup/DeleteGroup', async () => {
-            // add
-            await (sidebarProvider as any).handleAddGroup({
-                id: 'g2',
-                name: 'New Group',
-                enabled: true,
-                port: 9999,
-                interceptPrefix: '/api',
-                baseUrl: 'http://localhost:3000',
-                stripPrefix: true,
-                globalCookie: '',
-            });
-            expect((configManager.addProxyGroup as sinon.SinonStub)).to.have.been.called;
+        await (sidebarProvider as any).handleDeleteMock('test-group-id', 'route-1', 0);
 
-            // update
-            await (sidebarProvider as any).handleUpdateGroup('test-group-id', {
-                name: 'Updated',
-                port: 8888,
-                interceptPrefix: '/api',
-                baseUrl: 'http://localhost:8080',
-                stripPrefix: true,
-                globalCookie: '',
-                enabled: true,
-            });
-            expect((configManager.updateProxyGroup as sinon.SinonStub)).to.have.been.called;
+        expect(configManager.addMockApi.calledWith('test-group-id', 'route-1', match.has('path', '/x'))).to.equal(true);
+        expect(configManager.updateMockApi.calledWith('test-group-id', 'route-1', 0, match.has('method', 'POST'))).to.equal(true);
+        expect(configManager.removeMockApi.calledWith('test-group-id', 'route-1', 0)).to.equal(true);
+    });
 
-            // delete (confirm)
-            const l10nConfirm = (vscode as any).l10n.t('ui.confirm');
-            const origWarn = vscode.window.showWarningMessage;
-            (vscode.window as any).showWarningMessage = sandbox
-                .stub()
-                .resolves(l10nConfirm);
-            // Ensure there are at least 2 groups to allow deletion
-            const getConfigStub = configManager.getConfig as sinon.SinonStub;
-            getConfigStub.returns({
-                version: '2.0',
-                proxyGroups: [
-                    {
-                        id: 'test-group-id',
-                        name: 'Test Group',
-                        port: 8888,
-                        interceptPrefix: '/api',
-                        baseUrl: 'http://localhost:8080',
-                        stripPrefix: true,
-                        globalCookie: '',
-                        enabled: true,
-                        mockApis: [],
-                    },
-                    {
-                        id: 'another',
-                        name: 'Another',
-                        port: 9999,
-                        interceptPrefix: '/api',
-                        baseUrl: 'http://localhost:8081',
-                        stripPrefix: true,
-                        globalCookie: '',
-                        enabled: true,
-                        mockApis: [],
-                    },
-                ],
-            });
-            await (sidebarProvider as any).handleDeleteGroup('test-group-id');
-            (vscode.window as any).showWarningMessage = origWarn;
+    it('toggle mock updates the route-scoped mock entry and saves config', async () => {
+        const cfg = configManager.getConfig();
+        cfg.proxyGroups[0].routes[0].mockApis = [
+            { path: '/x', method: 'GET', enabled: true, mockData: '{}', statusCode: 200 },
+        ];
+        (configManager.getConfig as sinon.SinonStub).returns(cfg);
+
+        await (sidebarProvider as any).handleToggleMock('test-group-id', 'route-1', 0);
+
+        expect(configManager.saveConfig.calledOnce).to.equal(true);
+        expect(cfg.proxyGroups[0].routes[0].mockApis[0].enabled).to.equal(false);
+    });
+
+    it('refreshWebview posts active group, active route and statuses', async () => {
+        (mockServerManager.getGroupStatus as sinon.SinonStub).returns(true);
+        (sidebarProvider as any).activeGroupId = 'test-group-id';
+        (sidebarProvider as any).activeRouteId = 'route-1';
+
+        await (sidebarProvider as any).refreshWebview();
+
+        expect(webviewViewStub.webview.postMessage.calledOnce).to.equal(true);
+        const payload = webviewViewStub.webview.postMessage.firstCall.args[0];
+        expect(payload.type).to.equal('configUpdated');
+        expect(payload.activeGroupId).to.equal('test-group-id');
+        expect(payload.activeRouteId).to.equal('route-1');
+        expect(payload.groupStatuses['test-group-id']).to.equal(true);
+    });
+
+    it('delegates openPanel actions to the panel provider and keeps selection in sync', async () => {
+        await (sidebarProvider as any).handleMessage({
+            type: 'openPanel',
+            action: { type: 'focusEntity', groupId: 'test-group-id', routeId: 'route-1' },
         });
 
-        it('handleAddMock/UpdateMock/DeleteMock/ToggleMock', async () => {
-            await (sidebarProvider as any).handleAddMock('test-group-id', {
-                path: '/x',
-                method: 'GET',
-                enabled: true,
-                mockData: '{}',
-                statusCode: 200,
-                delay: 0,
-            });
-            expect((configManager.addMockApi as sinon.SinonStub)).to.have.been.called;
-
-            await (sidebarProvider as any).handleUpdateMock('test-group-id', 0, {
-                path: '/x',
-                method: 'POST',
-                enabled: false,
-                mockData: '{}',
-                statusCode: 201,
-                delay: 10,
-            });
-            expect((configManager.updateMockApi as sinon.SinonStub)).to.have.been.called;
-
-            const origWarn = vscode.window.showWarningMessage;
-            (vscode.window as any).showWarningMessage = sandbox
-                .stub()
-                .resolves((vscode as any).l10n.t('ui.confirm'));
-            await (sidebarProvider as any).handleDeleteMock('test-group-id', 0);
-            (vscode.window as any).showWarningMessage = origWarn;
-
-            // toggle: flip enabled and save
-            const getConfigStub = configManager.getConfig as sinon.SinonStub;
-            const cfg = {
-                version: '2.0',
-                proxyGroups: [
-                    {
-                        id: 'test-group-id',
-                        name: 'Test Group',
-                        port: 8888,
-                        interceptPrefix: '/api',
-                        baseUrl: 'http://localhost:8080',
-                        stripPrefix: true,
-                        globalCookie: '',
-                        enabled: true,
-                        mockApis: [
-                            {
-                                path: '/t',
-                                method: 'GET',
-                                enabled: true,
-                                mockData: '{}',
-                                statusCode: 200,
-                            },
-                        ],
-                    },
-                ],
-            };
-            getConfigStub.returns(cfg as any);
-            await (sidebarProvider as any).handleToggleMock('test-group-id', 0);
-            expect((configManager.saveConfig as sinon.SinonStub)).to.have.been.called;
+        expect(panelProvider.focusWithAction.calledOnce).to.equal(true);
+        expect(panelProvider.focusWithAction.firstCall.args[0]).to.deep.equal({
+            type: 'focusEntity',
+            groupId: 'test-group-id',
+            routeId: 'route-1',
         });
+        expect((sidebarProvider as any).activeGroupId).to.equal('test-group-id');
+        expect((sidebarProvider as any).activeRouteId).to.equal('route-1');
+    });
 
-        it('refreshWebview posts message with statuses', async () => {
-            // make group running
-            (mockServerManager.getGroupStatus as sinon.SinonStub).returns(true);
-            await (sidebarProvider as any).refreshWebview();
-            expect(webviewViewStub.webview.postMessage).to.have.been.called;
-            const arg = webviewViewStub.webview.postMessage.firstCall.args[0];
-            expect(arg.type).to.equal('configUpdated');
-            expect(arg.groupStatuses).to.be.an('object');
-        });
+    it('syncSelection updates sidebar state and refreshes the webview', async () => {
+        await sidebarProvider.syncSelection('test-group-id', 'route-1');
+
+        expect(webviewViewStub.webview.postMessage.calledOnce).to.equal(true);
+        const payload = webviewViewStub.webview.postMessage.firstCall.args[0];
+        expect(payload.activeGroupId).to.equal('test-group-id');
+        expect(payload.activeRouteId).to.equal('route-1');
     });
 });

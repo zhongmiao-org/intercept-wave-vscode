@@ -14,6 +14,16 @@ export interface MockApiConfig {
     overrides?: Record<string, any>;
 }
 
+export interface HttpRoute {
+    id: string;
+    name: string;
+    pathPrefix: string;
+    targetBaseUrl: string;
+    stripPrefix: boolean;
+    enableMock: boolean;
+    mockApis: MockApiConfig[];
+}
+
 export interface WsTimelineItem {
     atMs: number;
     message: string;
@@ -45,11 +55,12 @@ export interface ProxyGroup {
     id: string;
     name: string;
     port: number;
-    interceptPrefix: string;
-    baseUrl: string;
+    routes?: HttpRoute[];
     stripPrefix: boolean;
     globalCookie: string;
     enabled: boolean;
+    interceptPrefix: string;
+    baseUrl: string;
     mockApis: MockApiConfig[];
     // Future extension hooks (no runtime behavior yet)
     tls?: TLSConfig;

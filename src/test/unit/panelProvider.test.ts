@@ -51,14 +51,15 @@ describe('PanelProvider', () => {
 
     beforeEach(() => {
         sandbox = sinon.createSandbox();
-        if (!(vscode as any).ViewColumn) {
-            Object.defineProperty(vscode, 'ViewColumn', {
+        const vscodeAny = vscode as any;
+        if (!vscodeAny.ViewColumn) {
+            Object.defineProperty(vscodeAny, 'ViewColumn', {
                 value: { Active: 1 },
                 configurable: true,
             });
         }
-        if (!(vscode.Uri as any).joinPath) {
-            Object.defineProperty(vscode.Uri, 'joinPath', {
+        if (!(vscodeAny.Uri as any).joinPath) {
+            Object.defineProperty(vscodeAny.Uri, 'joinPath', {
                 value: (base: vscode.Uri, ...parts: string[]) =>
                     vscode.Uri.file([base.fsPath, ...parts].join('/')),
                 configurable: true,

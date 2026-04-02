@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import {MockConfig, ProxyGroup} from '../interfaces';
+import { MockConfig, ProxyGroup } from '../interfaces';
 import { parseJsonTolerant, stringifyCompact } from '../utils';
 import * as pkg from '../../../package.json';
-import {v4 as uuidv4} from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 
 export class ConfigManager {
     private readonly configPath: string;
@@ -73,7 +73,7 @@ export class ConfigManager {
                 return config;
             }
         } catch (error) {
-            console.error('Error loading config:', error);
+            // ignore
         }
 
         return this.getDefaultConfig();
@@ -86,7 +86,6 @@ export class ConfigManager {
 
             const content = JSON.stringify(config, null, 4);
             fs.writeFileSync(this.configPath, content, 'utf-8');
-            console.log('Configuration saved successfully');
         } catch (error) {
             console.error('Error saving config:', error);
             throw error;
@@ -102,7 +101,6 @@ export class ConfigManager {
             if (!config.version || !config.proxyGroups) {
                 const migratedConfig = this.migrateFromLegacy(config);
                 void this.saveConfig(migratedConfig);
-                console.log('Configuration migrated to v2.0 successfully');
                 return;
             }
 
@@ -144,11 +142,8 @@ export class ConfigManager {
                     }
                 }
                 if (changed) {
-                    // 不能调用 saveConfig，否则会提前把 version 改成当前版本，
-                    // 导致 normalizeV2Config 判定 version !== '2.0' 而提前返回，从而破坏现有测试。
                     const contentToWrite = JSON.stringify(config, null, 4);
                     fs.writeFileSync(this.configPath, contentToWrite, 'utf-8');
-                    console.log('Configuration normalized with WS defaults');
                 }
             }
         } catch (error) {
@@ -205,7 +200,7 @@ export class ConfigManager {
         // Migrate from old format to new format
         const defaultGroup: ProxyGroup = {
             id: uuidv4(),
-            name: '默认配置',
+            name: 'Default',
             port: oldConfig.port || 8888,
             interceptPrefix: oldConfig.interceptPrefix || '/api',
             baseUrl: oldConfig.baseUrl || 'http://localhost:8080',
@@ -232,7 +227,7 @@ export class ConfigManager {
     private getDefaultConfig(): MockConfig {
         const defaultGroup: ProxyGroup = {
             id: uuidv4(),
-            name: '默认配置',
+            name: 'Default',
             port: 8888,
             interceptPrefix: '/api',
             baseUrl: 'http://localhost:8080',

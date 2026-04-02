@@ -2,9 +2,11 @@ import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ConfigManager } from '../config';
-import { selectBestMockApiForRequest } from './pathMatcher';
-import { MockApiConfig, ProxyGroup, WsRule } from '../interfaces';
+import { selectBestMockApiForRequest, matchRequestBody } from './pathMatcher';
+import { MockApiConfig, ProxyGroup, WsRule, HttpProxy } from '../interfaces';
 import { WsManualTarget } from '../types';
 import { WsServerManager } from './wsServer';
 
@@ -61,14 +63,20 @@ export class MockServerManager {
                 .join(', ');
             this.outputChannel.appendLine(`✅ Mock servers started: ${urls}`);
             if (failed.length > 0) {
-                failed.forEach(f => this.outputChannel.appendLine(`❌ [${f.group.name}] failed to start: ${f.error?.message || f.error}`));
+                failed.forEach(f =>
+                    this.outputChannel.appendLine(
+                        `❌ [${f.group.name}] failed to start: ${f.error?.message || f.error}`
+                    )
+                );
             }
             this.outputChannel.show(true);
             return urls;
         }
 
         // none succeeded
-        const errorMsg = failed.map(f => `${f.group.name}(:${f.group.port}) - ${f.error?.message || f.error}`).join('; ');
+        const errorMsg = failed
+            .map(f => `${f.group.name}(:${f.group.port}) - ${f.error?.message || f.error}`)
+            .join('; ');
         throw new Error(`Failed to start any server: ${errorMsg}`);
     }
 
@@ -149,14 +157,22 @@ export class MockServerManager {
         return this.httpServers.has(groupId) || this.wsManager.getGroupStatus(groupId);
     }
 
-    async manualPushByRule(groupId: string, rule: WsRule, target: WsManualTarget): Promise<boolean> {
+    async manualPushByRule(
+        groupId: string,
+        rule: WsRule,
+        target: WsManualTarget
+    ): Promise<boolean> {
         const config = this.configManager.getConfig();
         const group = config.proxyGroups.find(g => g.id === groupId);
         const allRules = group?.wsPushRules || [];
         return this.wsManager.manualPushByRule(groupId, rule, target, allRules);
     }
 
-    async manualPushCustom(groupId: string, payload: string, target: WsManualTarget): Promise<boolean> {
+    async manualPushCustom(
+        groupId: string,
+        payload: string,
+        target: WsManualTarget
+    ): Promise<boolean> {
         const config = this.configManager.getConfig();
         const group = config.proxyGroups.find(g => g.id === groupId);
         const allRules = group?.wsPushRules || [];
@@ -232,24 +248,6 @@ export class MockServerManager {
 
         this.outputChannel.appendLine(`📥 [${group.name}] ${method} ${requestPath}`);
 
-        // Handle root path - welcome page
-        if (requestPath === '/' || requestPath === '') {
-            this.handleWelcomePage(res, group);
-            return;
-        }
-
-        // Handle prefix welcome page when stripPrefix=true
-        if (group.stripPrefix && group.interceptPrefix) {
-            const prefix = group.interceptPrefix.endsWith('/')
-                ? group.interceptPrefix.slice(0, -1)
-                : group.interceptPrefix;
-            if (requestPath === prefix || requestPath === prefix + '/') {
-                this.handleWelcomePage(res, group);
-                return;
-            }
-        }
-
-        // Handle OPTIONS request (CORS preflight)
         if (method === 'OPTIONS') {
             this.sendCorsHeaders(res);
             res.writeHead(200);
@@ -258,20 +256,108 @@ export class MockServerManager {
             return;
         }
 
-        // Path matching logic
-        const matchPath = this.getMatchPath(requestPath, group);
-        this.outputChannel.appendLine(`   🎯 Match path: ${matchPath}`);
+        const httpProxies = (group.httpProxies || [])
+            .slice()
+            .sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999));
+        let matchedProxy: HttpProxy | null = null;
+        let matchPath = requestPath;
 
-        // Find matching mock API
-        const mockApi = this.findMatchingMockApi(matchPath, method, group);
+        const enabledProxies = httpProxies.filter(p => p.enabled);
+        const matchingProxies = enabledProxies.filter(p =>
+            requestPath.startsWith(p.interceptPrefix)
+        );
+        if (matchingProxies.length > 0) {
+            matchedProxy = matchingProxies.reduce((best, current) =>
+                current.interceptPrefix.length > best.interceptPrefix.length ? current : best
+            );
+            if (matchedProxy.stripPrefix) {
+                const stripped = requestPath.substring(matchedProxy.interceptPrefix.length);
+                matchPath = stripped || '/';
+            }
+        }
+
+        if (!matchedProxy) {
+            matchPath = this.getMatchPath(requestPath, group);
+        }
+
+        if ((requestPath === '/' || requestPath === '') && !matchedProxy && !group.baseUrl) {
+            this.handleWelcomePage(res, group);
+            return;
+        }
+
+        this.outputChannel.appendLine(`   🎯 Match path: ${matchPath}`);
+        if (matchedProxy) {
+            this.outputChannel.appendLine(`   🔀 Using proxy: ${matchedProxy.name}`);
+        }
+
+        const requestBody = await this.readRequestBody(req);
+        const queryParams = this.parseQueryString(requestPath);
+
+        const mockApi = this.findMatchingMockApi(
+            matchPath,
+            method,
+            group,
+            matchedProxy,
+            queryParams,
+            requestBody
+        );
 
         if (mockApi && mockApi.enabled) {
-            // Use mock data
-            await this.handleMockResponse(res, mockApi, group);
+            await this.handleMockResponse(res, mockApi, group, matchedProxy);
         } else {
-            // Forward to original server
-            this.forwardToOriginalServer(req, res, group);
+            this.forwardToOriginalServer(req, res, group, matchedProxy, matchPath, requestBody);
         }
+    }
+
+    private parseQueryString(requestPath: string): Record<string, unknown> | null {
+        const queryIndex = requestPath.indexOf('?');
+        if (queryIndex === -1) {
+            return null;
+        }
+        const queryString = requestPath.substring(queryIndex + 1);
+        if (!queryString) {
+            return null;
+        }
+        const params: Record<string, unknown> = {};
+        const searchParams = new URLSearchParams(queryString);
+        searchParams.forEach((value, key) => {
+            params[key] = value;
+        });
+        return Object.keys(params).length > 0 ? params : null;
+    }
+
+    private async readRequestBody(req: http.IncomingMessage): Promise<unknown> {
+        return new Promise<unknown>(resolve => {
+            const chunks: Buffer[] = [];
+            req.on('data', (chunk: Buffer) => chunks.push(chunk));
+            req.on('end', () => {
+                if (chunks.length === 0) {
+                    resolve(null);
+                    return;
+                }
+                const body = Buffer.concat(chunks).toString('utf-8');
+                if (!body || body.trim() === '') {
+                    resolve(null);
+                    return;
+                }
+                try {
+                    const contentType = req.headers['content-type'] || '';
+                    if (contentType.includes('application/x-www-form-urlencoded')) {
+                        const params = new URLSearchParams(body);
+                        const obj: Record<string, unknown> = {};
+                        params.forEach((value, key) => {
+                            obj[key] = value;
+                        });
+                        resolve(obj);
+                    } else {
+                        resolve(JSON.parse(body));
+                    }
+                } catch {
+                    resolve(body);
+                }
+            });
+            req.on('error', () => resolve(null));
+        });
     }
 
     private getMatchPath(requestPath: string, group: ProxyGroup): string {
@@ -287,13 +373,29 @@ export class MockServerManager {
     private findMatchingMockApi(
         requestPath: string,
         method: string,
-        group: ProxyGroup
+        group: ProxyGroup,
+        matchedProxy: HttpProxy | null = null,
+        queryParams: unknown = null,
+        requestBody: unknown = null
     ): MockApiConfig | undefined {
-        // Strip query parameters from request path for matching
-        const pathWithoutQuery = requestPath.split('?')[0];
+        if (matchedProxy && matchedProxy.mockApis && matchedProxy.mockApis.length > 0) {
+            const proxyMock = selectBestMockApiForRequest(
+                matchedProxy.mockApis,
+                requestPath,
+                method,
+                queryParams,
+                requestBody
+            );
+            if (proxyMock) return proxyMock;
+        }
 
-        // Use wildcard-aware matcher with prioritization
-        return selectBestMockApiForRequest(group.mockApis, pathWithoutQuery, method);
+        return selectBestMockApiForRequest(
+            group.mockApis,
+            requestPath,
+            method,
+            queryParams,
+            requestBody
+        );
     }
 
     private handleWelcomePage(res: http.ServerResponse, group: ProxyGroup): void {
@@ -339,7 +441,8 @@ export class MockServerManager {
     private async handleMockResponse(
         res: http.ServerResponse,
         mockApi: MockApiConfig,
-        group: ProxyGroup
+        group: ProxyGroup,
+        matchedProxy: HttpProxy | null = null
     ): Promise<void> {
         this.outputChannel.appendLine(`   📝 Mock API found: ${JSON.stringify(mockApi)}`);
 
@@ -350,16 +453,74 @@ export class MockServerManager {
 
         // Set headers
         this.sendCorsHeaders(res);
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        const isFileMode = mockApi.contentType === '__FILE__' && mockApi.responseFile;
+        let contentType = 'application/json';
 
-        // Set cookie if enabled
-        if (mockApi.useCookie && group.globalCookie) {
-            res.setHeader('Set-Cookie', group.globalCookie);
+        if (isFileMode && mockApi.responseFile) {
+            const ext = path.extname(mockApi.responseFile).toLowerCase();
+            const mimeMap: Record<string, string> = {
+                '.json': 'application/json',
+                '.html': 'text/html',
+                '.htm': 'text/html',
+                '.txt': 'text/plain',
+                '.js': 'application/javascript',
+                '.css': 'text/css',
+                '.xml': 'application/xml',
+                '.svg': 'image/svg+xml',
+                '.png': 'image/png',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif',
+            };
+            contentType = mimeMap[ext] || 'application/octet-stream';
+        } else if (mockApi.contentType && mockApi.contentType !== '__FILE__') {
+            contentType = mockApi.contentType;
+        }
+        res.setHeader('Content-Type', `${contentType}; charset=utf-8`);
+
+        // Set cookie if enabled (prefer proxy-level cookie, fallback to group-level)
+        const globalCookie = matchedProxy?.globalCookie || group.globalCookie;
+        if (mockApi.useCookie && globalCookie) {
+            res.setHeader('Set-Cookie', globalCookie);
         }
 
-        // mockData is always a string (JetBrains plugin compatible format)
-        const responseData = mockApi.mockData;
-        this.outputChannel.appendLine(`   📤 Response data length: ${responseData.length}`);
+        // Get response data: prefer responseFile over mockData
+        let responseData: string;
+        if (mockApi.responseFile) {
+            try {
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                if (!workspaceFolder) {
+                    this.outputChannel.appendLine(
+                        `   ❌ No workspace folder found for response file`
+                    );
+                    responseData = mockApi.mockData || '{"error": "No workspace folder"}';
+                } else {
+                    const filePath = path.isAbsolute(mockApi.responseFile)
+                        ? mockApi.responseFile
+                        : path.join(workspaceFolder.uri.fsPath, mockApi.responseFile);
+
+                    try {
+                        await fs.promises.access(filePath, fs.constants.R_OK);
+                        responseData = await fs.promises.readFile(filePath, 'utf-8');
+                        this.outputChannel.appendLine(
+                            `   📄 Response loaded from file: ${mockApi.responseFile}`
+                        );
+                    } catch {
+                        this.outputChannel.appendLine(
+                            `   ⚠️ Response file not found: ${filePath}, using mockData`
+                        );
+                        responseData = mockApi.mockData || '';
+                    }
+                }
+            } catch (err) {
+                this.outputChannel.appendLine(`   ❌ Error reading response file: ${err}`);
+                responseData = mockApi.mockData || '';
+            }
+        } else {
+            responseData = mockApi.mockData;
+        }
+
+        this.outputChannel.appendLine(`   📤 Response data length: ${responseData?.length || 0}`);
 
         // Send response
         res.writeHead(mockApi.statusCode);
@@ -373,9 +534,24 @@ export class MockServerManager {
     private forwardToOriginalServer(
         req: http.IncomingMessage,
         res: http.ServerResponse,
-        group: ProxyGroup
+        group: ProxyGroup,
+        matchedProxy: HttpProxy | null,
+        matchPath: string,
+        requestBody: unknown = null
     ): void {
-        const targetUrl = group.baseUrl + req.url;
+        const baseUrl = matchedProxy?.baseUrl || group.baseUrl;
+
+        let targetPath: string;
+        if (matchPath.includes('?')) {
+            targetPath = matchPath;
+        } else {
+            const queryString = req.url?.split('?')[1] || '';
+            targetPath = queryString ? `${matchPath}?${queryString}` : matchPath;
+        }
+
+        const targetUrl = baseUrl + targetPath;
+        this.outputChannel.appendLine(`   🔍 DEBUG   targetPath: "${targetPath}"`);
+        this.outputChannel.appendLine(`   🔍 DEBUG   targetUrl: "${targetUrl}"`);
         this.outputChannel.appendLine(`   ⏩ Forwarding to: ${targetUrl}`);
 
         try {
@@ -395,7 +571,6 @@ export class MockServerManager {
             };
 
             const proxyReq = httpModule.request(options, proxyRes => {
-                // Copy response headers (excluding problematic ones)
                 Object.keys(proxyRes.headers).forEach(key => {
                     if (
                         key.toLowerCase() !== 'transfer-encoding' &&
@@ -408,10 +583,8 @@ export class MockServerManager {
                     }
                 });
 
-                // Add CORS headers
                 this.sendCorsHeaders(res);
 
-                // Send response
                 res.writeHead(proxyRes.statusCode || 200);
                 proxyRes.pipe(res);
 
@@ -427,8 +600,15 @@ export class MockServerManager {
                 this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to reach original server');
             });
 
-            // Forward request body
-            req.pipe(proxyReq);
+            if (requestBody !== null && requestBody !== undefined) {
+                const bodyString =
+                    typeof requestBody === 'string' ? requestBody : JSON.stringify(requestBody);
+                proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyString));
+                proxyReq.write(bodyString);
+                proxyReq.end();
+            } else {
+                req.pipe(proxyReq);
+            }
         } catch (error: any) {
             this.outputChannel.appendLine(`   ❌ URL parse error: ${error.message}`);
             this.sendErrorResponse(res, 500, `Internal Server Error: ${error.message}`);

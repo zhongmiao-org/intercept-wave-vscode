@@ -41,6 +41,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             webviewView.webview.onDidReceiveMessage(async data => {
                 await this.handleMessage(data, webviewView);
             });
+
+            webviewView.onDidChangeVisibility(() => {
+                if (webviewView.visible) {
+                    webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
+                }
+            });
         } catch (error: any) {
             void vscode.window.showErrorMessage(
                 `Failed to load Intercept Wave view: ${error.message}`
@@ -109,7 +115,17 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     await this.handleWsManualPushCustom(data.groupId, data.target, data.payload);
                     break;
                 case 'updateWsRules':
-                    await this.handleUpdateWsRules(data.groupId, data.rules, data.rulesIndexToDelete);
+                    await this.handleUpdateWsRules(
+                        data.groupId,
+                        data.rules,
+                        data.rulesIndexToDelete
+                    );
+                    break;
+                case 'updateHttpProxies':
+                    await this.handleUpdateHttpProxies(data.groupId, data.httpProxies);
+                    break;
+                case 'selectResponseFile':
+                    await this.handleSelectResponseFile(webviewView);
                     break;
             }
         } catch (error: any) {
@@ -143,6 +159,51 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         await this.configManager.updateProxyGroup(groupId, { wsPushRules: nextRules as any });
         await this.refreshWebview();
+    }
+
+    private async handleUpdateHttpProxies(groupId: string, httpProxies?: any[]) {
+        const config = this.configManager.getConfig();
+        const group = config.proxyGroups.find(g => g.id === groupId);
+        if (!group) {
+            const msg = vscode.l10n.t('error.ws.groupNotFound');
+            void vscode.window.showErrorMessage(msg);
+            await this.notify('error', msg);
+            return;
+        }
+
+        await this.configManager.updateProxyGroup(groupId, { httpProxies: httpProxies || [] });
+        await this.refreshWebview();
+    }
+
+    private async handleSelectResponseFile(webviewView: vscode.WebviewView) {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            void vscode.window.showErrorMessage('No workspace folder found');
+            return;
+        }
+
+        const files = await vscode.window.showOpenDialog({
+            defaultUri: workspaceFolder.uri,
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            filters: {
+                'All Files': ['*'],
+                JSON: ['json'],
+                HTML: ['html', 'htm'],
+                JavaScript: ['js'],
+                CSS: ['css'],
+                XML: ['xml'],
+            },
+        });
+
+        if (files && files[0]) {
+            const relativePath = vscode.workspace.asRelativePath(files[0]);
+            await webviewView.webview.postMessage({
+                type: 'responseFileSelected',
+                path: relativePath,
+            });
+        }
     }
 
     private async handleWsManualPushByRule(
@@ -224,9 +285,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     private async handleStartServer(_: vscode.WebviewView) {
         try {
             const url = await this.mockServerManager.start();
-            void vscode.window.showInformationMessage(
-                vscode.l10n.t('success.serversStarted', url)
-            );
+            void vscode.window.showInformationMessage(vscode.l10n.t('success.serversStarted', url));
             await this.refreshWebview();
         } catch (error: any) {
             void vscode.window.showErrorMessage(
@@ -242,9 +301,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             void vscode.window.showInformationMessage(vscode.l10n.t('success.serversStopped'));
             await this.refreshWebview();
         } catch (error: any) {
-            void vscode.window.showErrorMessage(
-                vscode.l10n.t('error.failedToStop', error.message)
-            );
+            void vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStop', error.message));
             await this.notify('error', vscode.l10n.t('error.failedToStop', error.message));
             await this.refreshWebview();
         }
@@ -253,9 +310,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     private async handleStartGroup(groupId: string) {
         try {
             const url = await this.mockServerManager.startGroupById(groupId);
-            void vscode.window.showInformationMessage(
-                vscode.l10n.t('success.serversStarted', url)
-            );
+            void vscode.window.showInformationMessage(vscode.l10n.t('success.serversStarted', url));
             await this.refreshWebview();
         } catch (error: any) {
             void vscode.window.showErrorMessage(
@@ -280,15 +335,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     vscode.l10n.t('success.groupStopped', serverInfo)
                 );
             } else {
-                void vscode.window.showInformationMessage(
-                    vscode.l10n.t('success.serversStopped')
-                );
+                void vscode.window.showInformationMessage(vscode.l10n.t('success.serversStopped'));
             }
             await this.refreshWebview();
         } catch (error: any) {
-            void vscode.window.showErrorMessage(
-                vscode.l10n.t('error.failedToStop', error.message)
-            );
+            void vscode.window.showErrorMessage(vscode.l10n.t('error.failedToStop', error.message));
             await this.notify('error', vscode.l10n.t('error.failedToStop', error.message));
             await this.refreshWebview();
         }
@@ -360,9 +411,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     private async handleDeleteGroup(groupId: string) {
         const config = this.configManager.getConfig();
         if (config.proxyGroups.length <= 1) {
-            void vscode.window.showWarningMessage(
-                vscode.l10n.t('error.cannotDeleteLastGroup')
-            );
+            void vscode.window.showWarningMessage(vscode.l10n.t('error.cannotDeleteLastGroup'));
             return;
         }
 
@@ -396,8 +445,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         if (group) {
             const newPath = String(data.path || '').trim();
             const newMethod = String(data.method || '').toUpperCase();
-            const exists = (group.mockApis || []).some(m =>
-                String(m.path || '').trim() === newPath && String((m as any).method || '').toUpperCase() === newMethod
+            const exists = (group.mockApis || []).some(
+                m =>
+                    String(m.path || '').trim() === newPath &&
+                    String((m as any).method || '').toUpperCase() === newMethod
             );
             if (exists) {
                 const msg = vscode.l10n.t('error.mockRouteExists', newMethod, newPath);
@@ -421,8 +472,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         if (group) {
             const newPath = String(data.path || '').trim();
             const newMethod = String(data.method || '').toUpperCase();
-            const exists = (group.mockApis || []).some((m, i) =>
-                i !== index && String(m.path || '').trim() === newPath && String((m as any).method || '').toUpperCase() === newMethod
+            const exists = (group.mockApis || []).some(
+                (m, i) =>
+                    i !== index &&
+                    String(m.path || '').trim() === newPath &&
+                    String((m as any).method || '').toUpperCase() === newMethod
             );
             if (exists) {
                 const msg = vscode.l10n.t('error.mockRouteExists', newMethod, newPath);
@@ -513,43 +567,139 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         // Build a map keyed by the full i18n keys (e.g. 'ui.startAll')
         const i18nKeys = [
             // Buttons
-            'ui.startAll', 'ui.stopAll', 'ui.startServer', 'ui.stopServer', 'ui.settings',
-            'ui.add', 'ui.edit', 'ui.delete', 'ui.enable', 'ui.disable', 'ui.save', 'ui.cancel',
-            'ui.format', 'ui.validate',
+            'ui.startAll',
+            'ui.stopAll',
+            'ui.startServer',
+            'ui.stopServer',
+            'ui.settings',
+            'ui.add',
+            'ui.edit',
+            'ui.delete',
+            'ui.enable',
+            'ui.disable',
+            'ui.save',
+            'ui.cancel',
+            'ui.format',
+            'ui.validate',
             // Form labels
-            'ui.groupName', 'ui.enabled', 'ui.port', 'ui.interceptPrefix', 'ui.baseUrl', 'ui.stripPrefix',
-            'ui.globalCookie', 'ui.method', 'ui.path', 'ui.statusCode', 'ui.responseBody', 'ui.delay',
-            'ui.protocol', 'ui.protocol.http', 'ui.protocol.ws',
-            'ui.wsBaseUrl', 'ui.wsInterceptPrefix', 'ui.wsManualPush',
-            'ui.wssEnabled', 'ui.wssKeystorePath', 'ui.wssKeystorePassword',
-            'ui.section.group', 'ui.section.http', 'ui.section.ws',
-            'ui.wsPanel.title', 'ui.wsPanel.rules', 'ui.wsPanel.sendSelected',
-            'ui.wsPanel.target.match', 'ui.wsPanel.target.all', 'ui.wsPanel.target.recent',
-            'ui.wsPanel.customMessage', 'ui.wsPanel.send', 'ui.wsPanel.noRules',
-            'ui.addWsRule', 'ui.editWsRule',
-            'ui.wsRule.mode', 'ui.wsRule.mode.off', 'ui.wsRule.mode.periodic', 'ui.wsRule.mode.timeline',
-            'ui.wsRule.event.key', 'ui.wsRule.event.value',
-            'ui.wsRule.direction', 'ui.wsRule.direction.both', 'ui.wsRule.direction.in', 'ui.wsRule.direction.out',
-            'ui.wsRule.onOpen', 'ui.wsRule.intercept',
-            'ui.wsRule.period.sec', 'ui.wsRule.timeline.secList', 'ui.wsRule.message',
+            'ui.groupName',
+            'ui.enabled',
+            'ui.port',
+            'ui.interceptPrefix',
+            'ui.baseUrl',
+            'ui.stripPrefix',
+            'ui.globalCookie',
+            'ui.method',
+            'ui.path',
+            'ui.statusCode',
+            'ui.responseBody',
+            'ui.delay',
+            'ui.protocol',
+            'ui.protocol.http',
+            'ui.protocol.ws',
+            'ui.wsBaseUrl',
+            'ui.wsInterceptPrefix',
+            'ui.wsManualPush',
+            'ui.wssEnabled',
+            'ui.wssKeystorePath',
+            'ui.wssKeystorePassword',
+            'ui.section.group',
+            'ui.section.http',
+            'ui.section.ws',
+            'ui.wsPanel.title',
+            'ui.wsPanel.rules',
+            'ui.wsPanel.sendSelected',
+            'ui.wsPanel.target.match',
+            'ui.wsPanel.target.all',
+            'ui.wsPanel.target.recent',
+            'ui.wsPanel.customMessage',
+            'ui.wsPanel.send',
+            'ui.wsPanel.noRules',
+            'ui.manageProxies',
+            'ui.noProxies',
+            'ui.prefix',
+            'ui.base',
+            'ui.selectProxyFirst',
+            'ui.responseFile',
+            'ui.queryParams',
+            'ui.queryParamsHint',
+            'ui.requestBody',
+            'ui.requestBodyHint',
+            'ui.addHttpProxy',
+            'ui.editHttpProxy',
+            'ui.proxyName',
+            'ui.priority',
+            'ui.actions',
+            'ui.moveUp',
+            'ui.moveDown',
+            'ui.close',
+            'ui.priorityHint',
+            'ui.addWsRule',
+            'ui.editWsRule',
+            'ui.wsRule.mode',
+            'ui.wsRule.mode.off',
+            'ui.wsRule.mode.periodic',
+            'ui.wsRule.mode.timeline',
+            'ui.wsRule.event.key',
+            'ui.wsRule.event.value',
+            'ui.wsRule.direction',
+            'ui.wsRule.direction.both',
+            'ui.wsRule.direction.in',
+            'ui.wsRule.direction.out',
+            'ui.wsRule.onOpen',
+            'ui.wsRule.intercept',
+            'ui.wsRule.period.sec',
+            'ui.wsRule.timeline.secList',
+            'ui.wsRule.message',
             'ui.wsRule.section.basic',
-            'ui.wsRule.timeline.empty', 'ui.wsRule.timeline.add', 'ui.wsRule.timeline.edit', 'ui.wsRule.timeline.delete',
-            'ui.wsRule.timeline.editor.addTitle', 'ui.wsRule.timeline.editor.editTitle',
-            'ui.wsRule.timeline.editor.atMs', 'ui.wsRule.timeline.editor.message',
-            'ui.wsRule.timeline.editor.save', 'ui.wsRule.timeline.editor.cancel',
-            'ui.yes', 'ui.no', 'ui.notSet',
+            'ui.wsRule.timeline.empty',
+            'ui.wsRule.timeline.add',
+            'ui.wsRule.timeline.edit',
+            'ui.wsRule.timeline.delete',
+            'ui.wsRule.timeline.editor.addTitle',
+            'ui.wsRule.timeline.editor.editTitle',
+            'ui.wsRule.timeline.editor.atMs',
+            'ui.wsRule.timeline.editor.message',
+            'ui.wsRule.timeline.editor.save',
+            'ui.wsRule.timeline.editor.cancel',
+            'ui.wsRule.timeline.invalidAtMs',
+            'ui.wsRule.jsonFormatError',
+            'ui.wsRule.selectTimelineItem',
+            'ui.yes',
+            'ui.no',
+            'ui.notSet',
             // Titles and lists
-            'ui.addProxyGroup', 'ui.editProxyGroup', 'ui.addMockApi', 'ui.editMockApi', 'ui.running', 'ui.stopped', 'ui.mockApis',
+            'ui.addProxyGroup',
+            'ui.editProxyGroup',
+            'ui.addMockApi',
+            'ui.editMockApi',
+            'ui.running',
+            'ui.stopped',
+            'ui.mockApis',
             // Empty state
-            'ui.noMockApis', 'ui.clickAddToCreate',
+            'ui.noMockApis',
+            'ui.clickAddToCreate',
             // Confirms
-            'ui.deleteProxyGroup', 'ui.deleteMockApi',
+            'ui.deleteProxyGroup',
+            'ui.deleteMockApi',
             // JSON validation
-            'ui.jsonFormatted', 'ui.jsonValid', 'ui.jsonInvalid',
+            'ui.jsonFormatted',
+            'ui.jsonValid',
+            'ui.jsonInvalid',
+            'ui.expandAll',
+            'ui.collapseAll',
+            'ui.variants',
+            'ui.searchUrl',
+            'ui.filtered',
             // Placeholders
-            'ui.groupNamePlaceholder', 'ui.baseUrlPlaceholder', 'ui.pathPlaceholder', 'ui.responsePlaceholder', 'ui.globalCookiePlaceholder',
+            'ui.groupNamePlaceholder',
+            'ui.baseUrlPlaceholder',
+            'ui.pathPlaceholder',
+            'ui.responsePlaceholder',
+            'ui.globalCookiePlaceholder',
             // No workspace prompt (may be used by webview)
-            'noWorkspace.title', 'noWorkspace.message',
+            'noWorkspace.title',
+            'noWorkspace.message',
         ];
         const i18n = Object.fromEntries(i18nKeys.map(k => [k, vscode.l10n.t(k as any)]));
 
@@ -586,7 +736,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         // Unique group name
         const name = String(data.name).trim();
         const configForName = this.configManager.getConfig();
-        const sameName = configForName.proxyGroups.find(g => g.name.trim() === name && g.id !== editingGroupId);
+        const sameName = configForName.proxyGroups.find(
+            g => g.name.trim() === name && g.id !== editingGroupId
+        );
         if (sameName) {
             return vscode.l10n.t('error.duplicateGroupName', name);
         }

@@ -94,6 +94,7 @@ export interface MockModalProps {
   onSave: () => void;
   onFormat: () => void;
   onCancel: () => void;
+  onSelectFile?: () => void;
   labels: {
     titleAdd: string;
     titleEdit: string;
@@ -103,9 +104,14 @@ export interface MockModalProps {
     statusCode: string;
     delay: string;
     responseBody: string;
+    responseFile: string;
     format: string;
-    cancel?: string;
     save: string;
+    cancel: string;
+    queryParams: string;
+    queryParamsHint: string;
+    requestBody: string;
+    requestBodyHint: string;
   };
   isEdit: boolean;
 }

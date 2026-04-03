@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [4.0.0]
+
 ### Added
 
 - 4.0 multi-route HTTP model aligned with the sibling `intercept-wave` project, so both projects can share the same major-version config file shape.

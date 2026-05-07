@@ -7,6 +7,7 @@ import { RouteList } from './components/RouteList';
 import { RouteModal } from './components/RouteModal';
 import { WsPushPanel, WsManualTarget } from './components/WsPushPanel';
 import { WsRuleModal } from './components/WsRuleModal';
+import { applyMockResponseTemplate, MOCK_RESPONSE_TEMPLATES } from '../../src/common/mockResponseTemplates';
 
 function useVscode(): VsCodeApi {
   try {
@@ -435,6 +436,14 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
       setMockDraft({ ...mockDraft, mockData: JSON.stringify(parseJsonSmart(mockDraft.mockData ?? ''), null, 2) });
     } catch (e) {
       alert(`${t('ui.jsonInvalid') || 'Invalid JSON'}: ${(e as Error)?.message || String(e)}`);
+    }
+  };
+
+  const applyMockTemplate = (templateId: string) => {
+    if (!mockDraft) return;
+    const nextDraft = applyMockResponseTemplate(mockDraft, templateId);
+    if (nextDraft) {
+      setMockDraft(nextDraft);
     }
   };
 
@@ -1334,6 +1343,8 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
         onSave={onSaveMock}
         onFormat={formatMock}
         onCancel={() => setShowMockModal(false)}
+        templates={MOCK_RESPONSE_TEMPLATES}
+        onApplyTemplate={applyMockTemplate}
         isEdit={editingMockIndex !== null}
         labels={{
           titleAdd: t('ui.addMockApi') || 'Add Mock',
@@ -1346,6 +1357,10 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
           path: t('ui.path') || 'Path',
           statusCode: t('ui.statusCode') || 'Status',
           delay: t('ui.delay') || 'Delay',
+          template: t('ui.mockTemplate') || 'Response Template',
+          templateHint: t('ui.mockTemplateHint') || 'Choose a built-in response shape and apply it to the editable Mock Data field.',
+          applyTemplate: t('ui.applyTemplate') || 'Apply Template',
+          templateLabels: Object.fromEntries(MOCK_RESPONSE_TEMPLATES.map(template => [template.id, t(template.labelKey) || template.id])),
           responseBody: t('ui.responseBody') || 'Response Body (JSON)',
           format: t('ui.format') || 'Format',
           cancel: t('ui.cancel') || 'Cancel',

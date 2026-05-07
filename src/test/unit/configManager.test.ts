@@ -221,6 +221,26 @@ describe('ConfigManager 4.0', () => {
         expect(cfg.proxyGroups[0].routes?.find(route => route.id === 'route-2')?.mockApis).to.have.length(0);
     });
 
+    it('keeps old mock api config serialization free of template metadata', async () => {
+        const cm = createManager();
+        const groupId = cm.getConfig().proxyGroups[0].id;
+        const routeId = cm.getConfig().proxyGroups[0].routes?.[0].id || '';
+
+        await cm.addMockApi(groupId, routeId, {
+            path: '/template-free',
+            enabled: true,
+            mockData: '{"code":0,"message":"success","data":{}}',
+            method: 'GET',
+            statusCode: 200,
+        });
+
+        const saved = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        const savedMock = saved.proxyGroups[0].routes[0].mockApis[0];
+
+        expect(savedMock.mockData).to.equal('{"code":0,"message":"success","data":{}}');
+        expect(savedMock).to.not.have.property('templateId');
+    });
+
     it('saves a 4.0-compatible file shape with routes', async () => {
         const cm = createManager();
         const cfg = cm.getConfig();

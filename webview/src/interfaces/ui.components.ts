@@ -1,5 +1,6 @@
 import type { GroupDraft, HttpRoute, MockApiConfig, MockApiDraft, ProxyGroup, RouteDraft, WsRule } from './business';
 import type { GroupSummary } from './ui';
+import type { MockResponseTemplate } from '../../../src/common/mockResponseTemplates';
 
 export interface GroupListProps {
   groups: GroupSummary[];
@@ -117,6 +118,8 @@ export interface MockModalProps {
   onSave: () => void;
   onFormat: () => void;
   onCancel: () => void;
+  templates: MockResponseTemplate[];
+  onApplyTemplate: (templateId: string) => void;
   labels: {
     titleAdd: string;
     titleEdit: string;
@@ -127,6 +130,10 @@ export interface MockModalProps {
     path: string;
     statusCode: string;
     delay: string;
+    template: string;
+    templateHint: string;
+    applyTemplate: string;
+    templateLabels: Record<string, string>;
     responseBody: string;
     format: string;
     cancel?: string;

@@ -114,6 +114,7 @@ Add mock APIs to each group:
 - **HTTP Method**: ALL, GET, POST, PUT, DELETE, PATCH
 - **Status Code**: HTTP response status code (default: 200)
 - **Delay (ms)**: Simulate network delay (default: 0)
+- **Response Template**: Optional built-in success, pagination, empty, error, or auth-expired JSON shape
 - **Mock Data**: Response data in JSON format
 - **Enabled**: Whether to enable this mock configuration
 - **Use Global Cookie**: Include the configured global cookie in response
@@ -328,6 +329,22 @@ sessionId=abc123; userId=456; token=xyz789
 ```
 
 Then check "Use Global Cookie" for mock APIs that need cookies, and the response will automatically include `Set-Cookie` header.
+
+### Mock Response Templates
+
+When creating or editing a Mock API, choose a response template and click **Apply Template** to replace the editable Mock Data area. The template does not change the HTTP status code or any other Mock settings, and the JSON can still be edited, formatted, validated, and saved through the existing minify flow.
+
+Built-in templates:
+
+```json
+{
+    "success": {"code":0,"message":"success","data":{}},
+    "pagination": {"code":0,"message":"success","data":{"list":[],"total":0,"pageNum":1,"pageSize":10}},
+    "empty": {"code":0,"message":"success","data":null},
+    "error": {"code":500,"message":"Internal Server Error","data":null},
+    "auth expired": {"code":401,"message":"Unauthorized","data":null}
+}
+```
 
 ### CORS Support
 

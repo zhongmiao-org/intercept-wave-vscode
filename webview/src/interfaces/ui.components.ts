@@ -58,7 +58,7 @@ export interface RouteListProps {
     enableMock: string;
     disableMock: string;
     rewriteTargetPath?: string;
-    spaFallback?: string;
+    spaFallbackPath?: string;
     mocksLabel?: string;
   };
 }
@@ -159,8 +159,8 @@ export interface RouteModalProps {
     stripPrefix: string;
     rewriteTargetPath: string;
     rewriteTargetPathHint: string;
-    spaFallback: string;
-    spaFallbackHint: string;
+    spaFallbackPath: string;
+    spaFallbackPathHint: string;
     enableMock: string;
     yesLabel: string;
     noLabel: string;

@@ -65,7 +65,7 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
                     {(labels.rewriteTargetPath || 'Rewrite')} {route.rewriteTargetPath}
                   </span>
                 )}
-                {route.spaFallback && (
+                {route.spaFallbackPath && (
                   <span style={{
                     fontSize: 11,
                     padding: '2px 6px',
@@ -73,7 +73,7 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
                     background: 'color-mix(in srgb, var(--vscode-charts-blue) 18%, transparent)',
                     color: 'var(--vscode-foreground)',
                   }}>
-                    {labels.spaFallback || 'SPA fallback'}
+                    {labels.spaFallbackPath || 'SPA fallback'} {route.spaFallbackPath}
                   </span>
                 )}
               </div>

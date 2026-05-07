@@ -6,8 +6,10 @@
 
 ### Added
 
+- Added nginx-like local gateway migration recipes for frontend dev servers, backend routes, path rewrites, and SPA fallback.
+- Added English and Chinese usage guides aligned with the sibling `intercept-wave` project.
 - Added built-in Mock response templates for success, pagination, empty data, error, and auth-expired payloads.
-- Added frontend dev-server proxy support for `/` HTTP routes, including explicit route-level `spaFallback` handling for SPA deep-link refreshes.
+- Added frontend dev-server proxy support for `/` HTTP routes, including explicit route-level `spaFallbackPath` handling for SPA deep-link refreshes.
 - Added HTTP route rewrite rules with `rewriteTargetPath`, applied after `stripPrefix` for both Mock matching and upstream forwarding while preserving query strings.
 
 ## [4.0.0]

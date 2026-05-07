@@ -366,38 +366,73 @@ Access-Control-Allow-Headers: Content-Type, Authorization
 - 请求体(对于 POST/PUT 等)
 - Cookie(如果有)
 
-### 前端开发服务代理与 SPA 回退
+### 本地网关 / Nginx 迁移
 
-可以用一条 API 路由加一条 `/` 前端路由替代常见的本地 nginx 配置:
+Intercept Wave 可以在本地开发阶段替代常见 nginx 反向代理配置，便于在 VS Code 内统一调试、Mock 和转发。它是本地开发网关，不是生产 nginx 替代品。
 
-```json
-{
-    "routes": [
-        {
-            "name": "API",
-            "pathPrefix": "/api",
-            "targetBaseUrl": "http://localhost:9000",
-            "stripPrefix": true,
-            "rewriteTargetPath": "",
-            "spaFallback": false,
-            "enableMock": true,
-            "mockApis": []
-        },
-        {
-            "name": "Frontend",
-            "pathPrefix": "/",
-            "targetBaseUrl": "http://localhost:5173",
-            "stripPrefix": false,
-            "rewriteTargetPath": "",
-            "spaFallback": true,
-            "enableMock": false,
-            "mockApis": []
-        }
-    ]
+典型的前端 + 后端 nginx 配置：
+
+```nginx
+server {
+  listen 8888;
+
+  location /api/ {
+    proxy_pass http://localhost:9000/;
+  }
+
+  location / {
+    proxy_pass http://localhost:5173/;
+    try_files $uri /index.html;
+  }
 }
 ```
 
-`/api/users` 等请求仍会命中更长的 `/api` 路由，可继续 Mock 或转发到后端。`/`、`/assets/app.js`、`/dashboard/settings` 等前端路径会命中 `/` 路由。启用 `spaFallback` 后，导航类请求遇到上游 `404` 会重试 `/index.html`，从而支持刷新 SPA 深链接。
+等价的 Intercept Wave HTTP 路由：
+
+```json
+[
+  {
+    "name": "API",
+    "pathPrefix": "/api",
+    "targetBaseUrl": "http://localhost:9000",
+    "stripPrefix": true,
+    "rewriteTargetPath": "",
+    "spaFallbackPath": "",
+    "enableMock": true,
+    "mockApis": []
+  },
+  {
+    "name": "Frontend",
+    "pathPrefix": "/",
+    "targetBaseUrl": "http://localhost:5173",
+    "stripPrefix": false,
+    "rewriteTargetPath": "",
+    "spaFallbackPath": "/index.html",
+    "enableMock": false,
+    "mockApis": []
+  }
+]
+```
+
+这适用于 Vite、Next、Webpack 等前端开发服务器：`/api/users` 进入后端路由，`/`、`/assets/app.js`、`/dashboard/settings` 进入前端开发服务器。浏览器刷新 `/dashboard/settings` 遇到上游 404 时，前端路由可通过 `spaFallbackPath` 重试 `/index.html`。
+
+多后端微服务可按前缀拆分多条路由，并依赖最长前缀匹配：
+
+```json
+[
+  { "name": "API", "pathPrefix": "/api", "targetBaseUrl": "http://localhost:9000", "stripPrefix": true, "rewriteTargetPath": "", "spaFallbackPath": "", "enableMock": true, "mockApis": [] },
+  { "name": "Auth", "pathPrefix": "/auth", "targetBaseUrl": "http://localhost:9010", "stripPrefix": true, "rewriteTargetPath": "", "spaFallbackPath": "", "enableMock": true, "mockApis": [] },
+  { "name": "Admin API", "pathPrefix": "/admin-api", "targetBaseUrl": "http://localhost:9020", "stripPrefix": true, "rewriteTargetPath": "", "spaFallbackPath": "", "enableMock": true, "mockApis": [] },
+  { "name": "Frontend", "pathPrefix": "/", "targetBaseUrl": "http://localhost:5173", "stripPrefix": false, "rewriteTargetPath": "", "spaFallbackPath": "/index.html", "enableMock": false, "mockApis": [] }
+]
+```
+
+路径重写遵循 nginx-like 本地网关语义：
+
+- `pathPrefix="/api"`，`stripPrefix=true`：`/api/users` 会按 `/users` 进行 Mock 匹配与转发
+- `pathPrefix="/backend"`，`stripPrefix=true`，`rewriteTargetPath="/v1"`：`/backend/users` 会按 `/v1/users` 进行 Mock 匹配与转发
+
+静态 `dist/` 文件服务由 [#42](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/42) 跟进，route 级请求/响应头覆盖由 [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44) 跟进，HTTPS 监听支持由 [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40) 跟进。跨平台 roadmap 链接：VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39)、IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150)、IntelliJ 文档对应 issue [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157)。
 
 ## 重要提示
 

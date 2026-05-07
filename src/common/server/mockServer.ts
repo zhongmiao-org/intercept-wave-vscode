@@ -40,7 +40,7 @@ export class MockServerManager {
                 targetBaseUrl: group.baseUrl || 'http://localhost:8080',
                 stripPrefix: group.stripPrefix,
                 rewriteTargetPath: '',
-                spaFallback: false,
+                spaFallbackPath: '',
                 enableMock: true,
                 mockApis: group.mockApis || [],
             },
@@ -328,7 +328,7 @@ export class MockServerManager {
                 targetBaseUrl: route.targetBaseUrl,
                 stripPrefix: route.stripPrefix,
                 rewriteTargetPath: route.rewriteTargetPath || '',
-                spaFallback: route.spaFallback === true,
+                spaFallbackPath: route.spaFallbackPath || '',
                 enableMock: route.enableMock,
                 mockApis: {
                     total: route.mockApis.length,
@@ -513,13 +513,14 @@ export class MockServerManager {
         originalRequestPath: string,
         isSpaFallbackRetry: boolean
     ): boolean {
-        if (!route.spaFallback || isSpaFallbackRetry || (proxyRes.statusCode || 0) !== 404) {
+        if (!route.spaFallbackPath || isSpaFallbackRetry || (proxyRes.statusCode || 0) !== 404) {
             return false;
         }
         if (!this.isBodylessMethod(req.method)) {
             return false;
         }
-        if (originalRequestPath === '/index.html' || originalRequestPath.endsWith('/index.html')) {
+        const fallbackPath = computeHttpSpaFallbackPath(route);
+        if (!fallbackPath || originalRequestPath === fallbackPath) {
             return false;
         }
         if (this.hasFileExtension(originalRequestPath)) {

@@ -54,9 +54,7 @@ export function computeHttpForwardPath(route: HttpRoute, requestPath: string): s
 }
 
 export function computeHttpSpaFallbackPath(route: HttpRoute): string {
-    const prefix = normalizePathPrefix(route.pathPrefix);
-    const fallbackRequestPath = prefix === '/' ? '/index.html' : `${prefix}/index.html`;
-    return computeHttpRoutePath(route, fallbackRequestPath);
+    return normalizeSpaFallbackPath(route.spaFallbackPath);
 }
 
 export function isRootHttpRoute(route: HttpRoute): boolean {
@@ -97,4 +95,10 @@ function normalizeRewriteTargetPath(path?: string): string | undefined {
     const trimmed = path.trim();
     const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
     return withLeadingSlash.replace(/\/+$/, '') || '/';
+}
+
+function normalizeSpaFallbackPath(path?: string): string {
+    if (!path || path.trim() === '') return '';
+    const trimmed = path.trim();
+    return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }

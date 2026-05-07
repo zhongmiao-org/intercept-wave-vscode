@@ -15,7 +15,7 @@ export interface HttpRoute {
   targetBaseUrl: string;
   stripPrefix: boolean;
   rewriteTargetPath?: string;
-  spaFallback?: boolean;
+  spaFallbackPath?: string;
   enableMock: boolean;
   mockApis: MockApiConfig[];
 }
@@ -99,5 +99,5 @@ export type MockApiDraft = Pick<
 
 export type RouteDraft = Pick<
   HttpRoute,
-  'name' | 'pathPrefix' | 'targetBaseUrl' | 'stripPrefix' | 'rewriteTargetPath' | 'spaFallback' | 'enableMock'
+  'name' | 'pathPrefix' | 'targetBaseUrl' | 'stripPrefix' | 'rewriteTargetPath' | 'spaFallbackPath' | 'enableMock'
 >;

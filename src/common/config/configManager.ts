@@ -236,10 +236,19 @@ export class ConfigManager {
             targetBaseUrl: route?.targetBaseUrl || 'http://localhost:8080',
             stripPrefix: route?.stripPrefix !== undefined ? route.stripPrefix : true,
             rewriteTargetPath: typeof route?.rewriteTargetPath === 'string' ? route.rewriteTargetPath.trim() : '',
-            spaFallback: route?.spaFallback === true,
+            spaFallbackPath: this.normalizeSpaFallbackPath(route),
             enableMock: route?.enableMock !== undefined ? route.enableMock : true,
             mockApis: this.normalizeMockApis(route?.mockApis),
         };
+    }
+
+    private normalizeSpaFallbackPath(route: Partial<HttpRoute> | null | undefined): string {
+        if (typeof route?.spaFallbackPath === 'string') {
+            const trimmed = route.spaFallbackPath.trim();
+            if (!trimmed) return '';
+            return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+        }
+        return '';
     }
 
     private normalizeMockApis(mockApis: any): MockApiConfig[] {
@@ -309,7 +318,7 @@ export class ConfigManager {
             targetBaseUrl: source?.baseUrl || 'http://localhost:8080',
             stripPrefix: source?.stripPrefix !== undefined ? source.stripPrefix : true,
             rewriteTargetPath: '',
-            spaFallback: false,
+            spaFallbackPath: '',
             enableMock: true,
             mockApis: this.normalizeMockApis(source?.mockApis),
         };

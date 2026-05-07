@@ -349,6 +349,39 @@ Access-Control-Allow-Headers: Content-Type, Authorization
 - 请求体(对于 POST/PUT 等)
 - Cookie(如果有)
 
+### 前端开发服务代理与 SPA 回退
+
+可以用一条 API 路由加一条 `/` 前端路由替代常见的本地 nginx 配置:
+
+```json
+{
+    "routes": [
+        {
+            "name": "API",
+            "pathPrefix": "/api",
+            "targetBaseUrl": "http://localhost:9000",
+            "stripPrefix": true,
+            "rewriteTargetPath": "",
+            "spaFallback": false,
+            "enableMock": true,
+            "mockApis": []
+        },
+        {
+            "name": "Frontend",
+            "pathPrefix": "/",
+            "targetBaseUrl": "http://localhost:5173",
+            "stripPrefix": false,
+            "rewriteTargetPath": "",
+            "spaFallback": true,
+            "enableMock": false,
+            "mockApis": []
+        }
+    ]
+}
+```
+
+`/api/users` 等请求仍会命中更长的 `/api` 路由，可继续 Mock 或转发到后端。`/`、`/assets/app.js`、`/dashboard/settings` 等前端路径会命中 `/` 路由。启用 `spaFallback` 后，导航类请求遇到上游 `404` 会重试 `/index.html`，从而支持刷新 SPA 深链接。
+
 ## 重要提示
 
 1. **端口占用**:确保配置的端口没有被其他程序占用

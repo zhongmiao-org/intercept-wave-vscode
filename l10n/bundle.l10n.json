@@ -94,6 +94,8 @@
   "ui.enableMock": "Enable Mock",
   "ui.rewriteTargetPath": "Rewrite Target Path",
   "ui.rewriteTargetPathHint": "Optional path base applied after strip-prefix, for example /v1 rewrites /backend/users to /v1/users.",
+  "ui.spaFallback": "SPA Fallback",
+  "ui.spaFallbackHint": "Retry /index.html for navigation 404s so frontend deep links can refresh.",
   "ui.cookieUsed": "Cookie",
   "ui.cookieUnused": "No cookie",
   "ui.routeModalHint": "Configure how this local prefix maps to an upstream service. Press Cmd/Ctrl + Enter to save.",

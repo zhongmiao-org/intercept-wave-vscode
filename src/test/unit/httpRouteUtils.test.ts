@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import {
     computeHttpForwardPath,
     computeHttpMatchPath,
+    computeHttpSpaFallbackPath,
     selectHttpRoute,
     shouldServeRouteWelcomePage,
 } from '../../common';
@@ -40,7 +41,9 @@ describe('httpRouteUtils', () => {
     it('selects the longest matching route and falls back when there is one route', () => {
         const group = { routes: [routeRoot, routeApi, routeApiV2] } as any;
         expect(selectHttpRoute(group, '/api/v2/users')?.id).to.equal('r2');
+        expect(selectHttpRoute(group, '/api')?.id).to.equal('r1');
         expect(selectHttpRoute(group, '/docs')?.id).to.equal('r0');
+        expect(selectHttpRoute(group, '/dashboard/settings')?.id).to.equal('r0');
         expect(selectHttpRoute({ routes: [routeApi] } as any, '/no-match')?.id).to.equal('r1');
     });
 
@@ -76,6 +79,13 @@ describe('httpRouteUtils', () => {
 
     it('treats root rewrite target path as no extra rewrite base', () => {
         expect(computeHttpForwardPath({ ...routeApi, rewriteTargetPath: '/' } as any, '/api/users')).to.equal('/users');
+    });
+
+    it('computes SPA fallback target paths through the same strip and rewrite rules', () => {
+        expect(computeHttpSpaFallbackPath(routeRoot as any)).to.equal('/index.html');
+        expect(computeHttpSpaFallbackPath(routeApi as any)).to.equal('/index.html');
+        expect(computeHttpSpaFallbackPath({ ...routeApi, stripPrefix: false } as any)).to.equal('/api/index.html');
+        expect(computeHttpSpaFallbackPath({ ...routeApi, rewriteTargetPath: '/app' } as any)).to.equal('/app/index.html');
     });
 
     it('serves welcome page only for stripped non-root prefixes', () => {

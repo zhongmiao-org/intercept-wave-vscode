@@ -94,6 +94,8 @@
   "ui.enableMock": "启用 Mock",
   "ui.rewriteTargetPath": "重写目标路径",
   "ui.rewriteTargetPathHint": "可选：剥离前缀后追加的目标路径基底，例如 /v1 会将 /backend/users 重写为 /v1/users。",
+  "ui.spaFallback": "SPA 回退",
+  "ui.spaFallbackHint": "导航请求返回 404 时重试 /index.html，让前端深链接刷新仍可进入应用。",
   "ui.cookieUsed": "携带 Cookie",
   "ui.cookieUnused": "不携带 Cookie",
   "ui.routeModalHint": "配置当前本地前缀如何映射到上游服务。按 Cmd/Ctrl + Enter 可直接保存。",

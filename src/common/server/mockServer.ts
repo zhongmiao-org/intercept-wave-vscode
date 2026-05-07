@@ -9,7 +9,9 @@ import { WsManualTarget } from '../types';
 import { WsServerManager } from './wsServer';
 import {
     computeHttpForwardPath,
+    computeHttpSpaFallbackPath,
     computeHttpMatchPath,
+    isRootHttpRoute,
     selectHttpRoute,
     shouldServeRouteWelcomePage,
 } from './httpRouteUtils';
@@ -38,6 +40,7 @@ export class MockServerManager {
                 targetBaseUrl: group.baseUrl || 'http://localhost:8080',
                 stripPrefix: group.stripPrefix,
                 rewriteTargetPath: '',
+                spaFallback: false,
                 enableMock: true,
                 mockApis: group.mockApis || [],
             },
@@ -251,16 +254,12 @@ export class MockServerManager {
         res: http.ServerResponse,
         group: ProxyGroup
     ): Promise<void> {
-        const requestPath = req.url || '/';
+        const requestUrl = req.url || '/';
+        const queryIndex = requestUrl.indexOf('?');
+        const requestPath = (queryIndex >= 0 ? requestUrl.slice(0, queryIndex) : requestUrl) || '/';
         const method = req.method || 'GET';
 
-        this.outputChannel.appendLine(`📥 [${group.name}] ${method} ${requestPath}`);
-
-        // Handle root path - welcome page
-        if (requestPath === '/' || requestPath === '') {
-            this.handleWelcomePage(res, group);
-            return;
-        }
+        this.outputChannel.appendLine(`📥 [${group.name}] ${method} ${requestUrl}`);
 
         // Handle OPTIONS request (CORS preflight)
         if (method === 'OPTIONS') {
@@ -272,6 +271,11 @@ export class MockServerManager {
         }
 
         const route = selectHttpRoute({ ...group, routes: this.getHttpRoutes(group) }, requestPath);
+        if ((requestPath === '/' || requestPath === '') && (!route || !isRootHttpRoute(route))) {
+            this.handleWelcomePage(res, group);
+            return;
+        }
+
         if (!route) {
             this.sendErrorResponse(res, 502, 'Bad Gateway: No matching route configured');
             return;
@@ -324,6 +328,7 @@ export class MockServerManager {
                 targetBaseUrl: route.targetBaseUrl,
                 stripPrefix: route.stripPrefix,
                 rewriteTargetPath: route.rewriteTargetPath || '',
+                spaFallback: route.spaFallback === true,
                 enableMock: route.enableMock,
                 mockApis: {
                     total: route.mockApis.length,
@@ -398,11 +403,28 @@ export class MockServerManager {
         route: HttpRoute
     ): void {
         const requestUrl = req.url || '/';
-        const [requestPath, queryString] = requestUrl.split('?', 2);
-        const forwardPath = computeHttpForwardPath(route, requestPath || '/');
-        const targetUrl = `${route.targetBaseUrl.replace(/\/$/, '')}${forwardPath}${queryString ? `?${queryString}` : ''}`;
+        const queryIndex = requestUrl.indexOf('?');
+        const requestPath = queryIndex >= 0 ? requestUrl.slice(0, queryIndex) : requestUrl;
+        const queryString = queryIndex >= 0 ? requestUrl.slice(queryIndex + 1) : undefined;
+        const targetUrl = this.buildTargetUrl(route, computeHttpForwardPath(route, requestPath || '/'), queryString);
         this.outputChannel.appendLine(`   ⏩ Forwarding to: ${targetUrl}`);
 
+        this.proxyToTarget(req, res, route, targetUrl, requestPath || '/', queryString);
+    }
+
+    private buildTargetUrl(route: HttpRoute, forwardPath: string, queryString?: string): string {
+        return `${route.targetBaseUrl.replace(/\/$/, '')}${forwardPath}${queryString !== undefined ? `?${queryString}` : ''}`;
+    }
+
+    private proxyToTarget(
+        req: http.IncomingMessage,
+        res: http.ServerResponse,
+        route: HttpRoute,
+        targetUrl: string,
+        originalRequestPath: string,
+        queryString?: string,
+        isSpaFallbackRetry: boolean = false
+    ): void {
         let url: URL;
         try {
             url = new URL(targetUrl);
@@ -433,6 +455,15 @@ export class MockServerManager {
         };
 
         const proxyReq = httpModule.request(options, proxyRes => {
+            if (this.shouldRetrySpaFallback(route, req, proxyRes, originalRequestPath, isSpaFallbackRetry)) {
+                proxyRes.resume();
+                const fallbackPath = computeHttpSpaFallbackPath(route);
+                const fallbackTargetUrl = this.buildTargetUrl(route, fallbackPath, queryString);
+                this.outputChannel.appendLine(`   ↩ SPA fallback retry: ${fallbackTargetUrl}`);
+                this.proxyToTarget(req, res, route, fallbackTargetUrl, originalRequestPath, queryString, true);
+                return;
+            }
+
             // Copy response headers (excluding problematic ones)
             Object.keys(proxyRes.headers).forEach(key => {
                 if (
@@ -466,7 +497,46 @@ export class MockServerManager {
         });
 
         // Forward request body
-        req.pipe(proxyReq);
+        if (this.isBodylessMethod(req.method)) {
+            if (typeof (proxyReq as any).end === 'function') {
+                proxyReq.end();
+            }
+        } else {
+            req.pipe(proxyReq);
+        }
+    }
+
+    private shouldRetrySpaFallback(
+        route: HttpRoute,
+        req: http.IncomingMessage,
+        proxyRes: http.IncomingMessage,
+        originalRequestPath: string,
+        isSpaFallbackRetry: boolean
+    ): boolean {
+        if (!route.spaFallback || isSpaFallbackRetry || (proxyRes.statusCode || 0) !== 404) {
+            return false;
+        }
+        if (!this.isBodylessMethod(req.method)) {
+            return false;
+        }
+        if (originalRequestPath === '/index.html' || originalRequestPath.endsWith('/index.html')) {
+            return false;
+        }
+        if (this.hasFileExtension(originalRequestPath)) {
+            return false;
+        }
+        const accept = String(req.headers.accept || '').toLowerCase();
+        return accept === '' || accept.includes('text/html') || accept.includes('application/xhtml+xml') || accept.includes('*/*');
+    }
+
+    private isBodylessMethod(method?: string): boolean {
+        const normalized = (method || 'GET').toUpperCase();
+        return normalized === 'GET' || normalized === 'HEAD';
+    }
+
+    private hasFileExtension(requestPath: string): boolean {
+        const lastSegment = requestPath.split('/').pop() || '';
+        return /\.[A-Za-z0-9]+$/.test(lastSegment);
     }
 
     private sendCorsHeaders(res: http.ServerResponse): void {

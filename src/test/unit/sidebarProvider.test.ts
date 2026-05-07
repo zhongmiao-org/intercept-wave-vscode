@@ -295,6 +295,7 @@ describe('SidebarProvider 4.0', () => {
             targetBaseUrl: 'http://localhost:8081',
             stripPrefix: true,
             rewriteTargetPath: '/v2',
+            spaFallback: true,
             enableMock: false,
         });
 
@@ -306,6 +307,7 @@ describe('SidebarProvider 4.0', () => {
             targetBaseUrl: 'http://localhost:8081',
             stripPrefix: true,
             rewriteTargetPath: '/v2',
+            spaFallback: true,
             enableMock: false,
         });
     });

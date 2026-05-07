@@ -236,6 +236,7 @@ export class ConfigManager {
             targetBaseUrl: route?.targetBaseUrl || 'http://localhost:8080',
             stripPrefix: route?.stripPrefix !== undefined ? route.stripPrefix : true,
             rewriteTargetPath: typeof route?.rewriteTargetPath === 'string' ? route.rewriteTargetPath.trim() : '',
+            spaFallback: route?.spaFallback === true,
             enableMock: route?.enableMock !== undefined ? route.enableMock : true,
             mockApis: this.normalizeMockApis(route?.mockApis),
         };
@@ -308,6 +309,7 @@ export class ConfigManager {
             targetBaseUrl: source?.baseUrl || 'http://localhost:8080',
             stripPrefix: source?.stripPrefix !== undefined ? source.stripPrefix : true,
             rewriteTargetPath: '',
+            spaFallback: false,
             enableMock: true,
             mockApis: this.normalizeMockApis(source?.mockApis),
         };

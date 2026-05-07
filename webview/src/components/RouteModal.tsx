@@ -1,8 +1,90 @@
 import React from 'react';
+import type { HeaderOverrideRule, HeaderRuleOperation } from '../interfaces/business';
 import type { RouteModalProps } from '../interfaces/ui.components';
 
 export function RouteModal({ open, draft, onChange, onSave, onCancel, labels, isEdit }: RouteModalProps) {
   if (!open) return null;
+
+  const createHeaderRule = (): HeaderOverrideRule => ({
+    name: '',
+    value: '',
+    operation: 'set',
+    enabled: true,
+  });
+
+  const updateHeaderRule = (kind: 'requestHeaders' | 'responseHeaders', index: number, patch: Partial<HeaderOverrideRule>) => {
+    const current = draft[kind] || [];
+    onChange({
+      ...draft,
+      [kind]: current.map((rule, idx) => idx === index ? { ...rule, ...patch } : rule),
+    });
+  };
+
+  const addHeaderRule = (kind: 'requestHeaders' | 'responseHeaders') => {
+    onChange({ ...draft, [kind]: [...(draft[kind] || []), createHeaderRule()] });
+  };
+
+  const removeHeaderRule = (kind: 'requestHeaders' | 'responseHeaders', index: number) => {
+    onChange({ ...draft, [kind]: (draft[kind] || []).filter((_, idx) => idx !== index) });
+  };
+
+  const renderHeaderRules = (kind: 'requestHeaders' | 'responseHeaders', title: string) => {
+    const rules = draft[kind] || [];
+    return (
+      <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 8, paddingTop: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--vscode-descriptionForeground)' }}>{title}</div>
+          <div style={{ flex: 1 }} />
+          <button type="button" onClick={() => addHeaderRule(kind)}>{labels.addHeaderRule}</button>
+        </div>
+        <div style={{ display: 'grid', gap: 6 }}>
+          {rules.map((rule, index) => (
+            <div
+              key={`${kind}-${index}`}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(78px, 96px) minmax(120px, 1fr) minmax(120px, 1fr) auto auto',
+                gap: 6,
+                alignItems: 'center',
+              }}
+            >
+              <select
+                aria-label={labels.headerOperation}
+                value={rule.operation}
+                onChange={e => updateHeaderRule(kind, index, { operation: e.target.value as HeaderRuleOperation })}
+              >
+                <option value="set">{labels.headerOpSet}</option>
+                <option value="add">{labels.headerOpAdd}</option>
+                <option value="remove">{labels.headerOpRemove}</option>
+              </select>
+              <input
+                aria-label={labels.headerName}
+                value={rule.name}
+                placeholder="Authorization"
+                onChange={e => updateHeaderRule(kind, index, { name: e.target.value })}
+              />
+              <input
+                aria-label={labels.headerValue}
+                value={rule.value}
+                placeholder="Bearer token"
+                disabled={rule.operation === 'remove'}
+                onChange={e => updateHeaderRule(kind, index, { value: e.target.value })}
+              />
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                <input
+                  type="checkbox"
+                  checked={rule.enabled}
+                  onChange={e => updateHeaderRule(kind, index, { enabled: e.target.checked })}
+                />
+                {labels.headerRuleEnabled}
+              </label>
+              <button type="button" onClick={() => removeHeaderRule(kind, index)}>{labels.delete}</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -54,6 +136,13 @@ export function RouteModal({ open, draft, onChange, onSave, onCancel, labels, is
             <input type="checkbox" checked={draft.enableMock} onChange={e => onChange({ ...draft, enableMock: e.target.checked })} />
             <span>{draft.enableMock ? labels.yesLabel : labels.noLabel}</span>
           </div>
+
+          <div style={{ gridColumn: '1 / -1', marginTop: 4, borderTop: '1px solid var(--vscode-panel-border)', paddingTop: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--vscode-descriptionForeground)', marginBottom: 4 }}>{labels.headerOverrides}</div>
+            <div style={{ fontSize: 11.5, lineHeight: 1.35, color: 'var(--vscode-descriptionForeground)' }}>{labels.headerRestrictedHint}</div>
+          </div>
+          {renderHeaderRules('requestHeaders', labels.requestHeaders)}
+          {renderHeaderRules('responseHeaders', labels.responseHeaders)}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
           <button onClick={onCancel}>{labels.cancel}</button>

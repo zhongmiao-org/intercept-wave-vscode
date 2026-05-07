@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { HttpRoute, MockApiConfig, MockConfig, ProxyGroup } from '../interfaces';
+import { HeaderOverrideRule, HeaderRuleOperation, HttpRoute, MockApiConfig, MockConfig, ProxyGroup } from '../interfaces';
 import { parseJsonTolerant, stringifyCompact } from '../utils';
 import { v4 as uuidv4 } from 'uuid';
 import * as pkg from '../../../package.json';
@@ -237,8 +237,30 @@ export class ConfigManager {
             stripPrefix: route?.stripPrefix !== undefined ? route.stripPrefix : true,
             rewriteTargetPath: typeof route?.rewriteTargetPath === 'string' ? route.rewriteTargetPath.trim() : '',
             enableMock: route?.enableMock !== undefined ? route.enableMock : true,
+            requestHeaders: this.normalizeHeaderRules(route?.requestHeaders),
+            responseHeaders: this.normalizeHeaderRules(route?.responseHeaders),
             mockApis: this.normalizeMockApis(route?.mockApis),
         };
+    }
+
+    private normalizeHeaderRules(rules: any): HeaderOverrideRule[] {
+        if (!Array.isArray(rules)) {
+            return [];
+        }
+
+        return rules
+            .filter(Boolean)
+            .map(rule => {
+                const operation = String(rule.operation || 'set').toLowerCase();
+                const normalizedOperation: HeaderRuleOperation =
+                    operation === 'add' || operation === 'remove' ? operation : 'set';
+                return {
+                    name: typeof rule.name === 'string' ? rule.name.trim() : '',
+                    value: rule.value !== undefined && rule.value !== null ? String(rule.value) : '',
+                    operation: normalizedOperation,
+                    enabled: rule.enabled !== undefined ? Boolean(rule.enabled) : true,
+                };
+            });
     }
 
     private normalizeMockApis(mockApis: any): MockApiConfig[] {
@@ -309,6 +331,8 @@ export class ConfigManager {
             stripPrefix: source?.stripPrefix !== undefined ? source.stripPrefix : true,
             rewriteTargetPath: '',
             enableMock: true,
+            requestHeaders: [],
+            responseHeaders: [],
             mockApis: this.normalizeMockApis(source?.mockApis),
         };
     }

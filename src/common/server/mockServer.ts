@@ -4,7 +4,7 @@ import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
 import { selectBestMockApiForRequest } from './pathMatcher';
-import { HttpRoute, MockApiConfig, ProxyGroup, WsRule } from '../interfaces';
+import { HeaderOverrideRule, HttpRoute, MockApiConfig, ProxyGroup, WsRule } from '../interfaces';
 import { WsManualTarget } from '../types';
 import { WsServerManager } from './wsServer';
 import {
@@ -13,6 +13,19 @@ import {
     selectHttpRoute,
     shouldServeRouteWelcomePage,
 } from './httpRouteUtils';
+
+const RESTRICTED_HEADER_NAMES = [
+    'connection',
+    'content-length',
+    'transfer-encoding',
+    'keep-alive',
+    'upgrade',
+    'te',
+    'trailer',
+];
+
+const REQUEST_RESTRICTED_HEADERS = new Set(RESTRICTED_HEADER_NAMES);
+const RESPONSE_RESTRICTED_HEADERS = new Set(RESTRICTED_HEADER_NAMES);
 
 export class MockServerManager {
     private readonly httpServers: Map<string, http.Server> = new Map(); // groupId -> HTTP server
@@ -39,6 +52,8 @@ export class MockServerManager {
                 stripPrefix: group.stripPrefix,
                 rewriteTargetPath: '',
                 enableMock: true,
+                requestHeaders: [],
+                responseHeaders: [],
                 mockApis: group.mockApis || [],
             },
         ];
@@ -262,16 +277,20 @@ export class MockServerManager {
             return;
         }
 
+        const route = selectHttpRoute({ ...group, routes: this.getHttpRoutes(group) }, requestPath);
+
         // Handle OPTIONS request (CORS preflight)
         if (method === 'OPTIONS') {
             this.sendCorsHeaders(res);
+            if (route) {
+                this.applyResponseHeaderRules(res, route.responseHeaders);
+            }
             res.writeHead(200);
             res.end();
             this.outputChannel.appendLine(`   ✓ CORS preflight handled`);
             return;
         }
 
-        const route = selectHttpRoute({ ...group, routes: this.getHttpRoutes(group) }, requestPath);
         if (!route) {
             this.sendErrorResponse(res, 502, 'Bad Gateway: No matching route configured');
             return;
@@ -288,7 +307,7 @@ export class MockServerManager {
         const mockApi = this.findMatchingMockApi(matchPath, method, route);
 
         if (route.enableMock && mockApi && mockApi.enabled) {
-            await this.handleMockResponse(res, mockApi, group);
+            await this.handleMockResponse(res, mockApi, group, route);
         } else {
             this.forwardToOriginalServer(req, res, route);
         }
@@ -324,6 +343,8 @@ export class MockServerManager {
                 targetBaseUrl: route.targetBaseUrl,
                 stripPrefix: route.stripPrefix,
                 rewriteTargetPath: route.rewriteTargetPath || '',
+                requestHeaders: route.requestHeaders || [],
+                responseHeaders: route.responseHeaders || [],
                 enableMock: route.enableMock,
                 mockApis: {
                     total: route.mockApis.length,
@@ -361,7 +382,8 @@ export class MockServerManager {
     private async handleMockResponse(
         res: http.ServerResponse,
         mockApi: MockApiConfig,
-        group: ProxyGroup
+        group: ProxyGroup,
+        route: HttpRoute
     ): Promise<void> {
         this.outputChannel.appendLine(`   📝 Mock API found: ${JSON.stringify(mockApi)}`);
 
@@ -378,6 +400,7 @@ export class MockServerManager {
         if (mockApi.useCookie && group.globalCookie) {
             res.setHeader('Set-Cookie', group.globalCookie);
         }
+        this.applyResponseHeaderRules(res, route.responseHeaders);
 
         // mockData is always a string (JetBrains plugin compatible format)
         const responseData = mockApi.mockData;
@@ -423,6 +446,7 @@ export class MockServerManager {
 
         const headers = { ...req.headers };
         delete headers.host;
+        this.applyRequestHeaderRules(headers, route.requestHeaders);
 
         const options: https.RequestOptions = {
             method: req.method,
@@ -448,6 +472,7 @@ export class MockServerManager {
 
             // Add CORS headers
             this.sendCorsHeaders(res);
+            this.applyResponseHeaderRules(res, route.responseHeaders);
 
             // Send response
             res.writeHead(proxyRes.statusCode || 200);
@@ -480,6 +505,78 @@ export class MockServerManager {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.writeHead(statusCode);
         res.end(errorJson);
+    }
+
+    private applyRequestHeaderRules(
+        headers: http.IncomingHttpHeaders,
+        rules: HeaderOverrideRule[] | undefined
+    ): void {
+        this.getEnabledHeaderRules(rules, REQUEST_RESTRICTED_HEADERS).forEach(rule => {
+            const existingKey = this.findHeaderKey(headers, rule.name);
+            if (rule.operation === 'remove') {
+                if (existingKey) delete headers[existingKey];
+                return;
+            }
+
+            const targetKey = existingKey || rule.name;
+            if (rule.operation === 'add' && existingKey && headers[existingKey] !== undefined) {
+                headers[existingKey] = this.appendHeaderValue(headers[existingKey], rule.value);
+                return;
+            }
+
+            headers[targetKey] = rule.value;
+        });
+    }
+
+    private applyResponseHeaderRules(
+        res: http.ServerResponse,
+        rules: HeaderOverrideRule[] | undefined
+    ): void {
+        this.getEnabledHeaderRules(rules, RESPONSE_RESTRICTED_HEADERS).forEach(rule => {
+            const existingKey = this.findResponseHeaderKey(res, rule.name);
+            if (rule.operation === 'remove') {
+                if (existingKey) res.removeHeader(existingKey);
+                return;
+            }
+
+            const targetKey = existingKey || rule.name;
+            if (rule.operation === 'add' && existingKey && res.hasHeader(existingKey)) {
+                res.setHeader(existingKey, this.appendHeaderValue(res.getHeader(existingKey), rule.value));
+                return;
+            }
+
+            res.setHeader(targetKey, rule.value);
+        });
+    }
+
+    private getEnabledHeaderRules(
+        rules: HeaderOverrideRule[] | undefined,
+        restrictedHeaders: Set<string>
+    ): HeaderOverrideRule[] {
+        return (rules || []).filter(rule => {
+            const name = rule?.name?.trim();
+            return Boolean(rule?.enabled && name && !restrictedHeaders.has(name.toLowerCase()));
+        });
+    }
+
+    private findHeaderKey(headers: http.IncomingHttpHeaders, name: string): string | undefined {
+        const lowerName = name.toLowerCase();
+        return Object.keys(headers).find(key => key.toLowerCase() === lowerName);
+    }
+
+    private findResponseHeaderKey(res: http.ServerResponse, name: string): string | undefined {
+        const lowerName = name.toLowerCase();
+        return res.getHeaderNames().find(key => key.toLowerCase() === lowerName);
+    }
+
+    private appendHeaderValue(current: string | number | string[] | undefined, value: string): string | string[] {
+        if (Array.isArray(current)) {
+            return [...current, value];
+        }
+        if (current === undefined) {
+            return value;
+        }
+        return `${current}, ${value}`;
     }
 
     private hasAnyWsServer(): boolean {

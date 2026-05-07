@@ -6,6 +6,7 @@
 
 ### Added
 
+- Added route-level request and response header override rules with `set`, `add`, and `remove` operations for local gateway auth, cache, CORS, and host simulation workflows.
 - Added HTTP route rewrite rules with `rewriteTargetPath`, applied after `stripPrefix` for both Mock matching and upstream forwarding while preserving query strings.
 
 ## [4.0.0]

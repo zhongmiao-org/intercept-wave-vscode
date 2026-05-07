@@ -70,6 +70,8 @@ describe('ConfigManager 4.0', () => {
             rewriteTargetPath: '',
             enableMock: true,
         });
+        expect(cfg.proxyGroups[0].routes?.[0].requestHeaders).to.deep.equal([]);
+        expect(cfg.proxyGroups[0].routes?.[0].responseHeaders).to.deep.equal([]);
     });
 
     it('migrates legacy flat config into 4.0 routes', () => {
@@ -98,6 +100,8 @@ describe('ConfigManager 4.0', () => {
             rewriteTargetPath: '',
             enableMock: true,
         });
+        expect(route?.requestHeaders).to.deep.equal([]);
+        expect(route?.responseHeaders).to.deep.equal([]);
         expect(route?.mockApis).to.have.length(1);
     });
 
@@ -132,6 +136,8 @@ describe('ConfigManager 4.0', () => {
             rewriteTargetPath: '',
             enableMock: true,
         });
+        expect(route?.requestHeaders).to.deep.equal([]);
+        expect(route?.responseHeaders).to.deep.equal([]);
         expect(route?.mockApis[0].path).to.equal('/test');
     });
 
@@ -147,6 +153,13 @@ describe('ConfigManager 4.0', () => {
             stripPrefix: true,
             rewriteTargetPath: '/v1/',
             enableMock: false,
+            requestHeaders: [
+                { name: 'X-Dev-Gateway', value: 'intercept-wave', operation: 'set', enabled: true },
+                { name: 'X-Skip', value: 'off', operation: 'add' as any, enabled: false },
+            ],
+            responseHeaders: [
+                { name: 'Cache-Control', value: 'no-store', operation: 'set', enabled: true },
+            ],
             mockApis: [],
         });
 
@@ -164,6 +177,14 @@ describe('ConfigManager 4.0', () => {
             rewriteTargetPath: '/v1/',
             enableMock: true,
         });
+        const route2 = cfg.proxyGroups[0].routes?.find(route => route.id === 'route-2');
+        expect(route2?.requestHeaders).to.deep.equal([
+            { name: 'X-Dev-Gateway', value: 'intercept-wave', operation: 'set', enabled: true },
+            { name: 'X-Skip', value: 'off', operation: 'add', enabled: false },
+        ]);
+        expect(route2?.responseHeaders).to.deep.equal([
+            { name: 'Cache-Control', value: 'no-store', operation: 'set', enabled: true },
+        ]);
 
         await cm.removeRoute(groupId, 'route-2');
         cfg = cm.getConfig();
@@ -238,6 +259,14 @@ describe('ConfigManager 4.0', () => {
                 stripPrefix: true,
                 rewriteTargetPath: '/v2',
                 enableMock: false,
+                requestHeaders: [
+                    { name: 'Authorization', value: 'Bearer dev', operation: 'set', enabled: true },
+                    { name: 'X-Debug', value: 'trace', operation: 'bogus' as any, enabled: true },
+                ],
+                responseHeaders: [
+                    { name: 'Cache-Control', value: 'no-store', operation: 'set', enabled: true },
+                    { name: 'X-Remove-Me', value: '', operation: 'remove', enabled: true },
+                ],
                 mockApis: [],
             },
         ];
@@ -254,6 +283,14 @@ describe('ConfigManager 4.0', () => {
             rewriteTargetPath: '/v2',
             enableMock: false,
         });
+        expect(saved.proxyGroups[0].routes[1].requestHeaders).to.deep.equal([
+            { name: 'Authorization', value: 'Bearer dev', operation: 'set', enabled: true },
+            { name: 'X-Debug', value: 'trace', operation: 'set', enabled: true },
+        ]);
+        expect(saved.proxyGroups[0].routes[1].responseHeaders).to.deep.equal([
+            { name: 'Cache-Control', value: 'no-store', operation: 'set', enabled: true },
+            { name: 'X-Remove-Me', value: '', operation: 'remove', enabled: true },
+        ]);
     });
 
     it('returns default config when stored json is invalid', () => {

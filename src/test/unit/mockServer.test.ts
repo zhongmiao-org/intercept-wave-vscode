@@ -180,6 +180,12 @@ describe('MockServerManager', () => {
             setHeader: sinon.stub().callsFake((key: string, value: any) => {
                 headers[key] = value;
             }),
+            getHeaderNames: sinon.stub().callsFake(() => Object.keys(headers)),
+            hasHeader: sinon.stub().callsFake((key: string) => headers[key] !== undefined),
+            getHeader: sinon.stub().callsFake((key: string) => headers[key]),
+            removeHeader: sinon.stub().callsFake((key: string) => {
+                delete headers[key];
+            }),
             writeHead: sinon.stub(),
             end: sinon.stub(),
         } as any;
@@ -187,12 +193,76 @@ describe('MockServerManager', () => {
         await (mockServerManager as any).handleMockResponse(
             res,
             { path: '/x', method: 'GET', enabled: true, mockData: '{"ok":true}', statusCode: 201, delay: 0, useCookie: true },
-            { ...defaultGroup, globalCookie: 'sid=1' }
+            { ...defaultGroup, globalCookie: 'sid=1' },
+            {
+                ...defaultGroup.routes?.[0],
+                responseHeaders: [
+                    { name: 'Cache-Control', value: 'no-store', operation: 'set', enabled: true },
+                ],
+            }
         );
 
         expect(headers['Set-Cookie']).to.equal('sid=1');
+        expect(headers['Cache-Control']).to.equal('no-store');
         expect(res.writeHead.calledWith(201)).to.equal(true);
         expect(res.end.calledWith('{"ok":true}')).to.equal(true);
+    });
+
+    it('applies request header set, add, remove and restricted rules', () => {
+        const headers = {
+            'x-existing': 'old',
+            'x-remove': 'gone',
+            'content-length': '100',
+        };
+
+        (mockServerManager as any).applyRequestHeaderRules(headers, [
+            { name: 'X-Existing', value: 'new', operation: 'set', enabled: true },
+            { name: 'X-Trace', value: 'one', operation: 'add', enabled: true },
+            { name: 'X-Trace', value: 'two', operation: 'add', enabled: true },
+            { name: 'X-Remove', value: '', operation: 'remove', enabled: true },
+            { name: 'Content-Length', value: '1', operation: 'set', enabled: true },
+            { name: 'X-Disabled', value: 'skip', operation: 'set', enabled: false },
+        ]);
+
+        expect(headers['x-existing']).to.equal('new');
+        expect(headers['X-Trace']).to.equal('one, two');
+        expect(headers).to.not.have.property('x-remove');
+        expect(headers['content-length']).to.equal('100');
+        expect(headers).to.not.have.property('X-Disabled');
+    });
+
+    it('applies response header set, add, remove and restricted rules', () => {
+        const headers: Record<string, any> = {
+            'x-existing': 'old',
+            'x-remove': 'gone',
+            'content-length': '100',
+        };
+        const res = {
+            getHeaderNames: sinon.stub().callsFake(() => Object.keys(headers)),
+            hasHeader: sinon.stub().callsFake((key: string) => headers[key] !== undefined),
+            getHeader: sinon.stub().callsFake((key: string) => headers[key]),
+            setHeader: sinon.stub().callsFake((key: string, value: any) => {
+                headers[key] = value;
+            }),
+            removeHeader: sinon.stub().callsFake((key: string) => {
+                delete headers[key];
+            }),
+        } as any;
+
+        (mockServerManager as any).applyResponseHeaderRules(res, [
+            { name: 'X-Existing', value: 'new', operation: 'set', enabled: true },
+            { name: 'X-Trace', value: 'one', operation: 'add', enabled: true },
+            { name: 'X-Trace', value: 'two', operation: 'add', enabled: true },
+            { name: 'X-Remove', value: '', operation: 'remove', enabled: true },
+            { name: 'Content-Length', value: '1', operation: 'set', enabled: true },
+            { name: 'X-Disabled', value: 'skip', operation: 'set', enabled: false },
+        ]);
+
+        expect(headers['x-existing']).to.equal('new');
+        expect(headers['X-Trace']).to.equal('one, two');
+        expect(headers).to.not.have.property('x-remove');
+        expect(headers['content-length']).to.equal('100');
+        expect(headers).to.not.have.property('X-Disabled');
     });
 
     it('forwardToOriginalServer handles invalid target url and proxy request errors', () => {
@@ -231,6 +301,68 @@ describe('MockServerManager', () => {
         });
         proxyReq.emit('error', new Error('connect failed'));
         expect(res.writeHead.calledWith(502)).to.equal(true);
+        httpModule.request = originalRequest;
+    });
+
+    it('forwardToOriginalServer applies request and response header overrides', () => {
+        const req = { url: '/users', method: 'GET', headers: { host: 'localhost', 'x-remove': 'gone' }, pipe: sinon.stub() } as any;
+        const responseHeaders: Record<string, any> = {};
+        const res = {
+            setHeader: sinon.stub().callsFake((key: string, value: any) => {
+                responseHeaders[key] = value;
+            }),
+            getHeaderNames: sinon.stub().callsFake(() => Object.keys(responseHeaders)),
+            hasHeader: sinon.stub().callsFake((key: string) => responseHeaders[key] !== undefined),
+            getHeader: sinon.stub().callsFake((key: string) => responseHeaders[key]),
+            removeHeader: sinon.stub().callsFake((key: string) => {
+                delete responseHeaders[key];
+            }),
+            writeHead: sinon.stub(),
+            end: sinon.stub(),
+        } as any;
+        const proxyReq = new EventEmitter() as any;
+        proxyReq.on = proxyReq.addListener.bind(proxyReq);
+        const httpModule = require('http') as any;
+        const originalRequest = httpModule.request;
+        let forwardedHeaders: any;
+        httpModule.request = ((options: any, cb: (proxyRes: any) => void) => {
+            forwardedHeaders = options.headers;
+            cb({
+                headers: { 'cache-control': 'max-age=60', 'x-remove-response': 'gone' },
+                statusCode: 200,
+                pipe: sinon.stub().callsFake((target: any) => target.end('ok')),
+            });
+            return proxyReq;
+        }) as any;
+
+        (mockServerManager as any).forwardToOriginalServer(req, res, {
+            id: 'route-1',
+            name: 'API',
+            pathPrefix: '/api',
+            targetBaseUrl: 'http://localhost:8080',
+            stripPrefix: true,
+            enableMock: true,
+            requestHeaders: [
+                { name: 'Authorization', value: 'Bearer dev', operation: 'set', enabled: true },
+                { name: 'X-Trace', value: 'one', operation: 'add', enabled: true },
+                { name: 'X-Trace', value: 'two', operation: 'add', enabled: true },
+                { name: 'X-Remove', value: '', operation: 'remove', enabled: true },
+            ],
+            responseHeaders: [
+                { name: 'Cache-Control', value: 'no-store', operation: 'set', enabled: true },
+                { name: 'X-Response-Trace', value: 'one', operation: 'add', enabled: true },
+                { name: 'X-Response-Trace', value: 'two', operation: 'add', enabled: true },
+                { name: 'X-Remove-Response', value: '', operation: 'remove', enabled: true },
+            ],
+            mockApis: [],
+        });
+
+        expect(forwardedHeaders.Authorization).to.equal('Bearer dev');
+        expect(forwardedHeaders['X-Trace']).to.equal('one, two');
+        expect(forwardedHeaders).to.not.have.property('x-remove');
+        expect(responseHeaders['cache-control']).to.equal('no-store');
+        expect(responseHeaders['X-Response-Trace']).to.equal('one, two');
+        expect(responseHeaders).to.not.have.property('x-remove-response');
         httpModule.request = originalRequest;
     });
 

@@ -6,6 +6,7 @@
 
 ### 新增
 
+- 新增路由级请求/响应 Header 覆盖规则,支持 `set`、`add`、`remove` 操作,用于本地网关中的认证、缓存、CORS 和 Host 模拟场景。
 - 新增 HTTP 路由重写规则 `rewriteTargetPath`,会在 `stripPrefix` 之后执行,同时影响 Mock 匹配和上游转发并保留查询参数。
 - 新增与兄弟项目 `intercept-wave` 对齐的 4.0 多规则 HTTP 模型，同一大版本下可直接共用配置文件结构。
 - 新增基于路由的 HTTP 配置结构，每个代理组下支持：

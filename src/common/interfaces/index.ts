@@ -14,6 +14,15 @@ export interface MockApiConfig {
     overrides?: Record<string, any>;
 }
 
+export type HeaderRuleOperation = 'add' | 'set' | 'remove';
+
+export interface HeaderOverrideRule {
+    name: string;
+    value: string;
+    operation: HeaderRuleOperation;
+    enabled: boolean;
+}
+
 export interface HttpRoute {
     id: string;
     name: string;
@@ -22,6 +31,8 @@ export interface HttpRoute {
     stripPrefix: boolean;
     rewriteTargetPath?: string;
     enableMock: boolean;
+    requestHeaders?: HeaderOverrideRule[];
+    responseHeaders?: HeaderOverrideRule[];
     mockApis: MockApiConfig[];
 }
 

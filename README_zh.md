@@ -49,6 +49,7 @@
 - 🌐 自动处理 CORS 跨域问题
 - ⏱️ 支持网络延迟模拟
 - 🔧 自定义响应状态码和请求头
+- 🧩 支持路由级请求/响应 Header 覆盖,用于认证、缓存、CORS 和 Host 模拟
 - 🍪 全局 Cookie 支持,方便测试需要认证的接口
 
 ## 安装方法
@@ -348,6 +349,28 @@ Access-Control-Allow-Headers: Content-Type, Authorization
 - User-Agent
 - 请求体(对于 POST/PUT 等)
 - Cookie(如果有)
+
+### 路由级 Header 覆盖
+
+每条 HTTP 路由都可以在转发上游前调整请求 Header,也可以在返回浏览器前调整响应 Header。规则支持 `set`、`add`、`remove`。
+
+```json
+{
+  "pathPrefix": "/api",
+  "targetBaseUrl": "http://localhost:9000",
+  "stripPrefix": true,
+  "requestHeaders": [
+    { "name": "Authorization", "value": "Bearer dev-token", "operation": "set", "enabled": true },
+    { "name": "Host", "value": "api.local.test", "operation": "set", "enabled": true }
+  ],
+  "responseHeaders": [
+    { "name": "Cache-Control", "value": "no-store", "operation": "set", "enabled": true },
+    { "name": "Access-Control-Allow-Origin", "value": "http://localhost:5173", "operation": "set", "enabled": true }
+  ]
+}
+```
+
+请求规则适合注入认证信息、模拟 `Host` / `Origin`,或移除浏览器发出的调试 Header。响应规则适合关闭缓存或为本地前端调试调整 CORS。`connection`、`content-length`、`transfer-encoding` 等 hop-by-hop 受限 Header 会被忽略。
 
 ## 重要提示
 

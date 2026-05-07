@@ -179,6 +179,103 @@ describe('HTTP Forwarding Integration', function () {
         expect(cookiesBody.cookies.user).to.equal('tom');
     });
 
+    it('applies route-level request header overrides before forwarding', async () => {
+        const output = createOutputChannel();
+        const port = await getFreePort();
+        manager = createMockServerManager(
+            [
+                createHttpGroup({
+                    id: 'request-header-overrides',
+                    port,
+                    routes: [
+                        {
+                            id: 'headers-route',
+                            name: 'Headers',
+                            pathPrefix: '/',
+                            targetBaseUrl: getUpstreamHttpBase(0),
+                            stripPrefix: false,
+                            enableMock: false,
+                            requestHeaders: [
+                                { name: 'Authorization', value: 'Bearer route-token', operation: 'set', enabled: true },
+                                { name: 'X-Request-Id', value: 'route', operation: 'add', enabled: true },
+                                { name: 'X-Remove-Me', value: '', operation: 'remove', enabled: true },
+                            ],
+                            responseHeaders: [],
+                            mockApis: [],
+                        },
+                    ],
+                }),
+            ],
+            output
+        );
+
+        await manager.start();
+
+        const response = await httpRequest({
+            url: `http://localhost:${port}/headers`,
+            headers: {
+                Authorization: 'Bearer browser-token',
+                'X-Request-Id': 'browser',
+                'X-Remove-Me': 'remove-this',
+            },
+        });
+
+        expect(response.statusCode).to.equal(200);
+        const body = JSON.parse(response.body);
+        expect(body.headers.Authorization).to.equal('Bearer route-token');
+        expect(body.headers['X-Request-Id']).to.equal('browser, route');
+        expect(body.headers['X-Remove-Me']).to.equal(undefined);
+    });
+
+    it('applies route-level response header overrides to forwarded and preflight responses', async () => {
+        const output = createOutputChannel();
+        const port = await getFreePort();
+        manager = createMockServerManager(
+            [
+                createHttpGroup({
+                    id: 'response-header-overrides',
+                    port,
+                    routes: [
+                        {
+                            id: 'response-route',
+                            name: 'Response',
+                            pathPrefix: '/api',
+                            targetBaseUrl: getUpstreamHttpBase(0),
+                            stripPrefix: true,
+                            enableMock: false,
+                            requestHeaders: [],
+                            responseHeaders: [
+                                { name: 'Cache-Control', value: 'no-store', operation: 'set', enabled: true },
+                                { name: 'Access-Control-Allow-Origin', value: 'http://dev.local', operation: 'set', enabled: true },
+                                { name: 'X-Dev-Gateway', value: 'intercept-wave', operation: 'set', enabled: true },
+                            ],
+                            mockApis: [],
+                        },
+                    ],
+                }),
+            ],
+            output
+        );
+
+        await manager.start();
+
+        const forwarded = await httpRequest({
+            url: `http://localhost:${port}/api/echo`,
+        });
+        expect(forwarded.statusCode).to.equal(200);
+        expect(forwarded.headers['cache-control']).to.equal('no-store');
+        expect(forwarded.headers['access-control-allow-origin']).to.equal('http://dev.local');
+        expect(forwarded.headers['x-dev-gateway']).to.equal('intercept-wave');
+
+        const preflight = await httpRequest({
+            method: 'OPTIONS',
+            url: `http://localhost:${port}/api/echo`,
+        });
+        expect(preflight.statusCode).to.equal(200);
+        expect(preflight.headers['access-control-allow-origin']).to.equal('http://dev.local');
+        expect(preflight.headers['x-dev-gateway']).to.equal('intercept-wave');
+    });
+
     it('routes different proxy groups to different upstream services', async () => {
         const output = createOutputChannel();
         const userPort = await getFreePort();

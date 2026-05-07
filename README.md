@@ -48,6 +48,7 @@ A powerful VSCode extension that combines the proxy and interception capabilitie
 - 🌐 Automatic CORS handling
 - ⏱️ Network delay simulation support
 - 🔧 Custom response status codes and headers
+- 🧩 Route-level request/response header overrides for auth, cache, CORS, and Host simulation
 - 🍪 Global cookie support for authenticated APIs
 
 ## Installation
@@ -347,6 +348,28 @@ Unconfigured mock APIs will be automatically forwarded to the original server, p
 - User-Agent
 - Request body (for POST/PUT, etc.)
 - Cookies (if any)
+
+### Route-Level Header Overrides
+
+Each HTTP route can adjust request headers before forwarding and response headers before returning to the browser. Rules support `set`, `add`, and `remove`.
+
+```json
+{
+  "pathPrefix": "/api",
+  "targetBaseUrl": "http://localhost:9000",
+  "stripPrefix": true,
+  "requestHeaders": [
+    { "name": "Authorization", "value": "Bearer dev-token", "operation": "set", "enabled": true },
+    { "name": "Host", "value": "api.local.test", "operation": "set", "enabled": true }
+  ],
+  "responseHeaders": [
+    { "name": "Cache-Control", "value": "no-store", "operation": "set", "enabled": true },
+    { "name": "Access-Control-Allow-Origin", "value": "http://localhost:5173", "operation": "set", "enabled": true }
+  ]
+}
+```
+
+Use request rules to inject authentication, simulate `Host` / `Origin`, or remove browser-sent debug headers. Use response rules to disable cache or tune CORS for local frontend work. Restricted hop-by-hop headers such as `connection`, `content-length`, and `transfer-encoding` are ignored.
 
 ## Important Notes
 

@@ -2,6 +2,9 @@ import React from 'react';
 import type { RouteListProps } from '../interfaces/ui.components';
 
 export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDelete, labels }: RouteListProps) {
+  const enabledHeaderOverrideCount = (route: RouteListProps['routes'][number]) =>
+    [...(route.requestHeaders || []), ...(route.responseHeaders || [])].filter(rule => rule.enabled).length;
+
   return (
     <div style={{ minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
@@ -63,6 +66,17 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
                     color: 'var(--vscode-foreground)',
                   }}>
                     {(labels.rewriteTargetPath || 'Rewrite')} {route.rewriteTargetPath}
+                  </span>
+                )}
+                {enabledHeaderOverrideCount(route) > 0 && (
+                  <span style={{
+                    fontSize: 11,
+                    padding: '2px 6px',
+                    borderRadius: 999,
+                    background: 'color-mix(in srgb, var(--vscode-charts-blue) 18%, transparent)',
+                    color: 'var(--vscode-foreground)',
+                  }}>
+                    {(labels.headerOverrides || 'Headers')} {enabledHeaderOverrideCount(route)}
                   </span>
                 )}
               </div>

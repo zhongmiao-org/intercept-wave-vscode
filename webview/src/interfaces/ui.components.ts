@@ -57,6 +57,7 @@ export interface RouteListProps {
     enableMock: string;
     disableMock: string;
     rewriteTargetPath?: string;
+    headerOverrides?: string;
     mocksLabel?: string;
   };
 }
@@ -152,6 +153,18 @@ export interface RouteModalProps {
     rewriteTargetPath: string;
     rewriteTargetPathHint: string;
     enableMock: string;
+    headerOverrides: string;
+    requestHeaders: string;
+    responseHeaders: string;
+    addHeaderRule: string;
+    headerName: string;
+    headerValue: string;
+    headerOperation: string;
+    headerRuleEnabled: string;
+    headerOpSet: string;
+    headerOpAdd: string;
+    headerOpRemove: string;
+    headerRestrictedHint: string;
     yesLabel: string;
     noLabel: string;
     save: string;

@@ -56,6 +56,7 @@ export interface RouteListProps {
     emptyText: string;
     enableMock: string;
     disableMock: string;
+    rewriteTargetPath?: string;
     mocksLabel?: string;
   };
 }
@@ -148,6 +149,8 @@ export interface RouteModalProps {
     pathPrefix: string;
     targetBaseUrl: string;
     stripPrefix: string;
+    rewriteTargetPath: string;
+    rewriteTargetPathHint: string;
     enableMock: string;
     yesLabel: string;
     noLabel: string;

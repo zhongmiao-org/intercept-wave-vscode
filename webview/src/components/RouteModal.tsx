@@ -37,6 +37,12 @@ export function RouteModal({ open, draft, onChange, onSave, onCancel, labels, is
           <label>{labels.targetBaseUrl}</label>
           <input value={draft.targetBaseUrl} onChange={e => onChange({ ...draft, targetBaseUrl: e.target.value })} />
 
+          <label>{labels.rewriteTargetPath}</label>
+          <div style={{ display: 'grid', gap: 4 }}>
+            <input value={draft.rewriteTargetPath || ''} placeholder="/v1" onChange={e => onChange({ ...draft, rewriteTargetPath: e.target.value })} />
+            <span style={{ fontSize: 11.5, lineHeight: 1.35, color: 'var(--vscode-descriptionForeground)' }}>{labels.rewriteTargetPathHint}</span>
+          </div>
+
           <label>{labels.stripPrefix}</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input type="checkbox" checked={draft.stripPrefix} onChange={e => onChange({ ...draft, stripPrefix: e.target.checked })} />

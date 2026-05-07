@@ -31,7 +31,7 @@ A powerful VSCode extension that combines the proxy and interception capabilitie
 - 🎯 Configure intercept prefix (e.g., `/api`) to precisely target specific request paths
 - 🔄 **With Mock Config**: Returns preset mock data for offline development
 - 🌐 **Without Mock Config**: Acts as a proxy server, forwarding requests with complete HTTP headers to get real data
-- 🔀 Smart path matching with prefix stripping support
+- 🔀 Smart path matching with prefix stripping and route rewrite support
 
 ### Wildcard Path Matching
 
@@ -102,6 +102,7 @@ Each proxy group has independent settings:
 - **Intercept Prefix**: API path prefix to intercept (default: /api)
 - **Base URL**: Base URL of the original server (e.g., http://localhost:8080)
 - **Strip Prefix**: When enabled, `/api/user` matches mock path `/user`
+- **Rewrite Target Path**: Optional route-level target path base applied after stripping, such as `/v1`
 - **Global Cookie**: Configure global cookie value for this group's mock APIs
 - **Enabled**: Whether this group should start when clicking "Start All"
 
@@ -374,6 +375,16 @@ A: When enabled, the interceptPrefix is removed before matching. For example:
 - Request: `/api/user` with interceptPrefix `/api`
 - Match path: `/user`
 - So your mock API path should be configured as `/user`
+
+### Q: How do route rewrite rules work?
+
+A: `rewriteTargetPath` runs after `stripPrefix` and affects both mock matching and upstream forwarding. Query strings are preserved.
+
+- Request: `/backend/users?active=true`
+- Route: `pathPrefix="/backend"`, `stripPrefix=true`, `rewriteTargetPath="/v1"`
+- Match and forward path: `/v1/users?active=true`
+
+This maps common local nginx rules, for example `location /backend/ { proxy_pass http://service/v1/; }`, to an Intercept Wave route.
 
 ### Q: How do I manage multiple proxy groups?
 

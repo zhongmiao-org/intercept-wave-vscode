@@ -20,6 +20,7 @@ export interface HttpRoute {
     pathPrefix: string;
     targetBaseUrl: string;
     stripPrefix: boolean;
+    rewriteTargetPath?: string;
     enableMock: boolean;
     mockApis: MockApiConfig[];
 }

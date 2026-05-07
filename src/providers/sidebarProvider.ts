@@ -317,6 +317,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             pathPrefix: data.pathPrefix,
             targetBaseUrl: data.targetBaseUrl,
             stripPrefix: data.stripPrefix,
+            rewriteTargetPath: typeof data.rewriteTargetPath === 'string' ? data.rewriteTargetPath.trim() : '',
             enableMock: data.enableMock,
             mockApis: [],
         };
@@ -452,7 +453,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             'ui.proxyControl', 'ui.navigator', 'ui.navigatorHint', 'ui.openWorkspace', 'ui.proxyGroups', 'ui.expand', 'ui.collapse', 'ui.openInPanel', 'ui.schema', 'ui.routes', 'ui.route', 'ui.mocks',
             'ui.mockOn', 'ui.mockOff', 'ui.routeDetail', 'ui.noActiveGroup', 'ui.noRouteSelected', 'ui.noRoutesConfigured',
             'ui.routeSelectionHint', 'ui.listenerSharedHint', 'ui.routeMatchHint', 'ui.routePrefix', 'ui.targetBaseUrl', 'ui.enableMock',
-            'ui.cookieUsed', 'ui.cookieUnused', 'ui.routeModalHint', 'ui.addRoute', 'ui.editRoute', 'ui.groupModalTitle', 'ui.groupModalHint', 'ui.listenerExtras',
+            'ui.rewriteTargetPath', 'ui.rewriteTargetPathHint', 'ui.cookieUsed', 'ui.cookieUnused', 'ui.routeModalHint', 'ui.addRoute', 'ui.editRoute', 'ui.groupModalTitle', 'ui.groupModalHint', 'ui.listenerExtras',
             'ui.close', 'ui.mockModalTitle', 'ui.mockModalHint',
             'noWorkspace.title', 'noWorkspace.message',
         ];
@@ -533,6 +534,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             pathPrefix: '/api',
             targetBaseUrl: 'http://localhost:8080',
             stripPrefix: true,
+            rewriteTargetPath: '',
             enableMock: true,
             mockApis: [],
         };

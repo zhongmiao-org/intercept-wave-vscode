@@ -54,6 +54,17 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
                 }}>
                   {route.mockApis.filter(api => api.enabled).length}/{route.mockApis.length} {labels.mocksLabel || 'mock'}
                 </span>
+                {route.rewriteTargetPath && (
+                  <span style={{
+                    fontSize: 11,
+                    padding: '2px 6px',
+                    borderRadius: 999,
+                    background: 'color-mix(in srgb, var(--vscode-button-background) 18%, transparent)',
+                    color: 'var(--vscode-foreground)',
+                  }}>
+                    {(labels.rewriteTargetPath || 'Rewrite')} {route.rewriteTargetPath}
+                  </span>
+                )}
               </div>
               <div style={{
                 fontSize: 12,

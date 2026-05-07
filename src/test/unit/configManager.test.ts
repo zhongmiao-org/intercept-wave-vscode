@@ -68,6 +68,7 @@ describe('ConfigManager 4.0', () => {
             targetBaseUrl: 'http://localhost:8080',
             stripPrefix: true,
             rewriteTargetPath: '',
+            spaFallback: false,
             enableMock: true,
         });
     });
@@ -96,6 +97,7 @@ describe('ConfigManager 4.0', () => {
             targetBaseUrl: 'http://localhost:18080',
             stripPrefix: false,
             rewriteTargetPath: '',
+            spaFallback: false,
             enableMock: true,
         });
         expect(route?.mockApis).to.have.length(1);
@@ -130,6 +132,7 @@ describe('ConfigManager 4.0', () => {
             targetBaseUrl: 'http://localhost:9000',
             stripPrefix: true,
             rewriteTargetPath: '',
+            spaFallback: false,
             enableMock: true,
         });
         expect(route?.mockApis[0].path).to.equal('/test');
@@ -146,6 +149,7 @@ describe('ConfigManager 4.0', () => {
             targetBaseUrl: 'http://localhost:8082',
             stripPrefix: true,
             rewriteTargetPath: '/v1/',
+            spaFallback: true,
             enableMock: false,
             mockApis: [],
         });
@@ -162,6 +166,7 @@ describe('ConfigManager 4.0', () => {
         expect(cfg.proxyGroups[0].routes?.find(route => route.id === 'route-2')).to.include({
             targetBaseUrl: 'http://localhost:9090',
             rewriteTargetPath: '/v1/',
+            spaFallback: true,
             enableMock: true,
         });
 
@@ -236,6 +241,7 @@ describe('ConfigManager 4.0', () => {
                 pathPrefix: '/api2',
                 targetBaseUrl: 'http://localhost:9001',
                 stripPrefix: true,
+                spaFallback: true,
                 rewriteTargetPath: '/v2',
                 enableMock: false,
                 mockApis: [],
@@ -252,6 +258,7 @@ describe('ConfigManager 4.0', () => {
             pathPrefix: '/api2',
             targetBaseUrl: 'http://localhost:9001',
             rewriteTargetPath: '/v2',
+            spaFallback: true,
             enableMock: false,
         });
     });

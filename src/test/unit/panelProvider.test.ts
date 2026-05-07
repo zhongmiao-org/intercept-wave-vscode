@@ -210,7 +210,7 @@ describe('PanelProvider', () => {
         await (panelProvider as any).handleMessage({ type: 'addGroup', data: { name: 'New', port: 9001, stripPrefix: true, globalCookie: '', enabled: true } });
         await (panelProvider as any).handleMessage({ type: 'updateGroup', groupId: 'group-1', data: { name: 'Updated' } });
         await (panelProvider as any).handleMessage({ type: 'deleteGroup', groupId: 'group-2' });
-        await (panelProvider as any).handleMessage({ type: 'addRoute', groupId: 'group-1', data: { name: 'R', pathPrefix: '/r', targetBaseUrl: 'http://r', stripPrefix: true, rewriteTargetPath: '/v1', enableMock: true } });
+        await (panelProvider as any).handleMessage({ type: 'addRoute', groupId: 'group-1', data: { name: 'R', pathPrefix: '/r', targetBaseUrl: 'http://r', stripPrefix: true, rewriteTargetPath: '/v1', spaFallback: true, enableMock: true } });
         await (panelProvider as any).handleMessage({ type: 'updateRoute', groupId: 'group-1', routeId: 'route-1', data: { name: 'R1', rewriteTargetPath: '/v2' } });
         await (panelProvider as any).handleMessage({ type: 'deleteRoute', groupId: 'group-1', routeId: 'route-1' });
         await (panelProvider as any).handleMessage({ type: 'addMock', groupId: 'group-1', routeId: '', data: { path: '/x', method: 'GET', enabled: true, mockData: '{}', statusCode: 200 } });
@@ -222,7 +222,7 @@ describe('PanelProvider', () => {
         expect(configManager.updateProxyGroup.calledWith('group-1', sinon.match.has('name', 'Updated'))).to.equal(true);
         expect(configManager.removeProxyGroup.calledOnce).to.equal(true);
         expect(configManager.addRoute.calledOnce).to.equal(true);
-        expect(configManager.addRoute.firstCall.args[1]).to.include({ rewriteTargetPath: '/v1' });
+        expect(configManager.addRoute.firstCall.args[1]).to.include({ rewriteTargetPath: '/v1', spaFallback: true });
         expect(configManager.updateRoute.calledWith('group-1', 'route-1', sinon.match.has('rewriteTargetPath', '/v2'))).to.equal(true);
         expect(configManager.removeRoute.calledOnce).to.equal(true);
         expect(configManager.addMockApi.calledOnce).to.equal(true);

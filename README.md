@@ -348,6 +348,39 @@ Unconfigured mock APIs will be automatically forwarded to the original server, p
 - Request body (for POST/PUT, etc.)
 - Cookies (if any)
 
+### Frontend Dev Server Proxy and SPA Fallback
+
+Use an API route plus a `/` frontend route to replace a common local nginx setup:
+
+```json
+{
+    "routes": [
+        {
+            "name": "API",
+            "pathPrefix": "/api",
+            "targetBaseUrl": "http://localhost:9000",
+            "stripPrefix": true,
+            "rewriteTargetPath": "",
+            "spaFallback": false,
+            "enableMock": true,
+            "mockApis": []
+        },
+        {
+            "name": "Frontend",
+            "pathPrefix": "/",
+            "targetBaseUrl": "http://localhost:5173",
+            "stripPrefix": false,
+            "rewriteTargetPath": "",
+            "spaFallback": true,
+            "enableMock": false,
+            "mockApis": []
+        }
+    ]
+}
+```
+
+Requests such as `/api/users` still use the longer `/api` route and can be mocked or forwarded to the backend. Frontend paths such as `/`, `/assets/app.js`, and `/dashboard/settings` use the `/` route. When `spaFallback` is enabled, navigation-style `404` responses are retried as `/index.html` so refreshed SPA deep links can load the app shell.
+
 ## Important Notes
 
 1. **Port Occupation**: Ensure the configured port is not occupied by other programs

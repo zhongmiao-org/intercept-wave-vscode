@@ -6,6 +6,7 @@
 
 ### Added
 
+- Added frontend dev-server proxy support for `/` HTTP routes, including explicit route-level `spaFallback` handling for SPA deep-link refreshes.
 - Added HTTP route rewrite rules with `rewriteTargetPath`, applied after `stripPrefix` for both Mock matching and upstream forwarding while preserving query strings.
 
 ## [4.0.0]

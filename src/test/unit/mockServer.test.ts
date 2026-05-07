@@ -319,6 +319,27 @@ describe('MockServerManager', () => {
         expect(handleWelcomeStub.calledOnce).to.equal(true);
         handleWelcomeStub.restore();
 
+        const forwardRootStub = sinon.stub(mockServerManager as any, 'forwardToOriginalServer');
+        await (mockServerManager as any).handleRequest(
+            { url: '/', method: 'GET', headers: {}, pipe: sinon.stub() } as any,
+            res,
+            {
+                ...defaultGroup,
+                routes: [
+                    {
+                        ...baseRoute,
+                        id: 'frontend',
+                        pathPrefix: '/',
+                        targetBaseUrl: 'http://localhost:5173',
+                        stripPrefix: false,
+                        enableMock: false,
+                    },
+                ],
+            }
+        );
+        expect(forwardRootStub.calledOnce).to.equal(true);
+        forwardRootStub.restore();
+
         const sendErrorStub = sinon.stub(mockServerManager as any, 'sendErrorResponse');
         await (mockServerManager as any).handleRequest(
             { url: '/x', method: 'GET', headers: {}, pipe: sinon.stub() } as any,
@@ -374,5 +395,63 @@ describe('MockServerManager', () => {
             }
         );
         expect(forwardStub.calledOnce).to.equal(true);
+    });
+
+    it('retries SPA fallback navigation 404s against index.html while preserving query strings', () => {
+        const req = {
+            url: '/dashboard/settings?tab=profile',
+            method: 'GET',
+            headers: { accept: 'text/html' },
+            pipe: sinon.stub(),
+        } as any;
+        const res = {
+            setHeader: sinon.stub(),
+            writeHead: sinon.stub(),
+            end: sinon.stub(),
+        } as any;
+        const httpModule = require('http') as any;
+        const originalRequest = httpModule.request;
+        const requestedPaths: string[] = [];
+        const endStubs: sinon.SinonStub[] = [];
+
+        httpModule.request = ((options: any, cb: (proxyRes: any) => void) => {
+            requestedPaths.push(options.path);
+            const proxyReq = new EventEmitter() as any;
+            proxyReq.on = proxyReq.addListener.bind(proxyReq);
+            proxyReq.end = sinon.stub();
+            endStubs.push(proxyReq.end);
+            if (requestedPaths.length === 1) {
+                cb({
+                    headers: {},
+                    statusCode: 404,
+                    resume: sinon.stub(),
+                    pipe: sinon.stub(),
+                });
+            } else {
+                cb({
+                    headers: { 'content-type': 'text/html' },
+                    statusCode: 200,
+                    pipe: sinon.stub().callsFake((target: any) => target.end('<html>app</html>')),
+                });
+            }
+            return proxyReq;
+        }) as any;
+
+        (mockServerManager as any).forwardToOriginalServer(req, res, {
+            id: 'frontend',
+            name: 'Frontend',
+            pathPrefix: '/',
+            targetBaseUrl: 'http://localhost:5173',
+            stripPrefix: false,
+            spaFallback: true,
+            enableMock: false,
+            mockApis: [],
+        });
+
+        expect(requestedPaths).to.deep.equal(['/dashboard/settings?tab=profile', '/index.html?tab=profile']);
+        expect(endStubs.every(stub => stub.calledOnce)).to.equal(true);
+        expect(res.writeHead.calledWith(200)).to.equal(true);
+        expect(res.end.calledWith('<html>app</html>')).to.equal(true);
+        httpModule.request = originalRequest;
     });
 });

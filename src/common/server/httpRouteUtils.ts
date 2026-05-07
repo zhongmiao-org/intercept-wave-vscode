@@ -53,6 +53,16 @@ export function computeHttpForwardPath(route: HttpRoute, requestPath: string): s
     return computeHttpRoutePath(route, requestPath);
 }
 
+export function computeHttpSpaFallbackPath(route: HttpRoute): string {
+    const prefix = normalizePathPrefix(route.pathPrefix);
+    const fallbackRequestPath = prefix === '/' ? '/index.html' : `${prefix}/index.html`;
+    return computeHttpRoutePath(route, fallbackRequestPath);
+}
+
+export function isRootHttpRoute(route: HttpRoute): boolean {
+    return normalizePathPrefix(route.pathPrefix) === '/';
+}
+
 export function shouldServeRouteWelcomePage(route: HttpRoute, requestPath: string): boolean {
     if (!route.stripPrefix) return false;
     const prefix = normalizePathPrefix(route.pathPrefix);

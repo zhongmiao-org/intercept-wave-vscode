@@ -437,6 +437,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             'ui.add', 'ui.edit', 'ui.delete', 'ui.enable', 'ui.disable', 'ui.save', 'ui.cancel',
             'ui.format', 'ui.validate', 'ui.groupName', 'ui.enabled', 'ui.port', 'ui.interceptPrefix', 'ui.baseUrl', 'ui.stripPrefix',
             'ui.globalCookie', 'ui.method', 'ui.path', 'ui.statusCode', 'ui.responseBody', 'ui.delay',
+            'ui.mockTemplate', 'ui.mockTemplateHint', 'ui.applyTemplate', 'ui.mockTemplate.success', 'ui.mockTemplate.pagination', 'ui.mockTemplate.empty', 'ui.mockTemplate.error', 'ui.mockTemplate.authExpired',
             'ui.protocol', 'ui.protocol.http', 'ui.protocol.ws', 'ui.wsBaseUrl', 'ui.wsInterceptPrefix', 'ui.wsManualPush',
             'ui.wssEnabled', 'ui.wssKeystorePath', 'ui.wssKeystorePassword', 'ui.section.group', 'ui.section.http', 'ui.section.ws',
             'ui.wsPanel.title', 'ui.wsPanel.rules', 'ui.wsPanel.sendSelected', 'ui.wsPanel.target.match', 'ui.wsPanel.target.all',

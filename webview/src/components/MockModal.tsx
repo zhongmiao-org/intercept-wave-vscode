@@ -1,8 +1,16 @@
 import React from 'react';
 import type { MockModalProps } from '../interfaces/ui.components';
 
-export function MockModal({ open, draft, onChange, onSave, onFormat, onCancel, labels, isEdit }: MockModalProps) {
+export function MockModal({ open, draft, onChange, onSave, onFormat, onCancel, templates, onApplyTemplate, labels, isEdit }: MockModalProps) {
   if (!open) return null;
+  const [selectedTemplateId, setSelectedTemplateId] = React.useState(templates[0]?.id || '');
+
+  React.useEffect(() => {
+    if (!templates.some(template => template.id === selectedTemplateId)) {
+      setSelectedTemplateId(templates[0]?.id || '');
+    }
+  }, [templates, selectedTemplateId]);
+
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -51,6 +59,21 @@ export function MockModal({ open, draft, onChange, onSave, onFormat, onCancel, l
 
           <label>{labels.delay}</label>
           <input type="number" value={draft.delay ?? 0} onChange={e => onChange({ ...draft, delay: Number(e.target.value) })} />
+
+          <label>{labels.template}</label>
+          <div style={{ display: 'grid', gap: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8 }}>
+              <select value={selectedTemplateId} title={labels.templateHint} onChange={e => setSelectedTemplateId(e.target.value)}>
+                {templates.map(template => (
+                  <option key={template.id} value={template.id}>{labels.templateLabels[template.id] || template.id}</option>
+                ))}
+              </select>
+              <button onClick={() => selectedTemplateId && onApplyTemplate(selectedTemplateId)} disabled={!selectedTemplateId}>
+                <span className="codicon codicon-insert" style={{ marginRight: 6 }} />{labels.applyTemplate}
+              </button>
+            </div>
+            <span style={{ fontSize: 11.5, lineHeight: 1.35, color: 'var(--vscode-descriptionForeground)' }}>{labels.templateHint}</span>
+          </div>
 
           <label>{labels.responseBody}</label>
           <div>

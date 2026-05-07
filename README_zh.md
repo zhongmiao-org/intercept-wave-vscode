@@ -115,6 +115,7 @@
 - **HTTP 方法**:ALL、GET、POST、PUT、DELETE、PATCH
 - **状态码**:HTTP 响应状态码(默认:200)
 - **延迟(毫秒)**:模拟网络延迟(默认:0)
+- **响应模板**:可选的成功、分页、空数据、错误或登录过期 JSON 结构
 - **Mock 数据**:JSON 格式的响应数据
 - **启用**:是否启用此 Mock 配置
 - **使用全局 Cookie**:在响应中包含配置的全局 Cookie
@@ -329,6 +330,22 @@ sessionId=abc123; userId=456; token=xyz789
 ```
 
 然后为需要 Cookie 的 Mock API 勾选"使用全局 Cookie",响应将自动包含 `Set-Cookie` 头。
+
+### Mock 响应模板
+
+新建或编辑 Mock API 时，可以选择响应模板并点击 **应用模板** 替换可编辑的 Mock 数据区域。模板不会修改 HTTP 状态码或其他 Mock 设置，JSON 仍可继续编辑、格式化、校验，并按现有流程保存为压缩格式。
+
+内置模板:
+
+```json
+{
+    "success": {"code":0,"message":"success","data":{}},
+    "pagination": {"code":0,"message":"success","data":{"list":[],"total":0,"pageNum":1,"pageSize":10}},
+    "empty": {"code":0,"message":"success","data":null},
+    "error": {"code":500,"message":"Internal Server Error","data":null},
+    "auth expired": {"code":401,"message":"Unauthorized","data":null}
+}
+```
 
 ### CORS 支持
 

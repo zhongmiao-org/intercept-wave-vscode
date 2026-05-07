@@ -55,6 +55,29 @@ describe('httpRouteUtils', () => {
         expect(computeHttpForwardPath(routeRoot as any, '')).to.equal('/');
     });
 
+    it('applies rewrite target path after stripping prefix for mock matching and forwarding', () => {
+        const rewriteRoute = { ...routeApi, pathPrefix: '/backend', rewriteTargetPath: '/v1' };
+
+        expect(computeHttpMatchPath(rewriteRoute as any, '/backend/users')).to.equal('/v1/users');
+        expect(computeHttpForwardPath(rewriteRoute as any, '/backend/users')).to.equal('/v1/users');
+    });
+
+    it('keeps existing behavior when no rewrite target path is configured', () => {
+        expect(computeHttpMatchPath({ ...routeApi, rewriteTargetPath: '' } as any, '/api/users')).to.equal('/users');
+        expect(computeHttpForwardPath({ ...routeApi, rewriteTargetPath: undefined } as any, '/api/users')).to.equal('/users');
+    });
+
+    it('preserves query strings after route rewrite', () => {
+        const rewriteRoute = { ...routeApi, pathPrefix: '/backend', rewriteTargetPath: '/v1/' };
+
+        expect(computeHttpMatchPath(rewriteRoute as any, '/backend/users?active=true')).to.equal('/v1/users?active=true');
+        expect(computeHttpForwardPath(rewriteRoute as any, '/backend?active=true')).to.equal('/v1?active=true');
+    });
+
+    it('treats root rewrite target path as no extra rewrite base', () => {
+        expect(computeHttpForwardPath({ ...routeApi, rewriteTargetPath: '/' } as any, '/api/users')).to.equal('/users');
+    });
+
     it('serves welcome page only for stripped non-root prefixes', () => {
         expect(shouldServeRouteWelcomePage(routeApi as any, '/api')).to.equal(true);
         expect(shouldServeRouteWelcomePage(routeApi as any, '/api/')).to.equal(true);

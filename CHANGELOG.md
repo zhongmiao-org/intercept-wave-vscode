@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added HTTP route rewrite rules with `rewriteTargetPath`, applied after `stripPrefix` for both Mock matching and upstream forwarding while preserving query strings.
+
 ## [4.0.0]
 
 ### Added

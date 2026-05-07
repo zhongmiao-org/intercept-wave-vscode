@@ -46,11 +46,11 @@ export function selectHttpRoute(group: ProxyGroup, requestPath: string): HttpRou
 }
 
 export function computeHttpMatchPath(route: HttpRoute, requestPath: string): string {
-    return computePathWithOptionalStrip(requestPath, normalizePathPrefix(route.pathPrefix), route.stripPrefix);
+    return computeHttpRoutePath(route, requestPath);
 }
 
 export function computeHttpForwardPath(route: HttpRoute, requestPath: string): string {
-    return computePathWithOptionalStrip(requestPath, normalizePathPrefix(route.pathPrefix), route.stripPrefix);
+    return computeHttpRoutePath(route, requestPath);
 }
 
 export function shouldServeRouteWelcomePage(route: HttpRoute, requestPath: string): boolean {
@@ -58,4 +58,33 @@ export function shouldServeRouteWelcomePage(route: HttpRoute, requestPath: strin
     const prefix = normalizePathPrefix(route.pathPrefix);
     if (prefix === '/') return false;
     return requestPath === prefix || requestPath === `${prefix}/`;
+}
+
+function computeHttpRoutePath(route: HttpRoute, requestPath: string): string {
+    const strippedPath = computePathWithOptionalStrip(
+        requestPath,
+        normalizePathPrefix(route.pathPrefix),
+        route.stripPrefix
+    );
+    return applyRewriteTargetPath(strippedPath, route.rewriteTargetPath);
+}
+
+function applyRewriteTargetPath(routeLocalPath: string, rewriteTargetPath?: string): string {
+    const rewriteBase = normalizeRewriteTargetPath(rewriteTargetPath);
+    if (!rewriteBase || rewriteBase === '/') {
+        return routeLocalPath || '/';
+    }
+
+    const queryIndex = routeLocalPath.indexOf('?');
+    const pathOnly = queryIndex >= 0 ? routeLocalPath.slice(0, queryIndex) : routeLocalPath;
+    const query = queryIndex >= 0 ? routeLocalPath.slice(queryIndex) : '';
+    const suffix = (pathOnly || '/').replace(/^\/+/, '');
+    return suffix ? `${rewriteBase}/${suffix}${query}` : `${rewriteBase}${query}`;
+}
+
+function normalizeRewriteTargetPath(path?: string): string | undefined {
+    if (!path || path.trim() === '') return undefined;
+    const trimmed = path.trim();
+    const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    return withLeadingSlash.replace(/\/+$/, '') || '/';
 }

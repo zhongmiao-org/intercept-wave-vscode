@@ -31,7 +31,7 @@
 - 🎯 配置拦截前缀(如 `/api`)来精确定位特定请求路径
 - 🔄 **有 Mock 配置时**:返回预设的 Mock 数据,支持离线开发
 - 🌐 **无 Mock 配置时**:作为代理服务器,携带完整 HTTP 头转发请求获取真实数据
-- 🔀 智能路径匹配,支持前缀剥离
+- 🔀 智能路径匹配,支持前缀剥离和路由重写
 
 ### 通配路径匹配
 
@@ -103,6 +103,7 @@
 - **拦截前缀**:要拦截的 API 路径前缀(默认:/api)
 - **基础 URL**:原始服务器的基础 URL(例如:http://localhost:8080)
 - **剥离前缀**:启用后,`/api/user` 将匹配 Mock 路径 `/user`
+- **重写目标路径**:可选的路由级目标路径基底,在剥离前缀后生效,例如 `/v1`
 - **全局 Cookie**:为此组的 Mock API 配置全局 Cookie 值
 - **启用**:点击"全部启动"时此组是否应该启动
 
@@ -375,6 +376,16 @@ Access-Control-Allow-Headers: Content-Type, Authorization
 - 请求:`/api/user`,interceptPrefix 为 `/api`
 - 匹配路径:`/user`
 - 所以你的 Mock API 路径应该配置为 `/user`
+
+### 问:路由重写规则如何工作?
+
+答:`rewriteTargetPath` 会在 `stripPrefix` 之后执行,并同时影响 Mock 匹配和上游转发。查询参数会被保留。
+
+- 请求:`/backend/users?active=true`
+- 路由:`pathPrefix="/backend"`、`stripPrefix=true`、`rewriteTargetPath="/v1"`
+- 匹配和转发路径:`/v1/users?active=true`
+
+这可以把常见本地 nginx 规则(如 `location /backend/ { proxy_pass http://service/v1/; }`)映射为一条 Intercept Wave 路由。
 
 ### 问:如何管理多个代理组?
 

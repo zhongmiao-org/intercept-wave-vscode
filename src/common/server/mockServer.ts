@@ -37,6 +37,7 @@ export class MockServerManager {
                 pathPrefix: group.interceptPrefix || '/api',
                 targetBaseUrl: group.baseUrl || 'http://localhost:8080',
                 stripPrefix: group.stripPrefix,
+                rewriteTargetPath: '',
                 enableMock: true,
                 mockApis: group.mockApis || [],
             },
@@ -322,6 +323,7 @@ export class MockServerManager {
                 pathPrefix: route.pathPrefix,
                 targetBaseUrl: route.targetBaseUrl,
                 stripPrefix: route.stripPrefix,
+                rewriteTargetPath: route.rewriteTargetPath || '',
                 enableMock: route.enableMock,
                 mockApis: {
                     total: route.mockApis.length,

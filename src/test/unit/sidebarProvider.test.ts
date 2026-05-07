@@ -294,6 +294,7 @@ describe('SidebarProvider 4.0', () => {
             pathPrefix: '/api2',
             targetBaseUrl: 'http://localhost:8081',
             stripPrefix: true,
+            rewriteTargetPath: '/v2',
             enableMock: false,
         });
 
@@ -304,6 +305,7 @@ describe('SidebarProvider 4.0', () => {
             pathPrefix: '/api2',
             targetBaseUrl: 'http://localhost:8081',
             stripPrefix: true,
+            rewriteTargetPath: '/v2',
             enableMock: false,
         });
     });
@@ -326,11 +328,12 @@ describe('SidebarProvider 4.0', () => {
             pathPrefix: '/api',
             targetBaseUrl: 'http://localhost:9090',
             stripPrefix: true,
+            rewriteTargetPath: '/v1',
             enableMock: true,
         });
         await (sidebarProvider as any).handleDeleteRoute('test-group-id', 'route-2');
 
-        expect(configManager.updateRoute.calledWith('test-group-id', 'route-1', match.has('targetBaseUrl', 'http://localhost:9090'))).to.equal(true);
+        expect(configManager.updateRoute.calledWith('test-group-id', 'route-1', match.has('rewriteTargetPath', '/v1'))).to.equal(true);
         expect(configManager.removeRoute.calledWith('test-group-id', 'route-2')).to.equal(true);
     });
 

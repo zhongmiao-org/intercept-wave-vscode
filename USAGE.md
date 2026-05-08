@@ -43,6 +43,7 @@ Click the "Configure" or settings button to edit proxy groups.
     - **Rewrite Target Path**: Optional path base applied after strip-prefix, such as `/v1`
     - **SPA Fallback Path**: Optional proxy fallback path for frontend navigation 404s, such as `/index.html`
     - **SPA Fallback**: Static route fallback switch that serves `index.html` for missing browser navigation paths
+    - **Request Headers / Response Headers**: Optional route-level header override rules using `ADD`, `SET`, or `REMOVE`
     - **Enable Mock**: Whether this route should check its own mock list first
 
 Route rewrite is useful when replacing a local nginx rule. For example, with `pathPrefix="/backend"`, `stripPrefix=true`, and `rewriteTargetPath="/v1"`, a request to `/backend/users?active=true` is matched and forwarded as `/v1/users?active=true`. This is local development gateway behavior, not production nginx replacement behavior.
@@ -156,13 +157,36 @@ Frontend static build route for `dist/` or `build/` output:
 
 For static routes, Intercept Wave still uses the same route-local path semantics: `stripPrefix` runs first, `rewriteTargetPath` runs second, and the query string is ignored for file lookup. Requests with raw or encoded `..` are rejected before any file is read outside `staticRoot`.
 
+Route-level header override examples:
+
+```json
+{
+    "requestHeaders": [
+        { "name": "Authorization", "value": "Bearer local-dev-token", "operation": "SET", "enabled": true },
+        { "name": "X-Debug-Mode", "value": "1", "operation": "ADD", "enabled": true },
+        { "name": "Cookie", "value": "", "operation": "REMOVE", "enabled": false }
+    ],
+    "responseHeaders": [
+        { "name": "Access-Control-Allow-Origin", "value": "http://localhost:5173", "operation": "SET", "enabled": true },
+        { "name": "Access-Control-Allow-Credentials", "value": "true", "operation": "SET", "enabled": true },
+        { "name": "Cache-Control", "value": "no-store", "operation": "SET", "enabled": true }
+    ]
+}
+```
+
+Request rules run before proxy forwarding and are useful for local auth injection, feature flags, or removing incoming cookies. Response rules run last for proxy, static, mock, and matched preflight responses, so they can override default CORS, cache, and content headers when those headers are not restricted.
+
+Restricted request headers are skipped at runtime: `host`, `connection`, `content-length`, `date`, `expect`, `upgrade`, `trailer`, `te`.
+
+Restricted response headers are skipped at runtime: `transfer-encoding`, `content-length`, `connection`.
+
 Common issues:
 
 - **Port occupied**: change the group port or stop the process that already listens on it.
 - **SPA refresh returns 404**: for proxy-to-dev-server routes, keep the frontend route at `pathPrefix="/"`, set `enableMock=false`, and set `spaFallbackPath="/index.html"` for HTML navigation requests. For static build routes, set `targetType="STATIC"` and `spaFallback=true`.
 - **Prefix or rewrite mismatch**: `stripPrefix` runs before `rewriteTargetPath`; Mock paths and forwarded paths use the rewritten route-local path.
-- **Unexpected CORS or headers**: the local gateway adds default CORS headers for development. Route-level header override recipes are tracked separately.
-- **Headers and HTTPS**: route-level header overrides are tracked by [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44), and HTTPS listener support is tracked by [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40).
+- **Unexpected CORS or cache headers**: response header rules run after the default CORS headers, so use `SET` or `REMOVE` on `responseHeaders` for route-specific CORS and cache behavior.
+- **HTTPS**: HTTPS listener support is tracked by [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40).
 
 Related roadmap items: VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39), IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150), and IntelliJ docs [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157).
 

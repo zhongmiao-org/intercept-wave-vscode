@@ -292,6 +292,8 @@ export class PanelProvider {
             rewriteTargetPath: typeof data.rewriteTargetPath === 'string' ? data.rewriteTargetPath.trim() : '',
             spaFallbackPath: this.normalizeSpaFallbackPath(data),
             spaFallback: data.targetType === 'STATIC' ? data.spaFallback === true : false,
+            requestHeaders: Array.isArray(data.requestHeaders) ? data.requestHeaders : [],
+            responseHeaders: Array.isArray(data.responseHeaders) ? data.responseHeaders : [],
             enableMock: data.enableMock,
             mockApis: [],
         };
@@ -380,7 +382,26 @@ export class PanelProvider {
         }
         const pathPrefix = String(data.pathPrefix).trim();
         const exists = (group.routes || []).some(route => route.id !== editingRouteId && route.pathPrefix.trim() === pathPrefix);
-        return exists ? vscode.l10n.t('error.routePathPrefixExists', pathPrefix) : null;
+        if (exists) return vscode.l10n.t('error.routePathPrefixExists', pathPrefix);
+        return this.validateHeaderOverrideRules(data);
+    }
+
+    private validateHeaderOverrideRules(data: any): string | null {
+        const rules = [
+            ...(Array.isArray(data.requestHeaders) ? data.requestHeaders : []),
+            ...(Array.isArray(data.responseHeaders) ? data.responseHeaders : []),
+        ];
+        for (const rule of rules) {
+            if (!rule) continue;
+            const name = String(rule.name || '').trim();
+            const operation = String(rule.operation || 'SET').trim().toUpperCase();
+            const value = String(rule.value || '');
+            if (!name) return vscode.l10n.t('error.headerRuleNameRequired');
+            if ((operation === 'ADD' || operation === 'SET') && value.trim() === '') {
+                return vscode.l10n.t('error.headerRuleValueRequired');
+            }
+        }
+        return null;
     }
 
     private async handleDeleteRoute(groupId: string, routeId: string) {
@@ -483,7 +504,10 @@ export class PanelProvider {
             'ui.mockOn', 'ui.mockOff', 'ui.routeDetail', 'ui.noActiveGroup', 'ui.noRouteSelected', 'ui.noRoutesConfigured',
             'ui.routeSelectionHint', 'ui.listenerSharedHint', 'ui.routeMatchHint', 'ui.routePrefix', 'ui.targetBaseUrl', 'ui.enableMock',
             'ui.targetType', 'ui.targetType.proxy', 'ui.targetType.static', 'ui.staticRoot', 'ui.staticRootHint', 'ui.staticRootExternalHint', 'ui.chooseFolder',
-            'ui.rewriteTargetPath', 'ui.rewriteTargetPathHint', 'ui.spaFallbackPath', 'ui.spaFallbackPathHint', 'ui.spaFallback', 'ui.spaFallbackHint', 'ui.cookieUsed', 'ui.cookieUnused', 'ui.routeModalHint', 'ui.addRoute', 'ui.editRoute', 'ui.groupModalTitle', 'ui.groupModalHint', 'ui.listenerExtras',
+            'ui.rewriteTargetPath', 'ui.rewriteTargetPathHint', 'ui.spaFallbackPath', 'ui.spaFallbackPathHint', 'ui.spaFallback', 'ui.spaFallbackHint',
+            'ui.headerOverrides', 'ui.requestHeaders', 'ui.responseHeaders', 'ui.headerRuleEnabled', 'ui.headerRuleOperation', 'ui.headerRuleName', 'ui.headerRuleValue',
+            'ui.addHeaderRule', 'ui.removeHeaderRule', 'ui.headerOperation.add', 'ui.headerOperation.set', 'ui.headerOperation.remove', 'ui.restrictedRequestHeaderHint', 'ui.restrictedResponseHeaderHint', 'ui.headerRulesHint',
+            'ui.cookieUsed', 'ui.cookieUnused', 'ui.routeModalHint', 'ui.addRoute', 'ui.editRoute', 'ui.groupModalTitle', 'ui.groupModalHint', 'ui.listenerExtras',
             'ui.close', 'ui.mockModalTitle', 'ui.mockModalHint',
             'noWorkspace.title', 'noWorkspace.message',
         ];
@@ -527,6 +551,8 @@ export class PanelProvider {
             rewriteTargetPath: '',
             spaFallbackPath: '',
             spaFallback: false,
+            requestHeaders: [],
+            responseHeaders: [],
             enableMock: true,
             mockApis: [],
         };

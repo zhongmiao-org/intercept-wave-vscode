@@ -1,6 +1,14 @@
 import type { WsDirection, WsRuleMode, ProxyProtocol } from '../types';
 
 export type HttpRouteTargetType = 'PROXY' | 'STATIC';
+export type HeaderOverrideOperation = 'ADD' | 'SET' | 'REMOVE';
+
+export interface HeaderOverrideRule {
+    name: string;
+    value: string;
+    operation: HeaderOverrideOperation;
+    enabled: boolean;
+}
 
 export interface MockApiConfig {
     path: string;
@@ -27,6 +35,8 @@ export interface HttpRoute {
     rewriteTargetPath?: string;
     spaFallbackPath?: string;
     spaFallback?: boolean;
+    requestHeaders?: HeaderOverrideRule[];
+    responseHeaders?: HeaderOverrideRule[];
     enableMock: boolean;
     mockApis: MockApiConfig[];
 }

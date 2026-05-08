@@ -179,6 +179,156 @@ describe('HTTP Forwarding Integration', function () {
         expect(cookiesBody.cookies.user).to.equal('tom');
     });
 
+    it('applies route-level request header overrides before forwarding upstream', async () => {
+        const output = createOutputChannel();
+        const port = await getFreePort();
+        manager = createMockServerManager(
+            [
+                createHttpGroup({
+                    id: 'request-override-service',
+                    port,
+                    routes: [
+                        {
+                            id: 'api',
+                            name: 'API',
+                            pathPrefix: '/',
+                            targetType: 'PROXY',
+                            targetBaseUrl: getUpstreamHttpBase(0),
+                            staticRoot: '',
+                            stripPrefix: false,
+                            rewriteTargetPath: '',
+                            spaFallbackPath: '',
+                            spaFallback: false,
+                            requestHeaders: [
+                                { name: 'Authorization', value: 'Bearer route-token', operation: 'SET', enabled: true },
+                                { name: 'X-Trace', value: 'route', operation: 'ADD', enabled: true },
+                                { name: 'X-Remove-Me', value: '', operation: 'REMOVE', enabled: true },
+                                { name: 'Host', value: 'blocked.example', operation: 'SET', enabled: true },
+                            ],
+                            responseHeaders: [],
+                            enableMock: false,
+                            mockApis: [],
+                        },
+                    ],
+                }),
+            ],
+            output
+        );
+
+        await manager.start();
+
+        const response = await httpRequest({
+            url: `http://localhost:${port}/headers`,
+            headers: {
+                Authorization: 'Bearer incoming-token',
+                'X-Trace': 'client',
+                'X-Remove-Me': 'delete-this',
+            },
+        });
+
+        expect(response.statusCode).to.equal(200);
+        const body = JSON.parse(response.body);
+        expect(body.headers.Authorization).to.equal('Bearer route-token');
+        expect(body.headers['X-Trace']).to.equal('client, route');
+        expect(body.headers['X-Remove-Me']).to.equal(undefined);
+        expect(body.headers.Host).to.not.equal('blocked.example');
+    });
+
+    it('applies route-level response header overrides to proxied responses', async () => {
+        const output = createOutputChannel();
+        const port = await getFreePort();
+        manager = createMockServerManager(
+            [
+                createHttpGroup({
+                    id: 'response-override-service',
+                    port,
+                    routes: [
+                        {
+                            id: 'api',
+                            name: 'API',
+                            pathPrefix: '/',
+                            targetType: 'PROXY',
+                            targetBaseUrl: getUpstreamHttpBase(0),
+                            staticRoot: '',
+                            stripPrefix: false,
+                            rewriteTargetPath: '',
+                            spaFallbackPath: '',
+                            spaFallback: false,
+                            requestHeaders: [],
+                            responseHeaders: [
+                                { name: 'Access-Control-Allow-Origin', value: 'http://localhost:5173', operation: 'SET', enabled: true },
+                                { name: 'Cache-Control', value: 'no-store', operation: 'SET', enabled: true },
+                                { name: 'X-Route-Header', value: 'enabled', operation: 'SET', enabled: true },
+                                { name: 'Content-Length', value: '1', operation: 'SET', enabled: true },
+                            ],
+                            enableMock: false,
+                            mockApis: [],
+                        },
+                    ],
+                }),
+            ],
+            output
+        );
+
+        await manager.start();
+
+        const response = await httpRequest({
+            url: `http://localhost:${port}/health`,
+        });
+
+        expect(response.statusCode).to.equal(200);
+        expect(response.headers['access-control-allow-origin']).to.equal('http://localhost:5173');
+        expect(response.headers['cache-control']).to.equal('no-store');
+        expect(response.headers['x-route-header']).to.equal('enabled');
+        expect(response.headers['content-length']).to.equal(undefined);
+    });
+
+    it('applies route-level response header overrides to matched preflight responses', async () => {
+        const output = createOutputChannel();
+        const port = await getFreePort();
+        manager = createMockServerManager(
+            [
+                createHttpGroup({
+                    id: 'preflight-override-service',
+                    port,
+                    routes: [
+                        {
+                            id: 'api',
+                            name: 'API',
+                            pathPrefix: '/api',
+                            targetType: 'PROXY',
+                            targetBaseUrl: getUpstreamHttpBase(0),
+                            staticRoot: '',
+                            stripPrefix: true,
+                            rewriteTargetPath: '',
+                            spaFallbackPath: '',
+                            spaFallback: false,
+                            requestHeaders: [],
+                            responseHeaders: [
+                                { name: 'Access-Control-Allow-Origin', value: 'http://localhost:5173', operation: 'SET', enabled: true },
+                                { name: 'Access-Control-Allow-Methods', value: '', operation: 'REMOVE', enabled: true },
+                            ],
+                            enableMock: false,
+                            mockApis: [],
+                        },
+                    ],
+                }),
+            ],
+            output
+        );
+
+        await manager.start();
+
+        const response = await httpRequest({
+            method: 'OPTIONS',
+            url: `http://localhost:${port}/api/users`,
+        });
+
+        expect(response.statusCode).to.equal(200);
+        expect(response.headers['access-control-allow-origin']).to.equal('http://localhost:5173');
+        expect(response.headers['access-control-allow-methods']).to.equal(undefined);
+    });
+
     it('routes different proxy groups to different upstream services', async () => {
         const output = createOutputChannel();
         const userPort = await getFreePort();

@@ -247,6 +247,8 @@ export class ConfigManager {
             rewriteTargetPath: typeof route?.rewriteTargetPath === 'string' ? route.rewriteTargetPath.trim() : '',
             spaFallbackPath: this.normalizeSpaFallbackPath(route),
             spaFallback: targetType === 'STATIC' ? route?.spaFallback === true : false,
+            requestHeaders: this.normalizeHeaderOverrideRules(route?.requestHeaders),
+            responseHeaders: this.normalizeHeaderOverrideRules(route?.responseHeaders),
             enableMock: route?.enableMock !== undefined ? route.enableMock : true,
             mockApis: this.normalizeMockApis(route?.mockApis),
         };
@@ -263,6 +265,26 @@ export class ConfigManager {
             return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
         }
         return '';
+    }
+
+    private normalizeHeaderOverrideRules(rules: any): HttpRoute['requestHeaders'] {
+        if (!Array.isArray(rules)) {
+            return [];
+        }
+
+        return rules
+            .filter(Boolean)
+            .map(rule => ({
+                name: typeof rule.name === 'string' ? rule.name.trim() : '',
+                value: typeof rule.value === 'string' ? rule.value : '',
+                operation: this.normalizeHeaderOverrideOperation(rule.operation),
+                enabled: rule.enabled !== undefined ? rule.enabled === true : true,
+            }));
+    }
+
+    private normalizeHeaderOverrideOperation(operation: any): 'ADD' | 'SET' | 'REMOVE' {
+        const normalized = typeof operation === 'string' ? operation.trim().toUpperCase() : '';
+        return normalized === 'ADD' || normalized === 'REMOVE' ? normalized : 'SET';
     }
 
     private normalizeMockApis(mockApis: any): MockApiConfig[] {
@@ -336,6 +358,8 @@ export class ConfigManager {
             rewriteTargetPath: '',
             spaFallbackPath: '',
             spaFallback: false,
+            requestHeaders: [],
+            responseHeaders: [],
             enableMock: true,
             mockApis: this.normalizeMockApis(source?.mockApis),
         };

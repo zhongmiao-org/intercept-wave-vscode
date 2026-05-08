@@ -465,6 +465,24 @@ describe('SidebarProvider 4.0', () => {
         expect((sidebarProvider as any).validateRouteData('test-group-id', { name: '', pathPrefix: '/x', targetBaseUrl: 'http://x' })).to.be.a('string');
         expect((sidebarProvider as any).validateRouteData('test-group-id', { name: 'A', pathPrefix: '', targetBaseUrl: 'http://x' })).to.be.a('string');
         expect((sidebarProvider as any).validateRouteData('test-group-id', { name: 'A', pathPrefix: '/x', targetBaseUrl: '' })).to.be.a('string');
+        expect((sidebarProvider as any).validateRouteData('test-group-id', {
+            name: 'A',
+            pathPrefix: '/x',
+            targetBaseUrl: 'http://x',
+            requestHeaders: [{ name: '', value: 'v', operation: 'SET', enabled: true }],
+        })).to.be.a('string');
+        expect((sidebarProvider as any).validateRouteData('test-group-id', {
+            name: 'A',
+            pathPrefix: '/x',
+            targetBaseUrl: 'http://x',
+            responseHeaders: [{ name: 'X-Test', value: '', operation: 'ADD', enabled: true }],
+        })).to.be.a('string');
+        expect((sidebarProvider as any).validateRouteData('test-group-id', {
+            name: 'A',
+            pathPrefix: '/x',
+            targetBaseUrl: 'http://x',
+            responseHeaders: [{ name: 'X-Test', value: '', operation: 'REMOVE', enabled: true }],
+        })).to.equal(null);
         expect((sidebarProvider as any).validateMockData('test-group-id', 'missing-route', { path: '/x', method: 'GET' })).to.be.a('string');
 
         await (sidebarProvider as any).handleDeleteRoute('missing-group', 'route-1');

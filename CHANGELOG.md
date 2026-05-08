@@ -9,6 +9,7 @@
 - Added nginx-like local gateway migration recipes for frontend dev servers, backend routes, path rewrites, and SPA fallback.
 - Added English and Chinese usage guides aligned with the sibling `intercept-wave` project.
 - Added static frontend build serving for HTTP routes with `targetType="STATIC"`, `staticRoot`, static `spaFallback`, MIME handling, and traversal protection.
+- Added route-level request and response header overrides for proxy, static, mock, and matched preflight responses, with shared-config-compatible `ADD` / `SET` / `REMOVE` rules.
 - Added built-in Mock response templates for success, pagination, empty data, error, and auth-expired payloads.
 - Added frontend dev-server proxy support for `/` HTTP routes, including explicit route-level `spaFallbackPath` handling for SPA deep-link refreshes.
 - Added HTTP route rewrite rules with `rewriteTargetPath`, applied after `stripPrefix` for both Mock matching and upstream forwarding while preserving query strings.

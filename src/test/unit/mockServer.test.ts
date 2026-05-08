@@ -80,8 +80,24 @@ describe('MockServerManager', () => {
         const chunks: Buffer[] = [];
         res.headers = {};
         res.statusCodeValue = undefined;
+        const findHeaderKey = (key: string) =>
+            Object.keys(res.headers).find(existing => existing.toLowerCase() === key.toLowerCase());
         res.setHeader = sinon.stub().callsFake((key: string, value: any) => {
+            const existing = findHeaderKey(key);
+            if (existing && existing !== key) {
+                delete res.headers[existing];
+            }
             res.headers[key] = value;
+        });
+        res.getHeader = sinon.stub().callsFake((key: string) => {
+            const existing = findHeaderKey(key);
+            return existing ? res.headers[existing] : undefined;
+        });
+        res.removeHeader = sinon.stub().callsFake((key: string) => {
+            const existing = findHeaderKey(key);
+            if (existing) {
+                delete res.headers[existing];
+            }
         });
         res.writeHead = sinon.stub().callsFake((statusCode: number) => {
             res.statusCodeValue = statusCode;
@@ -248,12 +264,84 @@ describe('MockServerManager', () => {
         await (mockServerManager as any).handleMockResponse(
             res,
             { path: '/x', method: 'GET', enabled: true, mockData: '{"ok":true}', statusCode: 201, delay: 0, useCookie: true },
-            { ...defaultGroup, globalCookie: 'sid=1' }
+            { ...defaultGroup, globalCookie: 'sid=1' },
+            { ...defaultGroup.routes![0], responseHeaders: [] }
         );
 
         expect(headers['Set-Cookie']).to.equal('sid=1');
         expect(res.writeHead.calledWith(201)).to.equal(true);
         expect(res.end.calledWith('{"ok":true}')).to.equal(true);
+    });
+
+    it('applies response header overrides to mock responses after defaults', async () => {
+        const response = createResponse();
+
+        await (mockServerManager as any).handleMockResponse(
+            response.res,
+            { path: '/x', method: 'GET', enabled: true, mockData: '{"ok":true}', statusCode: 200, delay: 0 },
+            defaultGroup,
+            {
+                ...defaultGroup.routes![0],
+                responseHeaders: [
+                    { name: 'Access-Control-Allow-Origin', value: 'http://app.local', operation: 'SET', enabled: true },
+                    { name: 'Cache-Control', value: 'no-store', operation: 'SET', enabled: true },
+                    { name: 'Content-Type', value: '', operation: 'REMOVE', enabled: true },
+                    { name: 'Content-Length', value: '1', operation: 'SET', enabled: true },
+                ],
+            }
+        );
+
+        await response.done;
+        expect(response.res.headers['Access-Control-Allow-Origin']).to.equal('http://app.local');
+        expect(response.res.headers['Cache-Control']).to.equal('no-store');
+        expect(response.res.headers['Content-Type']).to.equal(undefined);
+        expect(response.res.headers['Content-Length']).to.equal(undefined);
+    });
+
+    it('applies request header overrides before forwarding and skips restricted request headers', () => {
+        const req = {
+            url: '/headers',
+            method: 'GET',
+            headers: {
+                host: 'localhost:9999',
+                'x-dev': 'original',
+                'x-list': 'a',
+                'remove-me': 'yes',
+            },
+            pipe: sinon.stub(),
+        } as any;
+        const res = { setHeader: sinon.stub(), writeHead: sinon.stub(), end: sinon.stub() } as any;
+        const proxyReq = new EventEmitter() as any;
+        proxyReq.on = proxyReq.addListener.bind(proxyReq);
+        proxyReq.end = sinon.stub();
+        const httpModule = require('http') as any;
+        const originalRequest = httpModule.request;
+        let forwardedHeaders: any;
+        httpModule.request = ((options: any) => {
+            forwardedHeaders = options.headers;
+            return proxyReq;
+        }) as any;
+
+        (mockServerManager as any).forwardToOriginalServer(req, res, {
+            ...defaultGroup.routes![0],
+            pathPrefix: '/',
+            stripPrefix: false,
+            requestHeaders: [
+                { name: 'X-Dev', value: 'set-value', operation: 'SET', enabled: true },
+                { name: 'X-List', value: 'b', operation: 'ADD', enabled: true },
+                { name: 'Remove-Me', value: '', operation: 'REMOVE', enabled: true },
+                { name: 'Host', value: 'evil.example', operation: 'SET', enabled: true },
+                { name: 'X-Off', value: 'nope', operation: 'SET', enabled: false },
+            ],
+        });
+
+        expect(forwardedHeaders['X-Dev']).to.equal('set-value');
+        expect(forwardedHeaders['X-List']).to.equal('a, b');
+        expect(forwardedHeaders['Remove-Me']).to.equal(undefined);
+        expect(forwardedHeaders.Host).to.equal(undefined);
+        expect(forwardedHeaders['X-Off']).to.equal(undefined);
+        expect(proxyReq.end.calledOnce).to.equal(true);
+        httpModule.request = originalRequest;
     });
 
     it('forwardToOriginalServer handles invalid target url and proxy request errors', () => {
@@ -337,6 +425,51 @@ describe('MockServerManager', () => {
         expect(res.setHeader.calledWith('content-type', 'application/json')).to.equal(true);
         expect(res.setHeader.calledWith('transfer-encoding', sinon.match.any)).to.equal(false);
         expect(res.writeHead.calledWith(204)).to.equal(true);
+        httpModule.request = originalRequest;
+    });
+
+    it('applies response header overrides to proxied responses after upstream headers and CORS', async () => {
+        const req = { url: '/users', method: 'GET', headers: {}, pipe: sinon.stub() } as any;
+        const response = createResponse();
+        const proxyReq = new EventEmitter() as any;
+        proxyReq.on = proxyReq.addListener.bind(proxyReq);
+        proxyReq.end = sinon.stub();
+        const httpModule = require('http') as any;
+        const originalRequest = httpModule.request;
+        httpModule.request = ((...args: any[]) => {
+            const cb = args.find(arg => typeof arg === 'function') as (proxyRes: any) => void;
+            cb({
+                headers: {
+                    'content-type': 'text/plain',
+                    'cache-control': 'max-age=60',
+                    'content-length': '100',
+                    connection: 'close',
+                },
+                statusCode: 200,
+                pipe: sinon.stub().callsFake((target: any) => target.end('ok')),
+            });
+            return proxyReq;
+        }) as any;
+
+        (mockServerManager as any).forwardToOriginalServer(req, response.res, {
+            ...defaultGroup.routes![0],
+            pathPrefix: '/',
+            stripPrefix: false,
+            responseHeaders: [
+                { name: 'Access-Control-Allow-Origin', value: 'http://app.local', operation: 'SET', enabled: true },
+                { name: 'Cache-Control', value: 'no-store', operation: 'SET', enabled: true },
+                { name: 'Cache-Control', value: 'must-revalidate', operation: 'ADD', enabled: true },
+                { name: 'Content-Type', value: '', operation: 'REMOVE', enabled: true },
+                { name: 'Connection', value: 'keep-alive', operation: 'SET', enabled: true },
+            ],
+        });
+
+        await response.done;
+        expect(response.res.headers['Access-Control-Allow-Origin']).to.equal('http://app.local');
+        expect(response.res.headers['Cache-Control']).to.equal('no-store, must-revalidate');
+        expect(response.res.headers['Content-Type']).to.equal(undefined);
+        expect(response.res.headers.connection).to.equal(undefined);
+        expect(response.res.headers['content-length']).to.equal(undefined);
         httpModule.request = originalRequest;
     });
 
@@ -458,6 +591,32 @@ describe('MockServerManager', () => {
         expect(forwardStub.calledOnce).to.equal(true);
     });
 
+    it('applies route response header overrides to matched OPTIONS preflight responses', async () => {
+        const response = createResponse();
+
+        await (mockServerManager as any).handleRequest(
+            { url: '/api/users', method: 'OPTIONS', headers: {}, pipe: sinon.stub() } as any,
+            response.res,
+            {
+                ...defaultGroup,
+                routes: [
+                    {
+                        ...defaultGroup.routes![0],
+                        responseHeaders: [
+                            { name: 'Access-Control-Allow-Origin', value: 'http://app.local', operation: 'SET', enabled: true },
+                            { name: 'Access-Control-Allow-Methods', value: '', operation: 'REMOVE', enabled: true },
+                        ],
+                    },
+                ],
+            }
+        );
+
+        await response.done;
+        expect(response.res.statusCodeValue).to.equal(200);
+        expect(response.res.headers['Access-Control-Allow-Origin']).to.equal('http://app.local');
+        expect(response.res.headers['Access-Control-Allow-Methods']).to.equal(undefined);
+    });
+
     it('serves static js and css files with frontend MIME types', async () => {
         writeStaticFixture();
 
@@ -482,6 +641,39 @@ describe('MockServerManager', () => {
         expect(css.res.statusCodeValue).to.equal(200);
         expect(css.res.headers['Content-Type']).to.equal('text/css; charset=UTF-8');
         expect(css.body()).to.equal('body { color: red; }');
+    });
+
+    it('applies response header overrides to static responses and static errors', async () => {
+        writeStaticFixture();
+
+        const ok = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/assets/style.css', method: 'GET', headers: {} } as any,
+            ok.res,
+            createStaticRoute({
+                responseHeaders: [
+                    { name: 'Content-Type', value: 'text/plain; charset=UTF-8', operation: 'SET', enabled: true },
+                    { name: 'X-Static', value: 'yes', operation: 'SET', enabled: true },
+                ],
+            })
+        );
+        await ok.done;
+        expect(ok.res.headers['Content-Type']).to.equal('text/plain; charset=UTF-8');
+        expect(ok.res.headers['X-Static']).to.equal('yes');
+
+        const missing = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/missing.txt', method: 'GET', headers: {} } as any,
+            missing.res,
+            createStaticRoute({
+                responseHeaders: [
+                    { name: 'Content-Type', value: 'text/plain', operation: 'SET', enabled: true },
+                ],
+            })
+        );
+        await missing.done;
+        expect(missing.res.statusCodeValue).to.equal(404);
+        expect(missing.res.headers['Content-Type']).to.equal('text/plain');
     });
 
     it('serves index.html for static root and directory paths', async () => {

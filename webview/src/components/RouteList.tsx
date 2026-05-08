@@ -19,6 +19,8 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
             const targetDetail = targetType === 'STATIC'
               ? (route.staticRoot || (labels.staticRoot || 'Static root'))
               : route.targetBaseUrl;
+            const requestHeaderCount = (route.requestHeaders || []).filter(rule => rule.enabled).length;
+            const responseHeaderCount = (route.responseHeaders || []).filter(rule => rule.enabled).length;
             return (
           <div
             key={route.id}
@@ -105,6 +107,17 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
                     color: 'var(--vscode-foreground)',
                   }}>
                     {labels.spaFallback || 'SPA fallback'}
+                  </span>
+                )}
+                {(requestHeaderCount > 0 || responseHeaderCount > 0) && (
+                  <span style={{
+                    fontSize: 11,
+                    padding: '2px 6px',
+                    borderRadius: 999,
+                    background: 'color-mix(in srgb, var(--vscode-charts-yellow) 18%, transparent)',
+                    color: 'var(--vscode-foreground)',
+                  }}>
+                    {labels.headerOverrides || 'Headers'} {requestHeaderCount}/{responseHeaderCount}
                   </span>
                 )}
               </div>

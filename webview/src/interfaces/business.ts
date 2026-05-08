@@ -8,6 +8,15 @@ export interface MockApiConfig {
   delay?: number;
 }
 
+export type HeaderOverrideOperation = 'ADD' | 'SET' | 'REMOVE';
+
+export interface HeaderOverrideRule {
+  name: string;
+  value: string;
+  operation: HeaderOverrideOperation;
+  enabled: boolean;
+}
+
 export interface HttpRoute {
   id: string;
   name: string;
@@ -19,6 +28,8 @@ export interface HttpRoute {
   rewriteTargetPath?: string;
   spaFallbackPath?: string;
   spaFallback?: boolean;
+  requestHeaders?: HeaderOverrideRule[];
+  responseHeaders?: HeaderOverrideRule[];
   enableMock: boolean;
   mockApis: MockApiConfig[];
 }
@@ -102,5 +113,5 @@ export type MockApiDraft = Pick<
 
 export type RouteDraft = Pick<
   HttpRoute,
-  'name' | 'pathPrefix' | 'targetType' | 'targetBaseUrl' | 'staticRoot' | 'stripPrefix' | 'rewriteTargetPath' | 'spaFallbackPath' | 'spaFallback' | 'enableMock'
+  'name' | 'pathPrefix' | 'targetType' | 'targetBaseUrl' | 'staticRoot' | 'stripPrefix' | 'rewriteTargetPath' | 'spaFallbackPath' | 'spaFallback' | 'requestHeaders' | 'responseHeaders' | 'enableMock'
 >;

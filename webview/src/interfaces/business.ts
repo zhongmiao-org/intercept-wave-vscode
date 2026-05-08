@@ -12,10 +12,13 @@ export interface HttpRoute {
   id: string;
   name: string;
   pathPrefix: string;
+  targetType?: 'PROXY' | 'STATIC';
   targetBaseUrl: string;
+  staticRoot?: string;
   stripPrefix: boolean;
   rewriteTargetPath?: string;
   spaFallbackPath?: string;
+  spaFallback?: boolean;
   enableMock: boolean;
   mockApis: MockApiConfig[];
 }
@@ -99,5 +102,5 @@ export type MockApiDraft = Pick<
 
 export type RouteDraft = Pick<
   HttpRoute,
-  'name' | 'pathPrefix' | 'targetBaseUrl' | 'stripPrefix' | 'rewriteTargetPath' | 'spaFallbackPath' | 'enableMock'
+  'name' | 'pathPrefix' | 'targetType' | 'targetBaseUrl' | 'staticRoot' | 'stripPrefix' | 'rewriteTargetPath' | 'spaFallbackPath' | 'spaFallback' | 'enableMock'
 >;

@@ -3,6 +3,10 @@ import { expect } from 'chai';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import { EventEmitter } from 'events';
+import { PassThrough } from 'stream';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { ConfigManager, MockConfig, MockServerManager, ProxyGroup } from '../../common';
 
 describe('MockServerManager', () => {
@@ -10,6 +14,7 @@ describe('MockServerManager', () => {
     let configManager: ConfigManager;
     let outputChannel: vscode.OutputChannel;
     let appendLineStub: sinon.SinonStub;
+    let workspaceRoot: string;
 
     const defaultGroup: ProxyGroup = {
         id: 'test-group-id',
@@ -53,9 +58,11 @@ describe('MockServerManager', () => {
             appendLine: appendLineStub,
             show: sinon.stub(),
         } as any;
+        workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'iw-static-'));
 
         configManager = {
             getConfig: sinon.stub().returns(structuredClone(defaultConfig)),
+            getWorkspaceRoot: sinon.stub().returns(workspaceRoot),
         } as any;
 
         mockServerManager = new MockServerManager(configManager, outputChannel);
@@ -63,7 +70,61 @@ describe('MockServerManager', () => {
 
     afterEach(async () => {
         sinon.restore();
+        if (workspaceRoot && fs.existsSync(workspaceRoot)) {
+            fs.rmSync(workspaceRoot, { recursive: true, force: true });
+        }
     });
+
+    function createResponse() {
+        const res = new PassThrough() as any;
+        const chunks: Buffer[] = [];
+        res.headers = {};
+        res.statusCodeValue = undefined;
+        res.setHeader = sinon.stub().callsFake((key: string, value: any) => {
+            res.headers[key] = value;
+        });
+        res.writeHead = sinon.stub().callsFake((statusCode: number) => {
+            res.statusCodeValue = statusCode;
+            return res;
+        });
+        res.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+        const done = new Promise<void>(resolve => res.on('finish', resolve));
+        return {
+            res,
+            done,
+            body: () => Buffer.concat(chunks).toString('utf-8'),
+        };
+    }
+
+    function writeStaticFixture() {
+        const staticRoot = path.join(workspaceRoot, 'frontend', 'dist');
+        fs.mkdirSync(path.join(staticRoot, 'assets'), { recursive: true });
+        fs.mkdirSync(path.join(staticRoot, 'docs'), { recursive: true });
+        fs.writeFileSync(path.join(staticRoot, 'index.html'), '<html>app</html>');
+        fs.writeFileSync(path.join(staticRoot, 'docs', 'index.html'), '<html>docs</html>');
+        fs.writeFileSync(path.join(staticRoot, 'assets', 'index.js'), 'console.log("app");');
+        fs.writeFileSync(path.join(staticRoot, 'assets', 'style.css'), 'body { color: red; }');
+        fs.writeFileSync(path.join(workspaceRoot, 'secret.txt'), 'secret');
+        return staticRoot;
+    }
+
+    function createStaticRoute(overrides: any = {}) {
+        return {
+            id: 'static',
+            name: 'Frontend Build',
+            pathPrefix: '/',
+            targetType: 'STATIC' as const,
+            targetBaseUrl: 'http://localhost:8080',
+            staticRoot: 'frontend/dist',
+            stripPrefix: false,
+            rewriteTargetPath: '',
+            spaFallbackPath: '',
+            spaFallback: false,
+            enableMock: false,
+            mockApis: [],
+            ...overrides,
+        };
+    }
 
     async function expectRejected(promise: Promise<any>, message: string) {
         try {
@@ -395,6 +456,182 @@ describe('MockServerManager', () => {
             }
         );
         expect(forwardStub.calledOnce).to.equal(true);
+    });
+
+    it('serves static js and css files with frontend MIME types', async () => {
+        writeStaticFixture();
+
+        const js = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/assets/index.js?cache=1', method: 'GET', headers: {} } as any,
+            js.res,
+            createStaticRoute()
+        );
+        await js.done;
+        expect(js.res.statusCodeValue).to.equal(200);
+        expect(js.res.headers['Content-Type']).to.equal('application/javascript; charset=UTF-8');
+        expect(js.body()).to.equal('console.log("app");');
+
+        const css = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/assets/style.css', method: 'GET', headers: {} } as any,
+            css.res,
+            createStaticRoute()
+        );
+        await css.done;
+        expect(css.res.statusCodeValue).to.equal(200);
+        expect(css.res.headers['Content-Type']).to.equal('text/css; charset=UTF-8');
+        expect(css.body()).to.equal('body { color: red; }');
+    });
+
+    it('serves index.html for static root and directory paths', async () => {
+        writeStaticFixture();
+
+        const root = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/', method: 'GET', headers: { accept: 'text/html' } } as any,
+            root.res,
+            createStaticRoute()
+        );
+        await root.done;
+        expect(root.res.statusCodeValue).to.equal(200);
+        expect(root.body()).to.equal('<html>app</html>');
+
+        const directory = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/docs/', method: 'GET', headers: { accept: 'text/html' } } as any,
+            directory.res,
+            createStaticRoute()
+        );
+        await directory.done;
+        expect(directory.res.statusCodeValue).to.equal(200);
+        expect(directory.body()).to.equal('<html>docs</html>');
+    });
+
+    it('serves static route prefix roots instead of the gateway welcome page', async () => {
+        writeStaticFixture();
+        const response = createResponse();
+
+        await (mockServerManager as any).handleRequest(
+            { url: '/app', method: 'GET', headers: { accept: 'text/html' }, pipe: sinon.stub() } as any,
+            response.res,
+            {
+                ...defaultGroup,
+                routes: [createStaticRoute({ pathPrefix: '/app', stripPrefix: true })],
+            }
+        );
+
+        await response.done;
+        expect(response.res.statusCodeValue).to.equal(200);
+        expect(response.body()).to.equal('<html>app</html>');
+    });
+
+    it('applies static SPA fallback only for missing browser navigation paths', async () => {
+        writeStaticFixture();
+
+        const fallback = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/dashboard', method: 'GET', headers: { accept: 'text/html' } } as any,
+            fallback.res,
+            createStaticRoute({ spaFallback: true })
+        );
+        await fallback.done;
+        expect(fallback.res.statusCodeValue).to.equal(200);
+        expect(fallback.body()).to.equal('<html>app</html>');
+
+        const disabled = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/dashboard', method: 'GET', headers: { accept: 'text/html' } } as any,
+            disabled.res,
+            createStaticRoute({ spaFallback: false })
+        );
+        await disabled.done;
+        expect(disabled.res.statusCodeValue).to.equal(404);
+        expect(disabled.body()).to.contain('Static file not found');
+
+        const assetLike = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/assets/missing.js', method: 'GET', headers: { accept: 'text/html' } } as any,
+            assetLike.res,
+            createStaticRoute({ spaFallback: true })
+        );
+        await assetLike.done;
+        expect(assetLike.res.statusCodeValue).to.equal(404);
+    });
+
+    it('rejects raw and encoded static traversal outside the configured root', async () => {
+        writeStaticFixture();
+
+        for (const url of ['/../secret.txt', '/%2e%2e/secret.txt', '/%2e%2e%2fsecret.txt']) {
+            const attempt = createResponse();
+            (mockServerManager as any).handleStaticResponse(
+                { url, method: 'GET', headers: {} } as any,
+                attempt.res,
+                createStaticRoute()
+            );
+            await attempt.done;
+            expect(attempt.res.statusCodeValue).to.equal(403);
+            expect(attempt.body()).to.not.contain('secret');
+        }
+    });
+
+    it('returns clear errors for missing static files and bad static roots', async () => {
+        writeStaticFixture();
+
+        const missing = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/missing.txt', method: 'GET', headers: {} } as any,
+            missing.res,
+            createStaticRoute()
+        );
+        await missing.done;
+        expect(missing.res.statusCodeValue).to.equal(404);
+        expect(missing.body()).to.contain('Static file not found');
+
+        const badRoot = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/index.html', method: 'GET', headers: {} } as any,
+            badRoot.res,
+            createStaticRoute({ staticRoot: '' })
+        );
+        await badRoot.done;
+        expect(badRoot.res.statusCodeValue).to.equal(502);
+        expect(badRoot.body()).to.contain('Static root is not configured');
+    });
+
+    it('uses route path strip and rewrite semantics before static file resolution', async () => {
+        writeStaticFixture();
+        fs.mkdirSync(path.join(workspaceRoot, 'frontend', 'dist', 'v1'), { recursive: true });
+        fs.writeFileSync(path.join(workspaceRoot, 'frontend', 'dist', 'v1', 'users.json'), '{"users":[]}');
+
+        const response = createResponse();
+        (mockServerManager as any).handleStaticResponse(
+            { url: '/backend/users.json?active=true', method: 'GET', headers: {} } as any,
+            response.res,
+            createStaticRoute({ pathPrefix: '/backend', stripPrefix: true, rewriteTargetPath: '/v1' })
+        );
+        await response.done;
+        expect(response.res.statusCodeValue).to.equal(200);
+        expect(response.body()).to.equal('{"users":[]}');
+    });
+
+    it('prefers enabled mocks before serving static files', async () => {
+        writeStaticFixture();
+        const baseRoute = createStaticRoute({
+            enableMock: true,
+            mockApis: [{ path: '/assets/index.js', method: 'GET', enabled: true, mockData: '{"mock":true}', statusCode: 200 }],
+        });
+        const handleMockStub = sinon.stub(mockServerManager as any, 'handleMockResponse').resolves();
+        const staticStub = sinon.stub(mockServerManager as any, 'handleStaticResponse');
+
+        await (mockServerManager as any).handleRequest(
+            { url: '/assets/index.js', method: 'GET', headers: {}, pipe: sinon.stub() } as any,
+            createResponse().res,
+            { ...defaultGroup, routes: [baseRoute] }
+        );
+
+        expect(handleMockStub.calledOnce).to.equal(true);
+        expect(staticStub.called).to.equal(false);
     });
 
     it('retries SPA fallback navigation 404s against index.html while preserving query strings', () => {

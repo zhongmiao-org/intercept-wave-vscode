@@ -1,5 +1,7 @@
 import * as http from 'http';
 import * as https from 'https';
+import * as fs from 'fs';
+import * as path from 'path';
 import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
@@ -37,10 +39,13 @@ export class MockServerManager {
                 id: `${group.id}-legacy-route`,
                 name: 'API',
                 pathPrefix: group.interceptPrefix || '/api',
+                targetType: 'PROXY',
                 targetBaseUrl: group.baseUrl || 'http://localhost:8080',
+                staticRoot: '',
                 stripPrefix: group.stripPrefix,
                 rewriteTargetPath: '',
                 spaFallbackPath: '',
+                spaFallback: false,
                 enableMock: true,
                 mockApis: group.mockApis || [],
             },
@@ -281,7 +286,7 @@ export class MockServerManager {
             return;
         }
 
-        if (shouldServeRouteWelcomePage(route, requestPath)) {
+        if (route.targetType !== 'STATIC' && shouldServeRouteWelcomePage(route, requestPath)) {
             this.handleWelcomePage(res, group);
             return;
         }
@@ -293,6 +298,8 @@ export class MockServerManager {
 
         if (route.enableMock && mockApi && mockApi.enabled) {
             await this.handleMockResponse(res, mockApi, group);
+        } else if (route.targetType === 'STATIC') {
+            this.handleStaticResponse(req, res, route);
         } else {
             this.forwardToOriginalServer(req, res, route);
         }
@@ -325,10 +332,13 @@ export class MockServerManager {
                 id: route.id,
                 name: route.name,
                 pathPrefix: route.pathPrefix,
+                targetType: route.targetType || 'PROXY',
                 targetBaseUrl: route.targetBaseUrl,
+                staticRoot: route.staticRoot || '',
                 stripPrefix: route.stripPrefix,
                 rewriteTargetPath: route.rewriteTargetPath || '',
                 spaFallbackPath: route.spaFallbackPath || '',
+                spaFallback: route.spaFallback === true,
                 enableMock: route.enableMock,
                 mockApis: {
                     total: route.mockApis.length,
@@ -414,6 +424,150 @@ export class MockServerManager {
 
     private buildTargetUrl(route: HttpRoute, forwardPath: string, queryString?: string): string {
         return `${route.targetBaseUrl.replace(/\/$/, '')}${forwardPath}${queryString !== undefined ? `?${queryString}` : ''}`;
+    }
+
+    private handleStaticResponse(
+        req: http.IncomingMessage,
+        res: http.ServerResponse,
+        route: HttpRoute
+    ): void {
+        const root = this.resolveStaticRoot(route.staticRoot);
+        if (!root || !fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
+            this.sendErrorResponse(res, 502, 'Bad Gateway: Static root is not configured or is not a directory');
+            return;
+        }
+
+        const requestUrl = req.url || '/';
+        const queryIndex = requestUrl.indexOf('?');
+        const requestPath = queryIndex >= 0 ? requestUrl.slice(0, queryIndex) : requestUrl;
+        const staticRoutePath = computeHttpForwardPath(route, requestPath || '/');
+        const resolved = this.resolveStaticFile(root, staticRoutePath);
+        if (!resolved) {
+            this.sendErrorResponse(res, 403, 'Forbidden: static path escapes the configured root');
+            return;
+        }
+
+        try {
+            const directFile = this.selectStaticFile(resolved);
+            if (directFile) {
+                this.sendStaticFile(req, res, directFile);
+                return;
+            }
+
+            if (this.shouldServeStaticSpaFallback(req, route, staticRoutePath)) {
+                const fallbackFile = path.join(root, 'index.html');
+                if (fs.existsSync(fallbackFile) && fs.statSync(fallbackFile).isFile()) {
+                    this.sendStaticFile(req, res, fallbackFile);
+                    return;
+                }
+            }
+
+            this.sendErrorResponse(res, 404, 'Static file not found');
+        } catch (error: any) {
+            this.outputChannel.appendLine(`   ❌ Static file error: ${error.message || error}`);
+            this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to serve static file');
+        }
+    }
+
+    private resolveStaticRoot(staticRoot?: string): string | undefined {
+        const trimmed = typeof staticRoot === 'string' ? staticRoot.trim() : '';
+        if (!trimmed) return undefined;
+        if (path.isAbsolute(trimmed)) {
+            return path.resolve(trimmed);
+        }
+        return path.resolve(this.getWorkspaceRoot(), trimmed);
+    }
+
+    private getWorkspaceRoot(): string {
+        const manager = this.configManager as any;
+        if (typeof manager.getWorkspaceRoot === 'function') {
+            return manager.getWorkspaceRoot();
+        }
+        if (typeof manager.getConfigPath === 'function') {
+            return path.resolve(path.dirname(manager.getConfigPath()), '..');
+        }
+        return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+    }
+
+    private resolveStaticFile(root: string, staticRoutePath: string): string | undefined {
+        const decoded = this.decodeStaticPath(staticRoutePath);
+        if (decoded === undefined) return undefined;
+
+        const relativeText = decoded.replace(/\\/g, '/').replace(/^\/+/, '');
+        const target = relativeText ? path.resolve(root, relativeText) : root;
+        const relative = path.relative(root, target);
+        if (relative.startsWith('..') || path.isAbsolute(relative)) {
+            return undefined;
+        }
+        return target;
+    }
+
+    private decodeStaticPath(staticRoutePath: string): string | undefined {
+        try {
+            return decodeURIComponent(staticRoutePath);
+        } catch {
+            return undefined;
+        }
+    }
+
+    private selectStaticFile(resolved: string): string | undefined {
+        if (!fs.existsSync(resolved)) return undefined;
+        const stat = fs.statSync(resolved);
+        if (stat.isFile()) return resolved;
+        if (stat.isDirectory()) {
+            const indexFile = path.join(resolved, 'index.html');
+            if (fs.existsSync(indexFile) && fs.statSync(indexFile).isFile()) {
+                return indexFile;
+            }
+        }
+        return undefined;
+    }
+
+    private sendStaticFile(req: http.IncomingMessage, res: http.ServerResponse, filePath: string): void {
+        this.sendCorsHeaders(res);
+        res.setHeader('Content-Type', this.getStaticContentType(filePath));
+        res.writeHead(200);
+        if ((req.method || 'GET').toUpperCase() === 'HEAD') {
+            res.end();
+            return;
+        }
+        fs.createReadStream(filePath).pipe(res);
+    }
+
+    private getStaticContentType(filePath: string): string {
+        const ext = path.extname(filePath).slice(1).toLowerCase();
+        switch (ext) {
+            case 'html':
+            case 'htm':
+                return 'text/html; charset=UTF-8';
+            case 'js':
+            case 'mjs':
+                return 'application/javascript; charset=UTF-8';
+            case 'css':
+                return 'text/css; charset=UTF-8';
+            case 'json':
+            case 'map':
+                return 'application/json; charset=UTF-8';
+            case 'svg':
+                return 'image/svg+xml';
+            case 'png':
+                return 'image/png';
+            case 'jpg':
+            case 'jpeg':
+                return 'image/jpeg';
+            case 'webp':
+                return 'image/webp';
+            case 'gif':
+                return 'image/gif';
+            case 'ico':
+                return 'image/x-icon';
+            case 'wasm':
+                return 'application/wasm';
+            case 'txt':
+                return 'text/plain; charset=UTF-8';
+            default:
+                return 'application/octet-stream';
+        }
     }
 
     private proxyToTarget(
@@ -524,6 +678,20 @@ export class MockServerManager {
             return false;
         }
         if (this.hasFileExtension(originalRequestPath)) {
+            return false;
+        }
+        const accept = String(req.headers.accept || '').toLowerCase();
+        return accept === '' || accept.includes('text/html') || accept.includes('application/xhtml+xml') || accept.includes('*/*');
+    }
+
+    private shouldServeStaticSpaFallback(req: http.IncomingMessage, route: HttpRoute, staticRoutePath: string): boolean {
+        if (route.spaFallback !== true) {
+            return false;
+        }
+        if (!this.isBodylessMethod(req.method)) {
+            return false;
+        }
+        if (this.hasFileExtension(staticRoutePath)) {
             return false;
         }
         const accept = String(req.headers.accept || '').toLowerCase();

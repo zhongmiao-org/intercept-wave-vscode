@@ -36,15 +36,22 @@ Intercept Wave 是一个 VS Code 扩展，用于在本地开发中统一处理 H
 - **全局 Cookie**：需要时可统一为 Mock 响应附带 Cookie
 - **路由列表**：一个 HTTP 配置组可维护多条路由，每条路由都包含：
     - **路径前缀**：如 `/api`、`/order-api`
+    - **目标类型**：`PROXY` 表示转发到上游，`STATIC` 表示服务本地前端构建文件
     - **目标地址**：如 `http://localhost:8080`
+    - **静态目录**：当 `targetType="STATIC"` 时可配置 `dist`、`build` 或 `frontend/dist`
     - **剥离前缀**：是否在匹配和转发前移除当前路由前缀
     - **重写目标路径**：可选，剥离前缀后追加的目标路径基底，如 `/v1`
-    - **SPA 回退路径**：可选，前端导航请求返回 404 时重试的路径，如 `/index.html`
+    - **SPA 回退路径**：可选，proxy 路由前端导航请求返回 404 时重试的路径，如 `/index.html`
+    - **SPA 回退**：static 路由开关，未命中文件的浏览器导航请求会返回 `index.html`
     - **启用 Mock**：是否优先使用该路由下的 Mock 列表
 
 路由重写适合迁移本地 nginx 规则。例如配置 `pathPrefix="/backend"`、`stripPrefix=true`、`rewriteTargetPath="/v1"` 后，访问 `/backend/users?active=true` 会按 `/v1/users?active=true` 进行匹配和转发。该能力用于本地开发网关，不是生产 nginx 替代方案。
 
 前端开发服务器代理示例：配置后端路由 `pathPrefix="/api"`、`stripPrefix=true`、`targetBaseUrl="http://localhost:9000"`，再配置前端路由 `pathPrefix="/"`、`stripPrefix=false`、`targetBaseUrl="http://localhost:5173"`、`spaFallbackPath="/index.html"`、`enableMock=false`。之后 `/api/users` 进入后端，`/`、`/assets/app.js`、`/dashboard/settings` 进入前端开发服务器。
+
+前端构建产物静态路由示例：前端构建完成后，配置 `targetType="STATIC"`、`staticRoot="frontend/dist"`、`pathPrefix="/"`、`spaFallback=true`。之后 `/assets/index.js` 和 `/assets/style.css` 会从构建目录读取并返回正确的前端 MIME 类型，浏览器刷新 `/dashboard` 会返回 `index.html`。
+
+静态目录按工作区/项目根目录解析。项目内目录会保存为 `dist`、`build`、`frontend/dist` 这样的相对路径，便于共享 `.intercept-wave/config.json`；项目外绝对路径也允许用于本机实验，但依赖当前机器。
 
 #### Nginx 迁移配置片段
 
@@ -129,13 +136,33 @@ Intercept Wave 是一个 VS Code 扩展，用于在本地开发中统一处理 H
 ]
 ```
 
+面向 `dist/` 或 `build/` 产物的前端静态路由：
+
+```json
+{
+    "name": "Frontend Build",
+    "pathPrefix": "/",
+    "targetType": "STATIC",
+    "targetBaseUrl": "http://localhost:8080",
+    "staticRoot": "frontend/dist",
+    "stripPrefix": false,
+    "rewriteTargetPath": "",
+    "spaFallbackPath": "",
+    "spaFallback": true,
+    "enableMock": false,
+    "mockApis": []
+}
+```
+
+static 路由同样使用现有 route-local 路径语义：先执行 `stripPrefix`，再执行 `rewriteTargetPath`，查询参数不参与文件查找。包含原始或编码 `..` 的请求会在读取文件前被拒绝，不能逃出 `staticRoot`。
+
 常见问题：
 
 - **端口占用**：修改配置组端口，或停止已经监听该端口的进程。
-- **SPA 刷新返回 404**：前端路由保持 `pathPrefix="/"`，设置 `enableMock=false`，并设置 `spaFallbackPath="/index.html"` 处理 HTML 导航请求。
+- **SPA 刷新返回 404**：proxy 到前端开发服务器时，前端路由保持 `pathPrefix="/"`，设置 `enableMock=false`，并设置 `spaFallbackPath="/index.html"` 处理 HTML 导航请求。static 构建路由则设置 `targetType="STATIC"` 和 `spaFallback=true`。
 - **前缀或重写不符合预期**：`stripPrefix` 会先于 `rewriteTargetPath` 执行；Mock 路径和转发路径都使用重写后的路由本地路径。
 - **CORS 或请求头行为不符合预期**：本地网关会为开发场景追加默认 CORS 头；路由级请求/响应头覆盖能力另行跟进。
-- **静态 dist 和 HTTPS**：静态构建产物服务由 [#42](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/42) 跟进，HTTPS 监听支持由 [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40) 跟进。
+- **请求头和 HTTPS**：路由级请求/响应头覆盖由 [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44) 跟进，HTTPS 监听支持由 [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40) 跟进。
 
 相关 roadmap：VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39)、IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150)、IntelliJ 文档 [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157)。
 

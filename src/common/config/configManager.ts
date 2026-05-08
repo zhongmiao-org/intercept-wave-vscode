@@ -17,14 +17,16 @@ interface LegacyRootConfig {
 
 export class ConfigManager {
     private readonly configPath: string;
+    private readonly workspaceRoot: string;
 
     constructor(private readonly _: vscode.ExtensionContext) {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
             throw new Error('No workspace folder found');
         }
+        this.workspaceRoot = workspaceFolder.uri.fsPath;
 
-        const configDir = path.join(workspaceFolder.uri.fsPath, '.intercept-wave');
+        const configDir = path.join(this.workspaceRoot, '.intercept-wave');
         if (!fs.existsSync(configDir)) {
             fs.mkdirSync(configDir, { recursive: true });
         }
@@ -41,6 +43,10 @@ export class ConfigManager {
 
     getConfigPath(): string {
         return this.configPath;
+    }
+
+    getWorkspaceRoot(): string {
+        return this.workspaceRoot;
     }
 
     private getTargetVersion(): string {
@@ -229,17 +235,25 @@ export class ConfigManager {
     }
 
     private normalizeRoute(route: Partial<HttpRoute> | null | undefined): HttpRoute {
+        const targetType = this.normalizeRouteTargetType(route);
         return {
             id: route?.id || uuidv4(),
             name: route?.name || 'API',
             pathPrefix: route?.pathPrefix || '/api',
+            targetType,
             targetBaseUrl: route?.targetBaseUrl || 'http://localhost:8080',
+            staticRoot: targetType === 'STATIC' && typeof route?.staticRoot === 'string' ? route.staticRoot.trim() : '',
             stripPrefix: route?.stripPrefix !== undefined ? route.stripPrefix : true,
             rewriteTargetPath: typeof route?.rewriteTargetPath === 'string' ? route.rewriteTargetPath.trim() : '',
             spaFallbackPath: this.normalizeSpaFallbackPath(route),
+            spaFallback: targetType === 'STATIC' ? route?.spaFallback === true : false,
             enableMock: route?.enableMock !== undefined ? route.enableMock : true,
             mockApis: this.normalizeMockApis(route?.mockApis),
         };
+    }
+
+    private normalizeRouteTargetType(route: Partial<HttpRoute> | null | undefined): 'PROXY' | 'STATIC' {
+        return route?.targetType === 'STATIC' ? 'STATIC' : 'PROXY';
     }
 
     private normalizeSpaFallbackPath(route: Partial<HttpRoute> | null | undefined): string {
@@ -315,10 +329,13 @@ export class ConfigManager {
             id: uuidv4(),
             name: 'API',
             pathPrefix: source?.interceptPrefix || '/api',
+            targetType: 'PROXY',
             targetBaseUrl: source?.baseUrl || 'http://localhost:8080',
+            staticRoot: '',
             stripPrefix: source?.stripPrefix !== undefined ? source.stripPrefix : true,
             rewriteTargetPath: '',
             spaFallbackPath: '',
+            spaFallback: false,
             enableMock: true,
             mockApis: this.normalizeMockApis(source?.mockApis),
         };

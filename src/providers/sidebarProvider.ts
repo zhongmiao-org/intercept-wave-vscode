@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { ConfigManager, HttpRoute, MockServerManager, ProxyGroup, buildReactWebviewHtml } from '../common';
 import { PanelProvider } from './panelProvider';
 import { v4 as uuidv4 } from 'uuid';
@@ -107,6 +108,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'deleteRoute':
                     await this.handleDeleteRoute(data.groupId, data.routeId);
+                    break;
+                case 'chooseStaticRoot':
+                    await this.handleChooseStaticRoot(data.current);
                     break;
                 case 'addMock':
                     await this.handleAddMock(data.groupId, data.routeId, data.data);
@@ -315,10 +319,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             id: uuidv4(),
             name: data.name,
             pathPrefix: data.pathPrefix,
+            targetType: data.targetType === 'STATIC' ? 'STATIC' : 'PROXY',
             targetBaseUrl: data.targetBaseUrl,
+            staticRoot: typeof data.staticRoot === 'string' ? data.staticRoot.trim() : '',
             stripPrefix: data.stripPrefix,
             rewriteTargetPath: typeof data.rewriteTargetPath === 'string' ? data.rewriteTargetPath.trim() : '',
             spaFallbackPath: this.normalizeSpaFallbackPath(data),
+            spaFallback: data.targetType === 'STATIC' ? data.spaFallback === true : false,
             enableMock: data.enableMock,
             mockApis: [],
         };
@@ -328,7 +335,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
 
     private async handleUpdateRoute(groupId: string, routeId: string, data: any) {
-        const error = this.validateRouteData(groupId, data, routeId);
+        const existing = (this.configManager.getConfig().proxyGroups.find(g => g.id === groupId)?.routes || []).find(route => route.id === routeId);
+        const nextData = { ...existing, ...data };
+        const error = this.validateRouteData(groupId, nextData, routeId);
         if (error) {
             void vscode.window.showErrorMessage(error);
             await this.notify('error', error);
@@ -345,6 +354,52 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
         }
         return '';
+    }
+
+    private async handleChooseStaticRoot(current?: string) {
+        const workspaceRoot = this.getWorkspaceRoot();
+        const defaultUri = vscode.Uri.file(this.resolveStaticRootForUi(String(current || ''), workspaceRoot));
+        const selected = await vscode.window.showOpenDialog({
+            canSelectFiles: false,
+            canSelectFolders: true,
+            canSelectMany: false,
+            defaultUri,
+            openLabel: vscode.l10n.t('ui.chooseFolder'),
+        });
+        const folder = selected?.[0]?.fsPath;
+        if (!folder || !this.webviewView) return;
+        await this.webviewView.webview.postMessage({
+            type: 'staticRootSelected',
+            staticRoot: this.toStoredStaticRoot(folder, workspaceRoot),
+        });
+    }
+
+    private resolveStaticRootForUi(current: string, workspaceRoot: string): string {
+        const trimmed = current.trim();
+        if (!trimmed) return workspaceRoot;
+        return path.isAbsolute(trimmed) ? trimmed : path.resolve(workspaceRoot, trimmed);
+    }
+
+    private toStoredStaticRoot(selectedPath: string, workspaceRoot: string): string {
+        const relative = path.relative(workspaceRoot, selectedPath);
+        if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) {
+            return relative.split(path.sep).join('/');
+        }
+        if (relative === '') {
+            return '.';
+        }
+        return selectedPath;
+    }
+
+    private getWorkspaceRoot(): string {
+        const manager = this.configManager as any;
+        if (typeof manager.getWorkspaceRoot === 'function') {
+            return manager.getWorkspaceRoot();
+        }
+        if (typeof manager.getConfigPath === 'function') {
+            return path.resolve(path.dirname(manager.getConfigPath()), '..');
+        }
+        return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
     }
 
     private async handleDeleteRoute(groupId: string, routeId: string) {
@@ -464,7 +519,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             'ui.proxyControl', 'ui.navigator', 'ui.navigatorHint', 'ui.openWorkspace', 'ui.proxyGroups', 'ui.expand', 'ui.collapse', 'ui.openInPanel', 'ui.schema', 'ui.routes', 'ui.route', 'ui.mocks',
             'ui.mockOn', 'ui.mockOff', 'ui.routeDetail', 'ui.noActiveGroup', 'ui.noRouteSelected', 'ui.noRoutesConfigured',
             'ui.routeSelectionHint', 'ui.listenerSharedHint', 'ui.routeMatchHint', 'ui.routePrefix', 'ui.targetBaseUrl', 'ui.enableMock',
-            'ui.rewriteTargetPath', 'ui.rewriteTargetPathHint', 'ui.spaFallbackPath', 'ui.spaFallbackPathHint', 'ui.cookieUsed', 'ui.cookieUnused', 'ui.routeModalHint', 'ui.addRoute', 'ui.editRoute', 'ui.groupModalTitle', 'ui.groupModalHint', 'ui.listenerExtras',
+            'ui.targetType', 'ui.targetType.proxy', 'ui.targetType.static', 'ui.staticRoot', 'ui.staticRootHint', 'ui.staticRootExternalHint', 'ui.chooseFolder',
+            'ui.rewriteTargetPath', 'ui.rewriteTargetPathHint', 'ui.spaFallbackPath', 'ui.spaFallbackPathHint', 'ui.spaFallback', 'ui.spaFallbackHint', 'ui.cookieUsed', 'ui.cookieUnused', 'ui.routeModalHint', 'ui.addRoute', 'ui.editRoute', 'ui.groupModalTitle', 'ui.groupModalHint', 'ui.listenerExtras',
             'ui.close', 'ui.mockModalTitle', 'ui.mockModalHint',
             'noWorkspace.title', 'noWorkspace.message',
         ];
@@ -521,7 +577,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         if (!group) return vscode.l10n.t('error.groupNotFound');
         if (!data.name || String(data.name).trim() === '') return vscode.l10n.t('error.routeNameRequired');
         if (!data.pathPrefix || String(data.pathPrefix).trim() === '') return vscode.l10n.t('error.routePathPrefixRequired');
-        if (!data.targetBaseUrl || String(data.targetBaseUrl).trim() === '') return vscode.l10n.t('error.routeTargetBaseUrlRequired');
+        const targetType = data.targetType === 'STATIC' ? 'STATIC' : 'PROXY';
+        if (targetType === 'STATIC') {
+            if (!data.staticRoot || String(data.staticRoot).trim() === '') return vscode.l10n.t('error.routeStaticRootRequired');
+        } else if (!data.targetBaseUrl || String(data.targetBaseUrl).trim() === '') {
+            return vscode.l10n.t('error.routeTargetBaseUrlRequired');
+        }
         const pathPrefix = String(data.pathPrefix).trim();
         const exists = (group.routes || []).some(route => route.id !== editingRouteId && route.pathPrefix.trim() === pathPrefix);
         return exists ? vscode.l10n.t('error.routePathPrefixExists', pathPrefix) : null;
@@ -543,10 +604,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             id: uuidv4(),
             name: 'API',
             pathPrefix: '/api',
+            targetType: 'PROXY',
             targetBaseUrl: 'http://localhost:8080',
+            staticRoot: '',
             stripPrefix: true,
             rewriteTargetPath: '',
             spaFallbackPath: '',
+            spaFallback: false,
             enableMock: true,
             mockApis: [],
         };

@@ -11,6 +11,15 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {routes.map(route => (
+          (() => {
+            const targetType = route.targetType === 'STATIC' ? 'STATIC' : 'PROXY';
+            const targetLabel = targetType === 'STATIC'
+              ? (labels.targetTypeStatic || 'Static')
+              : (labels.targetTypeProxy || 'Proxy');
+            const targetDetail = targetType === 'STATIC'
+              ? (route.staticRoot || (labels.staticRoot || 'Static root'))
+              : route.targetBaseUrl;
+            return (
           <div
             key={route.id}
             onClick={() => onSelect(route.id)}
@@ -34,6 +43,17 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
             <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
                 <div style={{ fontWeight: 600 }}>{route.name}</div>
+                <span style={{
+                  fontSize: 11,
+                  padding: '2px 6px',
+                  borderRadius: 999,
+                  background: targetType === 'STATIC'
+                    ? 'color-mix(in srgb, var(--vscode-charts-green) 18%, transparent)'
+                    : 'color-mix(in srgb, var(--vscode-charts-blue) 18%, transparent)',
+                  color: 'var(--vscode-foreground)',
+                }}>
+                  {targetLabel}
+                </span>
                 <span style={{
                   fontSize: 11,
                   padding: '2px 6px',
@@ -65,7 +85,7 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
                     {(labels.rewriteTargetPath || 'Rewrite')} {route.rewriteTargetPath}
                   </span>
                 )}
-                {route.spaFallbackPath && (
+                {targetType !== 'STATIC' && route.spaFallbackPath && (
                   <span style={{
                     fontSize: 11,
                     padding: '2px 6px',
@@ -74,6 +94,17 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
                     color: 'var(--vscode-foreground)',
                   }}>
                     {labels.spaFallbackPath || 'SPA fallback'} {route.spaFallbackPath}
+                  </span>
+                )}
+                {targetType === 'STATIC' && route.spaFallback && (
+                  <span style={{
+                    fontSize: 11,
+                    padding: '2px 6px',
+                    borderRadius: 999,
+                    background: 'color-mix(in srgb, var(--vscode-charts-blue) 18%, transparent)',
+                    color: 'var(--vscode-foreground)',
+                  }}>
+                    {labels.spaFallback || 'SPA fallback'}
                   </span>
                 )}
               </div>
@@ -95,7 +126,7 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}>
-                {route.targetBaseUrl}
+                {targetDetail}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -115,6 +146,8 @@ export function RouteList({ routes, activeRouteId, onSelect, onAdd, onEdit, onDe
               </button>
             </div>
           </div>
+            );
+          })()
         ))}
         {routes.length === 0 && (
           <div style={{

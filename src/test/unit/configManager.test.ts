@@ -65,10 +65,13 @@ describe('ConfigManager 4.0', () => {
         expect(cfg.proxyGroups[0].routes?.[0]).to.include({
             name: 'API',
             pathPrefix: '/api',
+            targetType: 'PROXY',
             targetBaseUrl: 'http://localhost:8080',
+            staticRoot: '',
             stripPrefix: true,
             rewriteTargetPath: '',
             spaFallbackPath: '',
+            spaFallback: false,
             enableMock: true,
         });
     });
@@ -94,10 +97,13 @@ describe('ConfigManager 4.0', () => {
         expect(route).to.include({
             name: 'API',
             pathPrefix: '/legacy',
+            targetType: 'PROXY',
             targetBaseUrl: 'http://localhost:18080',
+            staticRoot: '',
             stripPrefix: false,
             rewriteTargetPath: '',
             spaFallbackPath: '',
+            spaFallback: false,
             enableMock: true,
         });
         expect(route?.mockApis).to.have.length(1);
@@ -129,10 +135,13 @@ describe('ConfigManager 4.0', () => {
         expect(route).to.include({
             name: 'API',
             pathPrefix: '/api',
+            targetType: 'PROXY',
             targetBaseUrl: 'http://localhost:9000',
+            staticRoot: '',
             stripPrefix: true,
             rewriteTargetPath: '',
             spaFallbackPath: '',
+            spaFallback: false,
             enableMock: true,
         });
         expect(route?.mockApis[0].path).to.equal('/test');
@@ -146,10 +155,13 @@ describe('ConfigManager 4.0', () => {
             id: 'route-2',
             name: 'API 2',
             pathPrefix: '/api2',
+            targetType: 'PROXY',
             targetBaseUrl: 'http://localhost:8082',
+            staticRoot: '',
             stripPrefix: true,
             rewriteTargetPath: '/v1/',
             spaFallbackPath: '/index.html',
+            spaFallback: false,
             enableMock: false,
             mockApis: [],
         });
@@ -165,8 +177,10 @@ describe('ConfigManager 4.0', () => {
         cfg = cm.getConfig();
         expect(cfg.proxyGroups[0].routes?.find(route => route.id === 'route-2')).to.include({
             targetBaseUrl: 'http://localhost:9090',
+            staticRoot: '',
             rewriteTargetPath: '/v1/',
             spaFallbackPath: '/index.html',
+            spaFallback: false,
             enableMock: true,
         });
 
@@ -183,8 +197,13 @@ describe('ConfigManager 4.0', () => {
             id: 'route-2',
             name: 'API 2',
             pathPrefix: '/api2',
+            targetType: 'PROXY',
             targetBaseUrl: 'http://localhost:8082',
+            staticRoot: '',
             stripPrefix: true,
+            rewriteTargetPath: '',
+            spaFallbackPath: '',
+            spaFallback: false,
             enableMock: true,
             mockApis: [],
         });
@@ -250,19 +269,27 @@ describe('ConfigManager 4.0', () => {
                 id: 'route-1',
                 name: 'API',
                 pathPrefix: '/api',
+                targetType: 'PROXY',
                 targetBaseUrl: 'http://localhost:9000',
+                staticRoot: '',
                 stripPrefix: true,
+                rewriteTargetPath: '',
+                spaFallbackPath: '',
+                spaFallback: false,
                 enableMock: true,
                 mockApis: [],
             },
             {
                 id: 'route-2',
-                name: 'API 2',
-                pathPrefix: '/api2',
+                name: 'Frontend Build',
+                pathPrefix: '/',
+                targetType: 'STATIC',
                 targetBaseUrl: 'http://localhost:9001',
+                staticRoot: 'frontend/dist',
                 stripPrefix: true,
                 spaFallbackPath: '/index.html',
                 rewriteTargetPath: '/v2',
+                spaFallback: true,
                 enableMock: false,
                 mockApis: [],
             },
@@ -274,11 +301,88 @@ describe('ConfigManager 4.0', () => {
         expect(saved.version).to.equal('4.0');
         expect(saved.proxyGroups[0].routes).to.have.length(2);
         expect(saved.proxyGroups[0].routes[1]).to.include({
-            name: 'API 2',
-            pathPrefix: '/api2',
+            name: 'Frontend Build',
+            pathPrefix: '/',
+            targetType: 'STATIC',
             targetBaseUrl: 'http://localhost:9001',
+            staticRoot: 'frontend/dist',
             rewriteTargetPath: '/v2',
             spaFallbackPath: '/index.html',
+            spaFallback: true,
+            enableMock: false,
+        });
+    });
+
+    it('normalizes missing static route fields to proxy-compatible values', () => {
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.writeFileSync(configPath, JSON.stringify({
+            version: '4.0',
+            proxyGroups: [
+                {
+                    id: 'g1',
+                    name: 'G1',
+                    protocol: 'HTTP',
+                    port: 8888,
+                    enabled: true,
+                    stripPrefix: true,
+                    globalCookie: '',
+                    interceptPrefix: '/api',
+                    baseUrl: 'http://localhost:9000',
+                    mockApis: [],
+                    routes: [
+                        {
+                            id: 'route-1',
+                            name: 'API',
+                            pathPrefix: '/api',
+                            targetBaseUrl: 'http://localhost:9000',
+                            stripPrefix: true,
+                            enableMock: true,
+                            mockApis: [],
+                        },
+                    ],
+                },
+            ],
+        }, null, 2), 'utf-8');
+
+        const route = createManager().getConfig().proxyGroups[0].routes?.[0];
+
+        expect(route).to.include({
+            targetType: 'PROXY',
+            staticRoot: '',
+            spaFallbackPath: '',
+            spaFallback: false,
+        });
+    });
+
+    it('preserves static route fields in the shared config shape', async () => {
+        const cm = createManager();
+        const groupId = cm.getConfig().proxyGroups[0].id;
+
+        await cm.addRoute(groupId, {
+            id: 'static-route',
+            name: 'Frontend Build',
+            pathPrefix: '/',
+            targetType: 'STATIC',
+            targetBaseUrl: 'http://localhost:8080',
+            staticRoot: './frontend/dist',
+            stripPrefix: false,
+            rewriteTargetPath: '',
+            spaFallbackPath: '',
+            spaFallback: true,
+            enableMock: false,
+            mockApis: [],
+        });
+
+        const saved = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        const route = saved.proxyGroups[0].routes.find((item: any) => item.id === 'static-route');
+
+        expect(route).to.include({
+            targetType: 'STATIC',
+            targetBaseUrl: 'http://localhost:8080',
+            staticRoot: './frontend/dist',
+            rewriteTargetPath: '',
+            spaFallbackPath: '',
+            spaFallback: true,
             enableMock: false,
         });
     });

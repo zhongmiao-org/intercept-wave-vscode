@@ -201,8 +201,8 @@ describe('HTTP Forwarding Integration', function () {
                             spaFallback: false,
                             requestHeaders: [
                                 { name: 'Authorization', value: 'Bearer route-token', operation: 'SET', enabled: true },
-                                { name: 'X-Trace', value: 'route', operation: 'ADD', enabled: true },
-                                { name: 'X-Remove-Me', value: '', operation: 'REMOVE', enabled: true },
+                                { name: 'X-Request-Id', value: 'route', operation: 'ADD', enabled: true },
+                                { name: 'Content-Type', value: '', operation: 'REMOVE', enabled: true },
                                 { name: 'Host', value: 'blocked.example', operation: 'SET', enabled: true },
                             ],
                             responseHeaders: [],
@@ -221,16 +221,16 @@ describe('HTTP Forwarding Integration', function () {
             url: `http://localhost:${port}/headers`,
             headers: {
                 Authorization: 'Bearer incoming-token',
-                'X-Trace': 'client',
-                'X-Remove-Me': 'delete-this',
+                'X-Request-Id': 'client',
+                'Content-Type': 'application/json',
             },
         });
 
         expect(response.statusCode).to.equal(200);
         const body = JSON.parse(response.body);
         expect(body.headers.Authorization).to.equal('Bearer route-token');
-        expect(body.headers['X-Trace']).to.equal('client, route');
-        expect(body.headers['X-Remove-Me']).to.equal(undefined);
+        expect(body.headers['X-Request-Id']).to.equal('client, route');
+        expect(body.headers['Content-Type']).to.equal(undefined);
         expect(body.headers.Host).to.not.equal('blocked.example');
     });
 

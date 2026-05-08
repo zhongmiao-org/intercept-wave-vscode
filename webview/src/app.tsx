@@ -148,7 +148,7 @@ function createDefaultRouteDraft(name = 'API'): RouteDraft {
     targetBaseUrl: 'http://localhost:8080',
     stripPrefix: true,
     rewriteTargetPath: '',
-    spaFallback: false,
+    spaFallbackPath: '',
     enableMock: true,
   };
 }
@@ -365,7 +365,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
       targetBaseUrl: route.targetBaseUrl,
       stripPrefix: route.stripPrefix,
       rewriteTargetPath: route.rewriteTargetPath || '',
-      spaFallback: route.spaFallback === true,
+      spaFallbackPath: route.spaFallbackPath || '',
       enableMock: route.enableMock,
     });
     setShowRouteModal(true);
@@ -1046,7 +1046,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                           enableMock: t('ui.mockOn') || 'Mock enabled',
                           disableMock: t('ui.mockOff') || 'Mock disabled',
                           rewriteTargetPath: t('ui.rewriteTargetPath') || 'Rewrite',
-                          spaFallback: t('ui.spaFallback') || 'SPA fallback',
+                          spaFallbackPath: t('ui.spaFallbackPath') || 'SPA fallback path',
                           mocksLabel: t('ui.mocks') || 'mock',
                         }}
                       />
@@ -1093,7 +1093,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                               <StatBadge label={t('ui.enableMock') || 'Enable Mock'} value={activeRoute.enableMock ? (t('ui.yes') || 'Yes') : (t('ui.no') || 'No')} tone={activeRoute.enableMock ? 'success' : 'muted'} />
                               <StatBadge label={t('ui.stripPrefix') || 'Strip Prefix'} value={activeRoute.stripPrefix ? (t('ui.yes') || 'Yes') : (t('ui.no') || 'No')} tone="muted" />
-                              {activeRoute.spaFallback && <StatBadge label={t('ui.spaFallback') || 'SPA Fallback'} value={t('ui.yes') || 'Yes'} tone="muted" />}
+                              {activeRoute.spaFallbackPath && <StatBadge label={t('ui.spaFallbackPath') || 'SPA Fallback Path'} value={activeRoute.spaFallbackPath} tone="muted" />}
                               {activeRoute.rewriteTargetPath && <StatBadge label={t('ui.rewriteTargetPath') || 'Rewrite Target Path'} value={activeRoute.rewriteTargetPath} tone="muted" />}
                             </div>
                           </div>
@@ -1116,8 +1116,8 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                               <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeRoute.rewriteTargetPath || (t('ui.notSet') || '(Not set)')}</div>
                             </div>
                             <div style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--vscode-panel-border)', background: 'color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-sideBar-background))' }}>
-                              <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{t('ui.spaFallback') || 'SPA Fallback'}</div>
-                              <div style={{ fontSize: 14, fontWeight: 600 }}>{activeRoute.spaFallback ? (t('ui.yes') || 'Yes') : (t('ui.no') || 'No')}</div>
+                              <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{t('ui.spaFallbackPath') || 'SPA Fallback Path'}</div>
+                              <div style={{ fontSize: 14, fontWeight: 600 }}>{activeRoute.spaFallbackPath || (t('ui.notSet') || '(Not set)')}</div>
                             </div>
                             <div style={{ gridColumn: '1 / -1', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--vscode-panel-border)', background: 'color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-sideBar-background))' }}>
                               <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{t('ui.targetBaseUrl') || 'Target Base URL'}</div>
@@ -1326,8 +1326,8 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
           stripPrefix: t('ui.stripPrefix') || 'Strip Prefix',
           rewriteTargetPath: t('ui.rewriteTargetPath') || 'Rewrite Target Path',
           rewriteTargetPathHint: t('ui.rewriteTargetPathHint') || 'Optional path base applied after strip-prefix, for example /v1 rewrites /backend/users to /v1/users.',
-          spaFallback: t('ui.spaFallback') || 'SPA Fallback',
-          spaFallbackHint: t('ui.spaFallbackHint') || 'Retry /index.html for navigation 404s so SPA deep links can refresh.',
+          spaFallbackPath: t('ui.spaFallbackPath') || 'SPA Fallback Path',
+          spaFallbackPathHint: t('ui.spaFallbackPathHint') || 'Optional fallback path such as /index.html for navigation 404s. Leave empty to disable.',
           enableMock: t('ui.enableMock') || 'Enable Mock',
           yesLabel: t('ui.yes') || 'Yes',
           noLabel: t('ui.no') || 'No',

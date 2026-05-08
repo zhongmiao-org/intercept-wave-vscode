@@ -443,7 +443,7 @@ describe('MockServerManager', () => {
             pathPrefix: '/',
             targetBaseUrl: 'http://localhost:5173',
             stripPrefix: false,
-            spaFallback: true,
+            spaFallbackPath: '/index.html',
             enableMock: false,
             mockApis: [],
         });

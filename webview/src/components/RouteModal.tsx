@@ -49,13 +49,10 @@ export function RouteModal({ open, draft, onChange, onSave, onCancel, labels, is
             <span>{draft.stripPrefix ? labels.yesLabel : labels.noLabel}</span>
           </div>
 
-          <label>{labels.spaFallback}</label>
+          <label>{labels.spaFallbackPath}</label>
           <div style={{ display: 'grid', gap: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input type="checkbox" checked={draft.spaFallback === true} onChange={e => onChange({ ...draft, spaFallback: e.target.checked })} />
-              <span>{draft.spaFallback ? labels.yesLabel : labels.noLabel}</span>
-            </div>
-            <span style={{ fontSize: 11.5, lineHeight: 1.35, color: 'var(--vscode-descriptionForeground)' }}>{labels.spaFallbackHint}</span>
+            <input value={draft.spaFallbackPath || ''} placeholder="/index.html" onChange={e => onChange({ ...draft, spaFallbackPath: e.target.value })} />
+            <span style={{ fontSize: 11.5, lineHeight: 1.35, color: 'var(--vscode-descriptionForeground)' }}>{labels.spaFallbackPathHint}</span>
           </div>
 
           <label>{labels.enableMock}</label>

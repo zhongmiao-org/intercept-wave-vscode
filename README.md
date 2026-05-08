@@ -365,38 +365,73 @@ Unconfigured mock APIs will be automatically forwarded to the original server, p
 - Request body (for POST/PUT, etc.)
 - Cookies (if any)
 
-### Frontend Dev Server Proxy and SPA Fallback
+### Local Gateway / Nginx Migration
 
-Use an API route plus a `/` frontend route to replace a common local nginx setup:
+Intercept Wave can replace common local nginx reverse-proxy recipes during development. It is a local development gateway for VSCode-driven debugging, mocking, and proxying; it is not a production nginx replacement.
 
-```json
-{
-    "routes": [
-        {
-            "name": "API",
-            "pathPrefix": "/api",
-            "targetBaseUrl": "http://localhost:9000",
-            "stripPrefix": true,
-            "rewriteTargetPath": "",
-            "spaFallback": false,
-            "enableMock": true,
-            "mockApis": []
-        },
-        {
-            "name": "Frontend",
-            "pathPrefix": "/",
-            "targetBaseUrl": "http://localhost:5173",
-            "stripPrefix": false,
-            "rewriteTargetPath": "",
-            "spaFallback": true,
-            "enableMock": false,
-            "mockApis": []
-        }
-    ]
+A typical frontend + backend nginx setup:
+
+```nginx
+server {
+  listen 8888;
+
+  location /api/ {
+    proxy_pass http://localhost:9000/;
+  }
+
+  location / {
+    proxy_pass http://localhost:5173/;
+    try_files $uri /index.html;
+  }
 }
 ```
 
-Requests such as `/api/users` still use the longer `/api` route and can be mocked or forwarded to the backend. Frontend paths such as `/`, `/assets/app.js`, and `/dashboard/settings` use the `/` route. When `spaFallback` is enabled, navigation-style `404` responses are retried as `/index.html` so refreshed SPA deep links can load the app shell.
+Equivalent Intercept Wave HTTP routes:
+
+```json
+[
+  {
+    "name": "API",
+    "pathPrefix": "/api",
+    "targetBaseUrl": "http://localhost:9000",
+    "stripPrefix": true,
+    "rewriteTargetPath": "",
+    "spaFallbackPath": "",
+    "enableMock": true,
+    "mockApis": []
+  },
+  {
+    "name": "Frontend",
+    "pathPrefix": "/",
+    "targetBaseUrl": "http://localhost:5173",
+    "stripPrefix": false,
+    "rewriteTargetPath": "",
+    "spaFallbackPath": "/index.html",
+    "enableMock": false,
+    "mockApis": []
+  }
+]
+```
+
+This works for Vite, Next, Webpack, and similar dev servers: `/api/users` goes to the backend route, while `/`, `/assets/app.js`, and `/dashboard/settings` go to the frontend dev server route. When a browser refresh on `/dashboard/settings` returns an upstream 404, the frontend route can retry `/index.html` through `spaFallbackPath`.
+
+For multiple backend services, add one route per prefix and rely on longest-prefix matching:
+
+```json
+[
+  { "name": "API", "pathPrefix": "/api", "targetBaseUrl": "http://localhost:9000", "stripPrefix": true, "rewriteTargetPath": "", "spaFallbackPath": "", "enableMock": true, "mockApis": [] },
+  { "name": "Auth", "pathPrefix": "/auth", "targetBaseUrl": "http://localhost:9010", "stripPrefix": true, "rewriteTargetPath": "", "spaFallbackPath": "", "enableMock": true, "mockApis": [] },
+  { "name": "Admin API", "pathPrefix": "/admin-api", "targetBaseUrl": "http://localhost:9020", "stripPrefix": true, "rewriteTargetPath": "", "spaFallbackPath": "", "enableMock": true, "mockApis": [] },
+  { "name": "Frontend", "pathPrefix": "/", "targetBaseUrl": "http://localhost:5173", "stripPrefix": false, "rewriteTargetPath": "", "spaFallbackPath": "/index.html", "enableMock": false, "mockApis": [] }
+]
+```
+
+Path rewrite follows nginx-like local gateway semantics:
+
+- `pathPrefix="/api"`, `stripPrefix=true`: `/api/users` is matched and forwarded as `/users`
+- `pathPrefix="/backend"`, `stripPrefix=true`, `rewriteTargetPath="/v1"`: `/backend/users` is matched and forwarded as `/v1/users`
+
+Static `dist/` serving is tracked by [#42](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/42), route-level header overrides are tracked by [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44), and HTTPS listener support is tracked by [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40). Cross-platform roadmap links: VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39), IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150), and IntelliJ docs counterpart [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157).
 
 ## Important Notes
 

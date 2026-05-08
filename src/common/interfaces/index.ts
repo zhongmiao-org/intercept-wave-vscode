@@ -21,7 +21,7 @@ export interface HttpRoute {
     targetBaseUrl: string;
     stripPrefix: boolean;
     rewriteTargetPath?: string;
-    spaFallback?: boolean;
+    spaFallbackPath?: string;
     enableMock: boolean;
     mockApis: MockApiConfig[];
 }

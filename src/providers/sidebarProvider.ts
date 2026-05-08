@@ -318,7 +318,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             targetBaseUrl: data.targetBaseUrl,
             stripPrefix: data.stripPrefix,
             rewriteTargetPath: typeof data.rewriteTargetPath === 'string' ? data.rewriteTargetPath.trim() : '',
-            spaFallback: data.spaFallback === true,
+            spaFallbackPath: this.normalizeSpaFallbackPath(data),
             enableMock: data.enableMock,
             mockApis: [],
         };
@@ -336,6 +336,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
         await this.configManager.updateRoute(groupId, routeId, data);
         await this.refreshWebview();
+    }
+
+    private normalizeSpaFallbackPath(data: any): string {
+        if (typeof data?.spaFallbackPath === 'string') {
+            const trimmed = data.spaFallbackPath.trim();
+            if (!trimmed) return '';
+            return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+        }
+        return '';
     }
 
     private async handleDeleteRoute(groupId: string, routeId: string) {
@@ -455,7 +464,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             'ui.proxyControl', 'ui.navigator', 'ui.navigatorHint', 'ui.openWorkspace', 'ui.proxyGroups', 'ui.expand', 'ui.collapse', 'ui.openInPanel', 'ui.schema', 'ui.routes', 'ui.route', 'ui.mocks',
             'ui.mockOn', 'ui.mockOff', 'ui.routeDetail', 'ui.noActiveGroup', 'ui.noRouteSelected', 'ui.noRoutesConfigured',
             'ui.routeSelectionHint', 'ui.listenerSharedHint', 'ui.routeMatchHint', 'ui.routePrefix', 'ui.targetBaseUrl', 'ui.enableMock',
-            'ui.rewriteTargetPath', 'ui.rewriteTargetPathHint', 'ui.spaFallback', 'ui.spaFallbackHint', 'ui.cookieUsed', 'ui.cookieUnused', 'ui.routeModalHint', 'ui.addRoute', 'ui.editRoute', 'ui.groupModalTitle', 'ui.groupModalHint', 'ui.listenerExtras',
+            'ui.rewriteTargetPath', 'ui.rewriteTargetPathHint', 'ui.spaFallbackPath', 'ui.spaFallbackPathHint', 'ui.cookieUsed', 'ui.cookieUnused', 'ui.routeModalHint', 'ui.addRoute', 'ui.editRoute', 'ui.groupModalTitle', 'ui.groupModalHint', 'ui.listenerExtras',
             'ui.close', 'ui.mockModalTitle', 'ui.mockModalHint',
             'noWorkspace.title', 'noWorkspace.message',
         ];
@@ -537,7 +546,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             targetBaseUrl: 'http://localhost:8080',
             stripPrefix: true,
             rewriteTargetPath: '',
-            spaFallback: false,
+            spaFallbackPath: '',
             enableMock: true,
             mockApis: [],
         };

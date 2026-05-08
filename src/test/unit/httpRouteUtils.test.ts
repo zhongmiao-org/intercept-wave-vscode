@@ -81,11 +81,11 @@ describe('httpRouteUtils', () => {
         expect(computeHttpForwardPath({ ...routeApi, rewriteTargetPath: '/' } as any, '/api/users')).to.equal('/users');
     });
 
-    it('computes SPA fallback target paths through the same strip and rewrite rules', () => {
-        expect(computeHttpSpaFallbackPath(routeRoot as any)).to.equal('/index.html');
-        expect(computeHttpSpaFallbackPath(routeApi as any)).to.equal('/index.html');
-        expect(computeHttpSpaFallbackPath({ ...routeApi, stripPrefix: false } as any)).to.equal('/api/index.html');
-        expect(computeHttpSpaFallbackPath({ ...routeApi, rewriteTargetPath: '/app' } as any)).to.equal('/app/index.html');
+    it('computes SPA fallback target paths from the shared spaFallbackPath field', () => {
+        expect(computeHttpSpaFallbackPath(routeRoot as any)).to.equal('');
+        expect(computeHttpSpaFallbackPath({ ...routeApi, spaFallbackPath: '/index.html' } as any)).to.equal('/index.html');
+        expect(computeHttpSpaFallbackPath({ ...routeApi, spaFallbackPath: 'index.html' } as any)).to.equal('/index.html');
+        expect(computeHttpSpaFallbackPath({ ...routeApi, stripPrefix: false, rewriteTargetPath: '/app', spaFallbackPath: '/shell.html' } as any)).to.equal('/shell.html');
     });
 
     it('serves welcome page only for stripped non-root prefixes', () => {

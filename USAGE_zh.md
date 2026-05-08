@@ -43,6 +43,7 @@ Intercept Wave 是一个 VS Code 扩展，用于在本地开发中统一处理 H
     - **重写目标路径**：可选，剥离前缀后追加的目标路径基底，如 `/v1`
     - **SPA 回退路径**：可选，proxy 路由前端导航请求返回 404 时重试的路径，如 `/index.html`
     - **SPA 回退**：static 路由开关，未命中文件的浏览器导航请求会返回 `index.html`
+    - **请求 Header / 响应 Header**：可选的 route 级 Header 覆盖规则，支持 `ADD`、`SET`、`REMOVE`
     - **启用 Mock**：是否优先使用该路由下的 Mock 列表
 
 路由重写适合迁移本地 nginx 规则。例如配置 `pathPrefix="/backend"`、`stripPrefix=true`、`rewriteTargetPath="/v1"` 后，访问 `/backend/users?active=true` 会按 `/v1/users?active=true` 进行匹配和转发。该能力用于本地开发网关，不是生产 nginx 替代方案。
@@ -156,13 +157,36 @@ Intercept Wave 是一个 VS Code 扩展，用于在本地开发中统一处理 H
 
 static 路由同样使用现有 route-local 路径语义：先执行 `stripPrefix`，再执行 `rewriteTargetPath`，查询参数不参与文件查找。包含原始或编码 `..` 的请求会在读取文件前被拒绝，不能逃出 `staticRoot`。
 
+route 级 Header 覆盖示例：
+
+```json
+{
+    "requestHeaders": [
+        { "name": "Authorization", "value": "Bearer local-dev-token", "operation": "SET", "enabled": true },
+        { "name": "X-Debug-Mode", "value": "1", "operation": "ADD", "enabled": true },
+        { "name": "Cookie", "value": "", "operation": "REMOVE", "enabled": false }
+    ],
+    "responseHeaders": [
+        { "name": "Access-Control-Allow-Origin", "value": "http://localhost:5173", "operation": "SET", "enabled": true },
+        { "name": "Access-Control-Allow-Credentials", "value": "true", "operation": "SET", "enabled": true },
+        { "name": "Cache-Control", "value": "no-store", "operation": "SET", "enabled": true }
+    ]
+}
+```
+
+请求规则会在 proxy 转发前执行，适合本地认证注入、功能开关或移除传入 Cookie。响应规则会最后作用于 proxy、static、mock 和命中 route 的预检响应，因此可在不受限时覆盖默认 CORS、缓存和内容类型相关 Header。
+
+受限请求 Header 运行时会跳过：`host`、`connection`、`content-length`、`date`、`expect`、`upgrade`、`trailer`、`te`。
+
+受限响应 Header 运行时会跳过：`transfer-encoding`、`content-length`、`connection`。
+
 常见问题：
 
 - **端口占用**：修改配置组端口，或停止已经监听该端口的进程。
 - **SPA 刷新返回 404**：proxy 到前端开发服务器时，前端路由保持 `pathPrefix="/"`，设置 `enableMock=false`，并设置 `spaFallbackPath="/index.html"` 处理 HTML 导航请求。static 构建路由则设置 `targetType="STATIC"` 和 `spaFallback=true`。
 - **前缀或重写不符合预期**：`stripPrefix` 会先于 `rewriteTargetPath` 执行；Mock 路径和转发路径都使用重写后的路由本地路径。
-- **CORS 或请求头行为不符合预期**：本地网关会为开发场景追加默认 CORS 头；路由级请求/响应头覆盖能力另行跟进。
-- **请求头和 HTTPS**：路由级请求/响应头覆盖由 [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44) 跟进，HTTPS 监听支持由 [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40) 跟进。
+- **CORS 或缓存 Header 不符合预期**：响应 Header 规则会在默认 CORS 头之后执行，可通过 `responseHeaders` 的 `SET` 或 `REMOVE` 配置 route 级 CORS 与缓存行为。
+- **HTTPS**：HTTPS 监听支持由 [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40) 跟进。
 
 相关 roadmap：VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39)、IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150)、IntelliJ 文档 [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157)。
 

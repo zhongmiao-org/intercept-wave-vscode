@@ -17,6 +17,7 @@ import {
     selectHttpRoute,
     shouldServeRouteWelcomePage,
 } from './httpRouteUtils';
+import { applyRequestHeaderOverrides, applyResponseHeaderOverrides } from './headerOverrideUtils';
 
 export class MockServerManager {
     private readonly httpServers: Map<string, http.Server> = new Map(); // groupId -> HTTP server
@@ -46,6 +47,8 @@ export class MockServerManager {
                 rewriteTargetPath: '',
                 spaFallbackPath: '',
                 spaFallback: false,
+                requestHeaders: [],
+                responseHeaders: [],
                 enableMock: true,
                 mockApis: group.mockApis || [],
             },
@@ -266,16 +269,18 @@ export class MockServerManager {
 
         this.outputChannel.appendLine(`📥 [${group.name}] ${method} ${requestUrl}`);
 
-        // Handle OPTIONS request (CORS preflight)
+        const route = selectHttpRoute({ ...group, routes: this.getHttpRoutes(group) }, requestPath);
         if (method === 'OPTIONS') {
             this.sendCorsHeaders(res);
+            if (route) {
+                applyResponseHeaderOverrides(res, route.responseHeaders);
+            }
             res.writeHead(200);
             res.end();
             this.outputChannel.appendLine(`   ✓ CORS preflight handled`);
             return;
         }
 
-        const route = selectHttpRoute({ ...group, routes: this.getHttpRoutes(group) }, requestPath);
         if ((requestPath === '/' || requestPath === '') && (!route || !isRootHttpRoute(route))) {
             this.handleWelcomePage(res, group);
             return;
@@ -297,7 +302,7 @@ export class MockServerManager {
         const mockApi = this.findMatchingMockApi(matchPath, method, route);
 
         if (route.enableMock && mockApi && mockApi.enabled) {
-            await this.handleMockResponse(res, mockApi, group);
+            await this.handleMockResponse(res, mockApi, group, route);
         } else if (route.targetType === 'STATIC') {
             this.handleStaticResponse(req, res, route);
         } else {
@@ -339,6 +344,8 @@ export class MockServerManager {
                 rewriteTargetPath: route.rewriteTargetPath || '',
                 spaFallbackPath: route.spaFallbackPath || '',
                 spaFallback: route.spaFallback === true,
+                requestHeaders: route.requestHeaders || [],
+                responseHeaders: route.responseHeaders || [],
                 enableMock: route.enableMock,
                 mockApis: {
                     total: route.mockApis.length,
@@ -376,7 +383,8 @@ export class MockServerManager {
     private async handleMockResponse(
         res: http.ServerResponse,
         mockApi: MockApiConfig,
-        group: ProxyGroup
+        group: ProxyGroup,
+        route: HttpRoute
     ): Promise<void> {
         this.outputChannel.appendLine(`   📝 Mock API found: ${JSON.stringify(mockApi)}`);
 
@@ -399,6 +407,7 @@ export class MockServerManager {
         this.outputChannel.appendLine(`   📤 Response data length: ${responseData.length}`);
 
         // Send response
+        applyResponseHeaderOverrides(res, route.responseHeaders);
         res.writeHead(mockApi.statusCode);
         res.end(responseData);
 
@@ -433,7 +442,7 @@ export class MockServerManager {
     ): void {
         const root = this.resolveStaticRoot(route.staticRoot);
         if (!root || !fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
-            this.sendErrorResponse(res, 502, 'Bad Gateway: Static root is not configured or is not a directory');
+            this.sendErrorResponse(res, 502, 'Bad Gateway: Static root is not configured or is not a directory', route);
             return;
         }
 
@@ -443,29 +452,29 @@ export class MockServerManager {
         const staticRoutePath = computeHttpForwardPath(route, requestPath || '/');
         const resolved = this.resolveStaticFile(root, staticRoutePath);
         if (!resolved) {
-            this.sendErrorResponse(res, 403, 'Forbidden: static path escapes the configured root');
+            this.sendErrorResponse(res, 403, 'Forbidden: static path escapes the configured root', route);
             return;
         }
 
         try {
             const directFile = this.selectStaticFile(resolved);
             if (directFile) {
-                this.sendStaticFile(req, res, directFile);
+                this.sendStaticFile(req, res, directFile, route);
                 return;
             }
 
             if (this.shouldServeStaticSpaFallback(req, route, staticRoutePath)) {
                 const fallbackFile = path.join(root, 'index.html');
                 if (fs.existsSync(fallbackFile) && fs.statSync(fallbackFile).isFile()) {
-                    this.sendStaticFile(req, res, fallbackFile);
+                    this.sendStaticFile(req, res, fallbackFile, route);
                     return;
                 }
             }
 
-            this.sendErrorResponse(res, 404, 'Static file not found');
+            this.sendErrorResponse(res, 404, 'Static file not found', route);
         } catch (error: any) {
             this.outputChannel.appendLine(`   ❌ Static file error: ${error.message || error}`);
-            this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to serve static file');
+            this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to serve static file', route);
         }
     }
 
@@ -523,9 +532,10 @@ export class MockServerManager {
         return undefined;
     }
 
-    private sendStaticFile(req: http.IncomingMessage, res: http.ServerResponse, filePath: string): void {
+    private sendStaticFile(req: http.IncomingMessage, res: http.ServerResponse, filePath: string, route: HttpRoute): void {
         this.sendCorsHeaders(res);
         res.setHeader('Content-Type', this.getStaticContentType(filePath));
+        applyResponseHeaderOverrides(res, route.responseHeaders);
         res.writeHead(200);
         if ((req.method || 'GET').toUpperCase() === 'HEAD') {
             res.end();
@@ -584,21 +594,20 @@ export class MockServerManager {
             url = new URL(targetUrl);
         } catch (error: any) {
             this.outputChannel.appendLine(`   ❌ URL parse error: ${error.message}`);
-            this.sendErrorResponse(res, 500, `Internal Server Error: ${error.message}`);
+            this.sendErrorResponse(res, 500, `Internal Server Error: ${error.message}`, route);
             return;
         }
 
         if (!url.hostname) {
             this.outputChannel.appendLine('   ❌ URL parse error: Invalid target URL');
-            this.sendErrorResponse(res, 500, 'Internal Server Error: Invalid target URL');
+            this.sendErrorResponse(res, 500, 'Internal Server Error: Invalid target URL', route);
             return;
         }
 
         const isHttps = url.protocol === 'https:';
         const httpModule = isHttps ? https : http;
 
-        const headers = { ...req.headers };
-        delete headers.host;
+        const headers = applyRequestHeaderOverrides(req.headers, route.requestHeaders);
 
         const options: https.RequestOptions = {
             method: req.method,
@@ -622,7 +631,8 @@ export class MockServerManager {
             Object.keys(proxyRes.headers).forEach(key => {
                 if (
                     key.toLowerCase() !== 'transfer-encoding' &&
-                    key.toLowerCase() !== 'content-length'
+                    key.toLowerCase() !== 'content-length' &&
+                    key.toLowerCase() !== 'connection'
                 ) {
                     const value = proxyRes.headers[key];
                     if (value) {
@@ -635,6 +645,7 @@ export class MockServerManager {
             this.sendCorsHeaders(res);
 
             // Send response
+            applyResponseHeaderOverrides(res, route.responseHeaders);
             res.writeHead(proxyRes.statusCode || 200);
             proxyRes.pipe(res);
 
@@ -647,7 +658,7 @@ export class MockServerManager {
             );
             this.outputChannel.appendLine(`   ❌ Error details: ${JSON.stringify(error)}`);
             this.outputChannel.appendLine(`   ❌ Target was: ${targetUrl}`);
-            this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to reach original server');
+            this.sendErrorResponse(res, 502, 'Bad Gateway: Unable to reach original server', route);
         });
 
         // Forward request body
@@ -714,9 +725,12 @@ export class MockServerManager {
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     }
 
-    private sendErrorResponse(res: http.ServerResponse, statusCode: number, message: string): void {
+    private sendErrorResponse(res: http.ServerResponse, statusCode: number, message: string, route?: HttpRoute): void {
         const errorJson = JSON.stringify({ error: message });
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        if (route) {
+            applyResponseHeaderOverrides(res, route.responseHeaders);
+        }
         res.writeHead(statusCode);
         res.end(errorJson);
     }

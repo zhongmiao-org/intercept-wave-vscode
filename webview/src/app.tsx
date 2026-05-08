@@ -152,6 +152,8 @@ function createDefaultRouteDraft(name = 'API'): RouteDraft {
     rewriteTargetPath: '',
     spaFallbackPath: '',
     spaFallback: false,
+    requestHeaders: [],
+    responseHeaders: [],
     enableMock: true,
   };
 }
@@ -372,6 +374,8 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
       rewriteTargetPath: route.rewriteTargetPath || '',
       spaFallbackPath: route.spaFallbackPath || '',
       spaFallback: route.spaFallback === true,
+      requestHeaders: route.requestHeaders || [],
+      responseHeaders: route.responseHeaders || [],
       enableMock: route.enableMock,
     });
     setShowRouteModal(true);
@@ -1085,6 +1089,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                           targetTypeStatic: t('ui.targetType.static') || 'Static',
                           staticRoot: t('ui.staticRoot') || 'Static Root',
                           spaFallback: t('ui.spaFallback') || 'SPA fallback',
+                          headerOverrides: t('ui.headerOverrides') || 'Headers',
                           rewriteTargetPath: t('ui.rewriteTargetPath') || 'Rewrite',
                           spaFallbackPath: t('ui.spaFallbackPath') || 'SPA fallback path',
                           mocksLabel: t('ui.mocks') || 'mock',
@@ -1137,6 +1142,13 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                               {activeRoute.targetType !== 'STATIC' && activeRoute.spaFallbackPath && <StatBadge label={t('ui.spaFallbackPath') || 'SPA Fallback Path'} value={activeRoute.spaFallbackPath} tone="muted" />}
                               {activeRoute.targetType === 'STATIC' && activeRoute.spaFallback && <StatBadge label={t('ui.spaFallback') || 'SPA Fallback'} value={t('ui.yes') || 'Yes'} tone="muted" />}
                               {activeRoute.rewriteTargetPath && <StatBadge label={t('ui.rewriteTargetPath') || 'Rewrite Target Path'} value={activeRoute.rewriteTargetPath} tone="muted" />}
+                              {((activeRoute.requestHeaders || []).filter(rule => rule.enabled).length > 0 || (activeRoute.responseHeaders || []).filter(rule => rule.enabled).length > 0) && (
+                                <StatBadge
+                                  label={t('ui.headerOverrides') || 'Header Overrides'}
+                                  value={`${(activeRoute.requestHeaders || []).filter(rule => rule.enabled).length}/${(activeRoute.responseHeaders || []).filter(rule => rule.enabled).length}`}
+                                  tone="muted"
+                                />
+                              )}
                             </div>
                           </div>
 
@@ -1168,6 +1180,12 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                             <div style={{ gridColumn: '1 / -1', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--vscode-panel-border)', background: 'color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-sideBar-background))' }}>
                               <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{activeRoute.targetType === 'STATIC' ? (t('ui.staticRoot') || 'Static Root') : (t('ui.targetBaseUrl') || 'Target Base URL')}</div>
                               <div style={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-all' }}>{activeRoute.targetType === 'STATIC' ? (activeRoute.staticRoot || (t('ui.notSet') || '(Not set)')) : activeRoute.targetBaseUrl}</div>
+                            </div>
+                            <div style={{ gridColumn: '1 / -1', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--vscode-panel-border)', background: 'color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-sideBar-background))' }}>
+                              <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{t('ui.headerOverrides') || 'Header Overrides'}</div>
+                              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                                {(t('ui.requestHeaders') || 'Request Headers')}: {(activeRoute.requestHeaders || []).filter(rule => rule.enabled).length} / {(t('ui.responseHeaders') || 'Response Headers')}: {(activeRoute.responseHeaders || []).filter(rule => rule.enabled).length}
+                              </div>
                             </div>
                           </div>
 
@@ -1384,6 +1402,20 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
           spaFallbackPathHint: t('ui.spaFallbackPathHint') || 'Optional fallback path such as /index.html for navigation 404s. Leave empty to disable.',
           spaFallback: t('ui.spaFallback') || 'SPA Fallback',
           spaFallbackHint: t('ui.spaFallbackHint') || 'Serve index.html for missing browser navigation paths.',
+          requestHeaders: t('ui.requestHeaders') || 'Request Headers',
+          responseHeaders: t('ui.responseHeaders') || 'Response Headers',
+          headerRuleEnabled: t('ui.headerRuleEnabled') || 'Enabled',
+          headerRuleOperation: t('ui.headerRuleOperation') || 'Operation',
+          headerRuleName: t('ui.headerRuleName') || 'Name',
+          headerRuleValue: t('ui.headerRuleValue') || 'Value',
+          addHeaderRule: t('ui.addHeaderRule') || 'Add Rule',
+          removeHeaderRule: t('ui.removeHeaderRule') || 'Delete Rule',
+          headerOperationAdd: t('ui.headerOperation.add') || 'ADD',
+          headerOperationSet: t('ui.headerOperation.set') || 'SET',
+          headerOperationRemove: t('ui.headerOperation.remove') || 'REMOVE',
+          restrictedRequestHeaderHint: t('ui.restrictedRequestHeaderHint') || 'This request header is restricted and will be skipped at runtime.',
+          restrictedResponseHeaderHint: t('ui.restrictedResponseHeaderHint') || 'This response header is restricted and will be skipped at runtime.',
+          headerRulesHint: t('ui.headerRulesHint') || 'Rules are applied in order. REMOVE may leave value empty.',
           enableMock: t('ui.enableMock') || 'Enable Mock',
           yesLabel: t('ui.yes') || 'Yes',
           noLabel: t('ui.no') || 'No',

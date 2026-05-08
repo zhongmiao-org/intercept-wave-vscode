@@ -357,6 +357,54 @@ Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
 Access-Control-Allow-Headers: Content-Type, Authorization
 ```
 
+### Route 级 Header 覆盖
+
+HTTP route 可以配置请求和响应 Header 覆盖规则。请求规则会在 proxy 转发上游前执行；响应规则会在返回浏览器前最后执行，因此会作用于 proxy、static、mock 以及命中 route 的 `OPTIONS` 预检响应，并且晚于默认 CORS 头。
+
+每条规则使用共享配置结构:
+
+```json
+{
+    "name": "Cache-Control",
+    "value": "no-store",
+    "operation": "SET",
+    "enabled": true
+}
+```
+
+支持的操作:
+
+- `SET`: 替换 Header 值
+- `ADD`: 如果已存在则用 `, ` 追加，否则设置该 Header
+- `REMOVE`: 移除 Header；`value` 可以为空
+
+常见用法:
+
+```json
+{
+    "name": "API",
+    "pathPrefix": "/api",
+    "targetType": "PROXY",
+    "targetBaseUrl": "http://localhost:9000",
+    "stripPrefix": true,
+    "requestHeaders": [
+        { "name": "Authorization", "value": "Bearer local-dev-token", "operation": "SET", "enabled": true }
+    ],
+    "responseHeaders": [
+        { "name": "Access-Control-Allow-Origin", "value": "http://localhost:5173", "operation": "SET", "enabled": true },
+        { "name": "Cache-Control", "value": "no-store", "operation": "SET", "enabled": true }
+    ],
+    "enableMock": true,
+    "mockApis": []
+}
+```
+
+请求规则适合本地认证注入或上游功能开关；响应规则适合覆盖 CORS、禁用缓存、调整 `Content-Type`，或从 proxy、static、mock 响应中移除 Header。
+
+受限请求 Header 可以保存，但运行时会跳过：`host`、`connection`、`content-length`、`date`、`expect`、`upgrade`、`trailer`、`te`。
+
+受限响应 Header 可以保存，但运行时会跳过：`transfer-encoding`、`content-length`、`connection`。
+
 ### 代理模式
 
 未配置 Mock 的 API 将自动转发到原始服务器,保留:

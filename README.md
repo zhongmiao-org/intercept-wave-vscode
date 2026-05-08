@@ -356,6 +356,54 @@ Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
 Access-Control-Allow-Headers: Content-Type, Authorization
 ```
 
+### Route-Level Header Overrides
+
+HTTP routes can define request and response header override rules. Request rules run immediately before proxy forwarding. Response rules run last before returning to the browser, so they apply to proxy, static, mock, and route-matched `OPTIONS` preflight responses after the default CORS headers are prepared.
+
+Each rule uses the shared config shape:
+
+```json
+{
+    "name": "Cache-Control",
+    "value": "no-store",
+    "operation": "SET",
+    "enabled": true
+}
+```
+
+Supported operations:
+
+- `SET`: replace the header value
+- `ADD`: append to an existing value with `, `, or set the header when missing
+- `REMOVE`: remove the header; `value` can be empty
+
+Common recipes:
+
+```json
+{
+    "name": "API",
+    "pathPrefix": "/api",
+    "targetType": "PROXY",
+    "targetBaseUrl": "http://localhost:9000",
+    "stripPrefix": true,
+    "requestHeaders": [
+        { "name": "Authorization", "value": "Bearer local-dev-token", "operation": "SET", "enabled": true }
+    ],
+    "responseHeaders": [
+        { "name": "Access-Control-Allow-Origin", "value": "http://localhost:5173", "operation": "SET", "enabled": true },
+        { "name": "Cache-Control", "value": "no-store", "operation": "SET", "enabled": true }
+    ],
+    "enableMock": true,
+    "mockApis": []
+}
+```
+
+Use request rules for local auth injection or upstream feature flags. Use response rules to override CORS, disable cache, adjust `Content-Type`, or remove headers from proxy, static, or mock responses.
+
+Restricted request headers are saved but skipped at runtime: `host`, `connection`, `content-length`, `date`, `expect`, `upgrade`, `trailer`, `te`.
+
+Restricted response headers are saved but skipped at runtime: `transfer-encoding`, `content-length`, `connection`.
+
 ### Proxy Mode
 
 Unconfigured mock APIs will be automatically forwarded to the original server, preserving:

@@ -74,6 +74,8 @@ describe('ConfigManager 4.0', () => {
             spaFallback: false,
             enableMock: true,
         });
+        expect(cfg.proxyGroups[0].routes?.[0].requestHeaders).to.deep.equal([]);
+        expect(cfg.proxyGroups[0].routes?.[0].responseHeaders).to.deep.equal([]);
     });
 
     it('migrates legacy flat config into 4.0 routes', () => {
@@ -106,6 +108,8 @@ describe('ConfigManager 4.0', () => {
             spaFallback: false,
             enableMock: true,
         });
+        expect(route?.requestHeaders).to.deep.equal([]);
+        expect(route?.responseHeaders).to.deep.equal([]);
         expect(route?.mockApis).to.have.length(1);
     });
 
@@ -144,6 +148,8 @@ describe('ConfigManager 4.0', () => {
             spaFallback: false,
             enableMock: true,
         });
+        expect(route?.requestHeaders).to.deep.equal([]);
+        expect(route?.responseHeaders).to.deep.equal([]);
         expect(route?.mockApis[0].path).to.equal('/test');
     });
 
@@ -164,6 +170,12 @@ describe('ConfigManager 4.0', () => {
             spaFallback: false,
             enableMock: false,
             mockApis: [],
+            requestHeaders: [
+                { name: 'X-Dev', value: 'one', operation: 'set' as any, enabled: true },
+            ],
+            responseHeaders: [
+                { name: 'Cache-Control', value: 'no-store', operation: 'ADD', enabled: false },
+            ],
         });
 
         let cfg = cm.getConfig();
@@ -183,6 +195,12 @@ describe('ConfigManager 4.0', () => {
             spaFallback: false,
             enableMock: true,
         });
+        expect(cfg.proxyGroups[0].routes?.find(route => route.id === 'route-2')?.requestHeaders).to.deep.equal([
+            { name: 'X-Dev', value: 'one', operation: 'SET', enabled: true },
+        ]);
+        expect(cfg.proxyGroups[0].routes?.find(route => route.id === 'route-2')?.responseHeaders).to.deep.equal([
+            { name: 'Cache-Control', value: 'no-store', operation: 'ADD', enabled: false },
+        ]);
 
         await cm.removeRoute(groupId, 'route-2');
         cfg = cm.getConfig();
@@ -278,6 +296,8 @@ describe('ConfigManager 4.0', () => {
                 spaFallback: false,
                 enableMock: true,
                 mockApis: [],
+                requestHeaders: [],
+                responseHeaders: [],
             },
             {
                 id: 'route-2',
@@ -292,6 +312,12 @@ describe('ConfigManager 4.0', () => {
                 spaFallback: true,
                 enableMock: false,
                 mockApis: [],
+                requestHeaders: [
+                    { name: 'Authorization', value: 'Bearer local', operation: 'SET', enabled: true },
+                ],
+                responseHeaders: [
+                    { name: 'Access-Control-Allow-Origin', value: 'http://localhost:5173', operation: 'SET', enabled: true },
+                ],
             },
         ];
 
@@ -311,6 +337,12 @@ describe('ConfigManager 4.0', () => {
             spaFallback: true,
             enableMock: false,
         });
+        expect(saved.proxyGroups[0].routes[1].requestHeaders).to.deep.equal([
+            { name: 'Authorization', value: 'Bearer local', operation: 'SET', enabled: true },
+        ]);
+        expect(saved.proxyGroups[0].routes[1].responseHeaders).to.deep.equal([
+            { name: 'Access-Control-Allow-Origin', value: 'http://localhost:5173', operation: 'SET', enabled: true },
+        ]);
     });
 
     it('normalizes missing static route fields to proxy-compatible values', () => {
@@ -352,6 +384,59 @@ describe('ConfigManager 4.0', () => {
             spaFallbackPath: '',
             spaFallback: false,
         });
+        expect(route?.requestHeaders).to.deep.equal([]);
+        expect(route?.responseHeaders).to.deep.equal([]);
+    });
+
+    it('normalizes header override arrays and legacy lowercase operations', () => {
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.writeFileSync(configPath, JSON.stringify({
+            version: '4.0',
+            proxyGroups: [
+                {
+                    id: 'g1',
+                    name: 'G1',
+                    protocol: 'HTTP',
+                    port: 8888,
+                    enabled: true,
+                    stripPrefix: true,
+                    globalCookie: '',
+                    interceptPrefix: '/api',
+                    baseUrl: 'http://localhost:9000',
+                    mockApis: [],
+                    routes: [
+                        {
+                            id: 'route-1',
+                            name: 'API',
+                            pathPrefix: '/api',
+                            targetBaseUrl: 'http://localhost:9000',
+                            stripPrefix: true,
+                            enableMock: true,
+                            requestHeaders: [
+                                { name: ' X-Token ', value: 123, operation: 'add', enabled: false },
+                                { name: 'X-Default', value: 'v' },
+                            ],
+                            responseHeaders: [
+                                { name: 'Cache-Control', value: 'no-store', operation: 'remove' },
+                                { name: '', value: 'skip', operation: 'SET' },
+                            ],
+                            mockApis: [],
+                        },
+                    ],
+                },
+            ],
+        }, null, 2), 'utf-8');
+
+        const route = createManager().getConfig().proxyGroups[0].routes?.[0];
+
+        expect(route?.requestHeaders).to.deep.equal([
+            { name: 'X-Token', value: '', operation: 'ADD', enabled: false },
+            { name: 'X-Default', value: 'v', operation: 'SET', enabled: true },
+        ]);
+        expect(route?.responseHeaders).to.deep.equal([
+            { name: 'Cache-Control', value: 'no-store', operation: 'REMOVE', enabled: true },
+            { name: '', value: 'skip', operation: 'SET', enabled: true },
+        ]);
     });
 
     it('preserves static route fields in the shared config shape', async () => {
@@ -371,6 +456,10 @@ describe('ConfigManager 4.0', () => {
             spaFallback: true,
             enableMock: false,
             mockApis: [],
+            requestHeaders: [],
+            responseHeaders: [
+                { name: 'Cache-Control', value: 'no-store', operation: 'SET', enabled: true },
+            ],
         });
 
         const saved = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
@@ -385,6 +474,9 @@ describe('ConfigManager 4.0', () => {
             spaFallback: true,
             enableMock: false,
         });
+        expect(route.responseHeaders).to.deep.equal([
+            { name: 'Cache-Control', value: 'no-store', operation: 'SET', enabled: true },
+        ]);
     });
 
     it('returns default config when stored json is invalid', () => {

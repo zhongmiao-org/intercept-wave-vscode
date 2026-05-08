@@ -71,6 +71,9 @@ export interface ProxyGroup {
   interceptPrefix: string;
   baseUrl: string;
   mockApis: MockApiConfig[];
+  httpsEnabled?: boolean;
+  httpsKeystorePath?: string;
+  httpsKeystorePassword?: string;
   protocol?: ProxyProtocol;
   wsBaseUrl?: string | null;
   wsInterceptPrefix?: string | null;
@@ -101,6 +104,9 @@ export type GroupDraft = Pick<
   | 'wsBaseUrl'
   | 'wsInterceptPrefix'
   | 'wsManualPush'
+  | 'httpsEnabled'
+  | 'httpsKeystorePath'
+  | 'httpsKeystorePassword'
   | 'wssEnabled'
   | 'wssKeystorePath'
   | 'wssKeystorePassword'

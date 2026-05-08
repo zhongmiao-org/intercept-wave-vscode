@@ -62,6 +62,11 @@ describe('ConfigManager 4.0', () => {
         expect(cfg.version).to.equal('4.0');
         expect(cfg.proxyGroups).to.have.length(1);
         expect(cfg.proxyGroups[0].routes).to.have.length(1);
+        expect(cfg.proxyGroups[0]).to.include({
+            httpsEnabled: false,
+            httpsKeystorePath: '',
+            httpsKeystorePassword: '',
+        });
         expect(cfg.proxyGroups[0].routes?.[0]).to.include({
             name: 'API',
             pathPrefix: '/api',
@@ -95,6 +100,11 @@ describe('ConfigManager 4.0', () => {
         const route = group.routes?.[0];
 
         expect(cfg.version).to.equal('4.0');
+        expect(group).to.include({
+            httpsEnabled: false,
+            httpsKeystorePath: '',
+            httpsKeystorePassword: '',
+        });
         expect(route).to.exist;
         expect(route).to.include({
             name: 'API',
@@ -282,6 +292,9 @@ describe('ConfigManager 4.0', () => {
         const cm = createManager();
         const cfg = cm.getConfig();
         cfg.proxyGroups[0].name = 'Shared Config';
+        cfg.proxyGroups[0].httpsEnabled = true;
+        cfg.proxyGroups[0].httpsKeystorePath = 'certs/intercept-wave-local.p12';
+        cfg.proxyGroups[0].httpsKeystorePassword = 'changeit';
         cfg.proxyGroups[0].routes = [
             {
                 id: 'route-1',
@@ -325,6 +338,11 @@ describe('ConfigManager 4.0', () => {
 
         const saved = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
         expect(saved.version).to.equal('4.0');
+        expect(saved.proxyGroups[0]).to.include({
+            httpsEnabled: true,
+            httpsKeystorePath: 'certs/intercept-wave-local.p12',
+            httpsKeystorePassword: 'changeit',
+        });
         expect(saved.proxyGroups[0].routes).to.have.length(2);
         expect(saved.proxyGroups[0].routes[1]).to.include({
             name: 'Frontend Build',
@@ -343,6 +361,48 @@ describe('ConfigManager 4.0', () => {
         expect(saved.proxyGroups[0].routes[1].responseHeaders).to.deep.equal([
             { name: 'Access-Control-Allow-Origin', value: 'http://localhost:5173', operation: 'SET', enabled: true },
         ]);
+    });
+
+    it('normalizes and preserves HTTPS listener fields in the shared group shape', async () => {
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.writeFileSync(configPath, JSON.stringify({
+            version: '4.0',
+            proxyGroups: [
+                {
+                    id: 'g1',
+                    name: 'HTTPS Group',
+                    protocol: 'HTTP',
+                    port: 9443,
+                    enabled: true,
+                    stripPrefix: true,
+                    globalCookie: '',
+                    interceptPrefix: '/api',
+                    baseUrl: 'http://localhost:9000',
+                    httpsEnabled: true,
+                    httpsKeystorePath: ' certs/intercept-wave-local.p12 ',
+                    httpsKeystorePassword: 'changeit',
+                    mockApis: [],
+                    routes: [],
+                },
+            ],
+        }, null, 2), 'utf-8');
+
+        const cm = createManager();
+        const group = cm.getConfig().proxyGroups[0];
+
+        expect(group).to.include({
+            httpsEnabled: true,
+            httpsKeystorePath: 'certs/intercept-wave-local.p12',
+            httpsKeystorePassword: 'changeit',
+        });
+
+        await cm.saveConfig(cm.getConfig());
+        const saved = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        expect(saved.proxyGroups[0]).to.include({
+            httpsEnabled: true,
+            httpsKeystorePath: 'certs/intercept-wave-local.p12',
+            httpsKeystorePassword: 'changeit',
+        });
     });
 
     it('normalizes missing static route fields to proxy-compatible values', () => {
@@ -376,13 +436,19 @@ describe('ConfigManager 4.0', () => {
             ],
         }, null, 2), 'utf-8');
 
-        const route = createManager().getConfig().proxyGroups[0].routes?.[0];
+        const config = createManager().getConfig();
+        const route = config.proxyGroups[0].routes?.[0];
 
         expect(route).to.include({
             targetType: 'PROXY',
             staticRoot: '',
             spaFallbackPath: '',
             spaFallback: false,
+        });
+        expect(config.proxyGroups[0]).to.include({
+            httpsEnabled: false,
+            httpsKeystorePath: '',
+            httpsKeystorePassword: '',
         });
         expect(route?.requestHeaders).to.deep.equal([]);
         expect(route?.responseHeaders).to.deep.equal([]);

@@ -6,6 +6,7 @@
 
 ### Added
 
+- Added HTTPS listener support for HTTP groups with shared `httpsEnabled` / PKCS#12 config fields, local certificate generation, HTTPS URL display, and hard-fail validation for invalid keystores.
 - Added nginx-like local gateway migration recipes for frontend dev servers, backend routes, path rewrites, and SPA fallback.
 - Added English and Chinese usage guides aligned with the sibling `intercept-wave` project.
 - Added static frontend build serving for HTTP routes with `targetType="STATIC"`, `staticRoot`, static `spaFallback`, MIME handling, and traversal protection.

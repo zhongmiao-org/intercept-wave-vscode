@@ -82,6 +82,9 @@ export interface ProxyGroup {
     // Future extension hooks (no runtime behavior yet)
     tls?: TLSConfig;
     defaultHeaders?: Record<string, string>;
+    httpsEnabled?: boolean;
+    httpsKeystorePath?: string;
+    httpsKeystorePassword?: string;
 
     // v3 shared config fields (must stay in sync with Kotlin project)
     protocol?: ProxyProtocol; // defaults to 'HTTP' when omitted

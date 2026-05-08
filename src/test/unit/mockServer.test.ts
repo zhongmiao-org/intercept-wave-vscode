@@ -5,9 +5,12 @@ import * as vscode from 'vscode';
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
 import * as fs from 'fs';
+import * as https from 'https';
+import * as net from 'net';
 import * as os from 'os';
 import * as path from 'path';
 import { ConfigManager, MockConfig, MockServerManager, ProxyGroup } from '../../common';
+import { generateLocalPkcs12Certificate, LOCAL_CERTIFICATE_PASSWORD, LOCAL_CERTIFICATE_RELATIVE_PATH } from '../../common/utils';
 
 describe('MockServerManager', () => {
     let mockServerManager: MockServerManager;
@@ -151,6 +154,55 @@ describe('MockServerManager', () => {
         }
     }
 
+    async function getFreePort(): Promise<number> {
+        return await new Promise<number>((resolve, reject) => {
+            const server = net.createServer();
+            server.listen(0, () => {
+                const address = server.address();
+                if (!address || typeof address === 'string') {
+                    server.close(() => reject(new Error('Failed to allocate free port')));
+                    return;
+                }
+                const port = address.port;
+                server.close(error => {
+                    if (error) {
+                        reject(error);
+                        return;
+                    }
+                    resolve(port);
+                });
+            });
+            server.on('error', reject);
+        });
+    }
+
+    async function httpsRequest(port: number, requestPath: string): Promise<{ statusCode: number; body: string; headers: any }> {
+        return await new Promise((resolve, reject) => {
+            const req = https.request(
+                {
+                    hostname: 'localhost',
+                    port,
+                    path: requestPath,
+                    rejectUnauthorized: false,
+                },
+                res => {
+                    let body = '';
+                    res.setEncoding('utf8');
+                    res.on('data', chunk => {
+                        body += chunk;
+                    });
+                    res.on('end', () => resolve({
+                        statusCode: res.statusCode || 0,
+                        body,
+                        headers: res.headers,
+                    }));
+                }
+            );
+            req.on('error', reject);
+            req.end();
+        });
+    }
+
     it('creates an instance', () => {
         expect(mockServerManager).to.be.instanceOf(MockServerManager);
     });
@@ -213,6 +265,102 @@ describe('MockServerManager', () => {
         (mockServerManager as any).httpServers.set('g1', { close: closeStub });
         await mockServerManager.stopGroupById('g1');
         expect(closeStub.calledOnce).to.equal(true);
+    });
+
+    it('starts HTTPS groups on the configured port and serves mock responses', async () => {
+        generateLocalPkcs12Certificate(workspaceRoot, LOCAL_CERTIFICATE_RELATIVE_PATH, LOCAL_CERTIFICATE_PASSWORD, true);
+        const port = await getFreePort();
+        (configManager.getConfig as sinon.SinonStub).returns({
+            version: '4.0',
+            proxyGroups: [
+                {
+                    ...defaultGroup,
+                    id: 'https-mock',
+                    name: 'HTTPS Mock',
+                    port,
+                    httpsEnabled: true,
+                    httpsKeystorePath: LOCAL_CERTIFICATE_RELATIVE_PATH,
+                    httpsKeystorePassword: LOCAL_CERTIFICATE_PASSWORD,
+                    routes: [
+                        {
+                            ...defaultGroup.routes![0],
+                            pathPrefix: '/api',
+                            stripPrefix: true,
+                            enableMock: true,
+                            mockApis: [
+                                { path: '/hello', enabled: true, mockData: '{"ok":true}', method: 'GET', statusCode: 200 },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        });
+
+        try {
+            const url = await mockServerManager.startGroupById('https-mock');
+            expect(url).to.equal(`https://localhost:${port} (HTTPS Mock)`);
+            const response = await httpsRequest(port, '/api/hello');
+            expect(response.statusCode).to.equal(200);
+            expect(response.body).to.equal('{"ok":true}');
+        } finally {
+            await mockServerManager.stopGroupById('https-mock');
+        }
+    });
+
+    it('serves static routes through an HTTPS group without changing static behavior', async () => {
+        generateLocalPkcs12Certificate(workspaceRoot, LOCAL_CERTIFICATE_RELATIVE_PATH, LOCAL_CERTIFICATE_PASSWORD, true);
+        writeStaticFixture();
+        const port = await getFreePort();
+        (configManager.getConfig as sinon.SinonStub).returns({
+            version: '4.0',
+            proxyGroups: [
+                {
+                    ...defaultGroup,
+                    id: 'https-static',
+                    name: 'HTTPS Static',
+                    port,
+                    httpsEnabled: true,
+                    httpsKeystorePath: LOCAL_CERTIFICATE_RELATIVE_PATH,
+                    httpsKeystorePassword: LOCAL_CERTIFICATE_PASSWORD,
+                    routes: [createStaticRoute({ spaFallback: true })],
+                },
+            ],
+        });
+
+        try {
+            const url = await mockServerManager.startGroupById('https-static');
+            expect(url).to.equal(`https://localhost:${port} (HTTPS Static)`);
+            const response = await httpsRequest(port, '/dashboard');
+            expect(response.statusCode).to.equal(200);
+            expect(response.headers['content-type']).to.equal('text/html; charset=UTF-8');
+            expect(response.body).to.equal('<html>app</html>');
+        } finally {
+            await mockServerManager.stopGroupById('https-static');
+        }
+    });
+
+    it('fails HTTPS startup hard when keystore config is invalid', async () => {
+        const port = await getFreePort();
+        (configManager.getConfig as sinon.SinonStub).returns({
+            version: '4.0',
+            proxyGroups: [
+                {
+                    ...defaultGroup,
+                    id: 'bad-https',
+                    name: 'Bad HTTPS',
+                    port,
+                    httpsEnabled: true,
+                    httpsKeystorePath: 'certs/missing.p12',
+                    httpsKeystorePassword: LOCAL_CERTIFICATE_PASSWORD,
+                },
+            ],
+        });
+
+        await expectRejected(
+            mockServerManager.startGroupById('bad-https'),
+            path.join(workspaceRoot, 'certs', 'missing.p12').replace(/^/, 'HTTPS keystore file does not exist: ')
+        );
+        expect(mockServerManager.getGroupStatus('bad-https')).to.equal(false);
     });
 
     it('delegates ws manual push helpers with full rules list', async () => {

@@ -1,10 +1,9 @@
 import React from 'react';
 import type { GroupModalProps } from '../interfaces/ui.components';
 
-export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, isEdit }: GroupModalProps) {
-  if (!open) return null;
-
+export function GroupModal({ open, draft, onChange, onSave, onCancel, onPickHttpsKeystore, onGenerateLocalCertificate, labels, isEdit }: GroupModalProps) {
   React.useEffect(() => {
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -17,7 +16,7 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel, onSave]);
+  }, [open, onCancel, onSave]);
 
   const [vw, setVw] = React.useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
   React.useEffect(() => {
@@ -29,6 +28,10 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
   const protocol = draft.protocol || 'HTTP';
   const isWs = protocol === 'WS';
   const modalWidth = Math.max(600, Math.min(840, vw - 48));
+  const httpsKeystorePath = draft.httpsKeystorePath || '';
+  const isExternalHttpsKeystore = httpsKeystorePath.trim() !== '' && /^(\/|[A-Za-z]:[\\/])/.test(httpsKeystorePath.trim());
+
+  if (!open) return null;
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', overflowY: 'auto', zIndex: 50 }} onClick={onCancel}>
@@ -76,7 +79,7 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
         </button>
 
         {/* Title */}
-        <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: 'var(--vscode-descriptionForeground)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0, color: 'var(--vscode-descriptionForeground)' }}>
           {labels.chromeTitle || labels.sectionHttp}
         </div>
         <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
@@ -191,6 +194,51 @@ export function GroupModal({ open, draft, onChange, onSave, onCancel, labels, is
                 value={draft.globalCookie}
                 onChange={e => onChange({ ...draft, globalCookie: e.target.value })}
               />
+
+              <div style={{ gridColumn: '1 / -1', marginTop: 8, fontWeight: 600 }}>{labels.httpsSection}</div>
+
+              <label>{labels.httpsEnabled}</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={draft.httpsEnabled === true}
+                  onChange={e => onChange({ ...draft, httpsEnabled: e.target.checked })}
+                />
+                <span>{draft.httpsEnabled ? labels.yesLabel : labels.noLabel}</span>
+              </div>
+
+              <label>{labels.httpsKeystorePath}</label>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+                  <input
+                    value={httpsKeystorePath}
+                    placeholder="certs/intercept-wave-local.p12"
+                    onChange={e => onChange({ ...draft, httpsKeystorePath: e.target.value })}
+                  />
+                  <button type="button" onClick={onPickHttpsKeystore}>{labels.chooseFile}</button>
+                </div>
+                <span style={{ fontSize: 11.5, lineHeight: 1.35, color: isExternalHttpsKeystore ? 'var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground))' : 'var(--vscode-descriptionForeground)' }}>
+                  {isExternalHttpsKeystore ? labels.httpsExternalWarning : labels.httpsHint}
+                </span>
+              </div>
+
+              <label>{labels.httpsKeystorePassword}</label>
+              <input
+                type="password"
+                value={draft.httpsKeystorePassword || ''}
+                placeholder="changeit"
+                onChange={e => onChange({ ...draft, httpsKeystorePassword: e.target.value })}
+              />
+
+              <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 6 }}>
+                <button type="button" onClick={onGenerateLocalCertificate} style={{ justifySelf: 'start' }}>
+                  <span className="codicon codicon-key" style={{ marginRight: 6 }} />
+                  {labels.generateLocalCertificate}
+                </button>
+                <span style={{ fontSize: 11.5, lineHeight: 1.35, color: 'var(--vscode-descriptionForeground)' }}>
+                  {labels.httpsLocalCertificateWarning}
+                </span>
+              </div>
             </>
           )}
         </div>

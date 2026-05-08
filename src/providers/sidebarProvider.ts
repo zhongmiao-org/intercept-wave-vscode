@@ -1,6 +1,17 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { ConfigManager, HttpRoute, MockServerManager, ProxyGroup, buildReactWebviewHtml } from '../common';
+import * as fs from 'fs';
+import {
+    ConfigManager,
+    HttpRoute,
+    LOCAL_CERTIFICATE_PASSWORD,
+    LOCAL_CERTIFICATE_RELATIVE_PATH,
+    MockServerManager,
+    ProxyGroup,
+    buildReactWebviewHtml,
+    generateLocalPkcs12Certificate,
+    resolveLocalCertificatePath,
+} from '../common';
 import { PanelProvider } from './panelProvider';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -111,6 +122,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'chooseStaticRoot':
                     await this.handleChooseStaticRoot(data.current);
+                    break;
+                case 'chooseHttpsKeystore':
+                    await this.handleChooseHttpsKeystore(data.current);
+                    break;
+                case 'generateLocalCertificate':
+                    await this.handleGenerateLocalCertificate(data.path, data.password);
                     break;
                 case 'addMock':
                     await this.handleAddMock(data.groupId, data.routeId, data.data);
@@ -269,6 +286,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             interceptPrefix: route.pathPrefix,
             baseUrl: route.targetBaseUrl,
             mockApis: [],
+            httpsEnabled: data.httpsEnabled === true,
+            httpsKeystorePath: typeof data.httpsKeystorePath === 'string' ? data.httpsKeystorePath.trim() : '',
+            httpsKeystorePassword: typeof data.httpsKeystorePassword === 'string' ? data.httpsKeystorePassword : '',
             wsBaseUrl: data.wsBaseUrl ?? null,
             wsInterceptPrefix: data.wsInterceptPrefix ?? null,
             wsManualPush: data.wsManualPush ?? true,
@@ -393,6 +413,79 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         return selectedPath;
     }
 
+    private async handleChooseHttpsKeystore(current?: string) {
+        const workspaceRoot = this.getWorkspaceRoot();
+        const defaultUri = vscode.Uri.file(this.resolveProjectPathForUi(String(current || ''), workspaceRoot));
+        const selected = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            defaultUri,
+            openLabel: vscode.l10n.t('ui.chooseFile'),
+            filters: {
+                'PKCS#12': ['p12', 'pfx'],
+                'All Files': ['*'],
+            },
+        });
+        const file = selected?.[0]?.fsPath;
+        if (!file || !this.webviewView) return;
+        await this.webviewView.webview.postMessage({
+            type: 'httpsKeystoreSelected',
+            httpsKeystorePath: this.toStoredProjectPath(file, workspaceRoot),
+        });
+    }
+
+    private async handleGenerateLocalCertificate(rawPath?: string, rawPassword?: string) {
+        const workspaceRoot = this.getWorkspaceRoot();
+        const targetPath = resolveLocalCertificatePath(workspaceRoot, String(rawPath || LOCAL_CERTIFICATE_RELATIVE_PATH));
+        const password = String(rawPassword || LOCAL_CERTIFICATE_PASSWORD);
+        const overwrite = await this.confirmCertificateOverwrite(targetPath);
+        if (overwrite === undefined) return;
+
+        try {
+            const result = generateLocalPkcs12Certificate(workspaceRoot, targetPath, password, overwrite);
+            await this.webviewView?.webview.postMessage({
+                type: 'httpsCertificateGenerated',
+                httpsKeystorePath: result.relativePath,
+                httpsKeystorePassword: result.password,
+                httpsEnabled: true,
+            });
+            await this.notify('info', vscode.l10n.t('success.httpsCertificateGenerated', result.relativePath));
+        } catch (error: any) {
+            await this.notify('error', vscode.l10n.t('error.httpsCertificateGenerationFailed', error?.message || error));
+        }
+    }
+
+    private async confirmCertificateOverwrite(targetPath: string): Promise<boolean | undefined> {
+        if (!this.webviewView) return undefined;
+        if (!fs.existsSync(targetPath)) return false;
+        const overwrite = vscode.l10n.t('ui.overwrite');
+        const choice = await vscode.window.showWarningMessage(
+            vscode.l10n.t('warning.httpsCertificateExists', targetPath),
+            { modal: true },
+            overwrite,
+            vscode.l10n.t('ui.cancel')
+        );
+        return choice === overwrite ? true : undefined;
+    }
+
+    private resolveProjectPathForUi(current: string, workspaceRoot: string): string {
+        const trimmed = current.trim();
+        if (!trimmed) return workspaceRoot;
+        return path.isAbsolute(trimmed) ? trimmed : path.resolve(workspaceRoot, trimmed);
+    }
+
+    private toStoredProjectPath(selectedPath: string, workspaceRoot: string): string {
+        const relative = path.relative(workspaceRoot, selectedPath);
+        if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) {
+            return relative.split(path.sep).join('/');
+        }
+        if (relative === '') {
+            return '.';
+        }
+        return selectedPath;
+    }
+
     private getWorkspaceRoot(): string {
         const manager = this.configManager as any;
         if (typeof manager.getWorkspaceRoot === 'function') {
@@ -506,6 +599,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             'ui.mockTemplate', 'ui.mockTemplateHint', 'ui.applyTemplate', 'ui.mockTemplate.success', 'ui.mockTemplate.pagination', 'ui.mockTemplate.empty', 'ui.mockTemplate.error', 'ui.mockTemplate.authExpired',
             'ui.protocol', 'ui.protocol.http', 'ui.protocol.ws', 'ui.wsBaseUrl', 'ui.wsInterceptPrefix', 'ui.wsManualPush',
             'ui.wssEnabled', 'ui.wssKeystorePath', 'ui.wssKeystorePassword', 'ui.section.group', 'ui.section.http', 'ui.section.ws',
+            'ui.httpsEnabled', 'ui.httpsKeystorePath', 'ui.httpsKeystorePassword', 'ui.httpsSection', 'ui.httpsHint', 'ui.httpsExternalWarning', 'ui.generateLocalCertificate', 'ui.httpsLocalCertificateWarning', 'ui.chooseFile', 'ui.overwrite',
             'ui.wsPanel.title', 'ui.wsPanel.rules', 'ui.wsPanel.sendSelected', 'ui.wsPanel.target.match', 'ui.wsPanel.target.all',
             'ui.wsPanel.target.recent', 'ui.wsPanel.customMessage', 'ui.wsPanel.send', 'ui.wsPanel.noRules', 'ui.addWsRule', 'ui.editWsRule',
             'ui.wsRule.mode', 'ui.wsRule.mode.off', 'ui.wsRule.mode.periodic', 'ui.wsRule.mode.timeline', 'ui.wsRule.event.key',
@@ -573,6 +667,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         const conflict = config.proxyGroups.find(g => g.port === port && g.id !== editingGroupId);
         if (conflict) {
             return vscode.l10n.t('error.portInUse', port.toString(), conflict.name);
+        }
+        if (data.protocol !== 'WS' && data.httpsEnabled === true) {
+            if (!String(data.httpsKeystorePath || '').trim()) return vscode.l10n.t('error.httpsKeystorePathRequired');
+            if (!String(data.httpsKeystorePassword || '')) return vscode.l10n.t('error.httpsKeystorePasswordRequired');
         }
         return null;
     }

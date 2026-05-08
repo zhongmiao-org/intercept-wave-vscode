@@ -132,6 +132,9 @@ function createDefaultGroupDraft(): GroupDraft {
     stripPrefix: true,
     globalCookie: '',
     protocol: 'HTTP',
+    httpsEnabled: false,
+    httpsKeystorePath: '',
+    httpsKeystorePassword: '',
     wsBaseUrl: null,
     wsInterceptPrefix: null,
     wsManualPush: true,
@@ -285,6 +288,16 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupDraft | null>(null);
   const [isEditingGroup, setIsEditingGroup] = useState(false);
+
+  const getGroupProtocolLabel = (group: ProxyGroup) => {
+    if (group.protocol === 'WS') return group.wssEnabled ? 'WSS' : 'WS';
+    return group.httpsEnabled ? 'HTTPS' : 'HTTP';
+  };
+
+  const getGroupLocalUrl = (group: ProxyGroup) => {
+    const protocol = group.protocol === 'WS' ? (group.wssEnabled ? 'wss' : 'ws') : (group.httpsEnabled ? 'https' : 'http');
+    return `${protocol}://localhost:${group.port}`;
+  };
   const [showRouteModal, setShowRouteModal] = useState(false);
   const [editingRoute, setEditingRoute] = useState<RouteDraft | null>(null);
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
@@ -333,7 +346,12 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
   const onEditGroup = () => {
     if (!activeGroup) return;
     const { id: _id, routes: _routes, interceptPrefix: _interceptPrefix, baseUrl: _baseUrl, mockApis: _mockApis, ...rest } = activeGroup;
-    setEditingGroup(rest as GroupDraft);
+    setEditingGroup({
+      ...rest,
+      httpsEnabled: activeGroup.httpsEnabled === true,
+      httpsKeystorePath: activeGroup.httpsKeystorePath || '',
+      httpsKeystorePassword: activeGroup.httpsKeystorePassword || '',
+    } as GroupDraft);
     setIsEditingGroup(true);
     setShowGroupModal(true);
   };
@@ -390,6 +408,30 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
     };
     window.addEventListener('iw:staticRootSelected', onStaticRootSelected as EventListener);
     return () => window.removeEventListener('iw:staticRootSelected', onStaticRootSelected as EventListener);
+  }, []);
+
+  React.useEffect(() => {
+    const onHttpsKeystoreSelected = (event: Event) => {
+      const httpsKeystorePath = (event as CustomEvent<{ httpsKeystorePath?: string }>).detail?.httpsKeystorePath;
+      if (typeof httpsKeystorePath === 'string') {
+        setEditingGroup(current => current ? { ...current, httpsKeystorePath } : current);
+      }
+    };
+    const onHttpsCertificateGenerated = (event: Event) => {
+      const detail = (event as CustomEvent<{ httpsEnabled?: boolean; httpsKeystorePath?: string; httpsKeystorePassword?: string }>).detail || {};
+      setEditingGroup(current => current ? {
+        ...current,
+        httpsEnabled: detail.httpsEnabled === true,
+        httpsKeystorePath: detail.httpsKeystorePath || current.httpsKeystorePath || '',
+        httpsKeystorePassword: detail.httpsKeystorePassword || current.httpsKeystorePassword || '',
+      } : current);
+    };
+    window.addEventListener('iw:httpsKeystoreSelected', onHttpsKeystoreSelected as EventListener);
+    window.addEventListener('iw:httpsCertificateGenerated', onHttpsCertificateGenerated as EventListener);
+    return () => {
+      window.removeEventListener('iw:httpsKeystoreSelected', onHttpsKeystoreSelected as EventListener);
+      window.removeEventListener('iw:httpsCertificateGenerated', onHttpsCertificateGenerated as EventListener);
+    };
   }, []);
 
   const onSaveRoute = () => {
@@ -773,8 +815,8 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11.5, color: 'var(--vscode-descriptionForeground)', paddingLeft: 24 }}>
-                    <span>:{group.port}</span>
-                    <span>{group.protocol || 'HTTP'}</span>
+                    <span>{getGroupLocalUrl(group)}</span>
+                    <span>{getGroupProtocolLabel(group)}</span>
                     <span>{(group.routes || []).length} {t('ui.routes') || 'routes'}</span>
                   </div>
                 </div>
@@ -972,7 +1014,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                 <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{activeGroup.name}</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                   <StatBadge label={t('ui.port') || 'Port'} value={activeGroup.port} />
-                  <StatBadge label={t('ui.protocol') || 'Protocol'} value={activeGroup.protocol || 'HTTP'} tone="muted" />
+                  <StatBadge label={t('ui.protocol') || 'Protocol'} value={getGroupProtocolLabel(activeGroup)} tone="muted" />
                   <StatBadge
                     label={t('ui.running') || 'Running'}
                     value={state.groupStatuses?.[activeGroup.id] ? (t('ui.running') || 'Running') : (t('ui.stopped') || 'Stopped')}
@@ -1000,11 +1042,11 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                   </div>
                   <div>
                     <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 4 }}>{t('ui.port') || 'Port'}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{activeGroup.port}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{getGroupLocalUrl(activeGroup)}</div>
                   </div>
                   <div>
                     <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 4 }}>{t('ui.protocol') || 'Protocol'}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{activeGroup.protocol || 'HTTP'}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{getGroupProtocolLabel(activeGroup)}</div>
                   </div>
                   <div>
                     <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 4 }}>{t('ui.stripPrefix') || 'Strip Prefix'}</div>
@@ -1340,6 +1382,12 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
         onChange={setEditingGroup as (next: GroupDraft) => void}
         onSave={onSaveGroup}
         onCancel={() => setShowGroupModal(false)}
+        onPickHttpsKeystore={() => vscode.postMessage({ type: 'chooseHttpsKeystore', current: editingGroup?.httpsKeystorePath || '' })}
+        onGenerateLocalCertificate={() => vscode.postMessage({
+          type: 'generateLocalCertificate',
+          path: editingGroup?.httpsKeystorePath || 'certs/intercept-wave-local.p12',
+          password: editingGroup?.httpsKeystorePassword || 'changeit',
+        })}
         isEdit={isEditingGroup}
         labels={{
           titleAdd: t('ui.addProxyGroup') || 'Add Group',
@@ -1359,6 +1407,15 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
           port: t('ui.port') || 'Port',
           stripPrefix: t('ui.stripPrefix') || 'Strip Prefix',
           globalCookie: t('ui.globalCookie') || 'Global Cookie',
+          httpsEnabled: t('ui.httpsEnabled') || 'Enable HTTPS',
+          httpsKeystorePath: t('ui.httpsKeystorePath') || 'PKCS#12 Keystore Path',
+          httpsKeystorePassword: t('ui.httpsKeystorePassword') || 'PKCS#12 Password',
+          httpsSection: t('ui.httpsSection') || 'HTTPS Local Origin',
+          httpsHint: t('ui.httpsHint') || 'Project-relative paths such as certs/intercept-wave-local.p12 are best for shared config.',
+          httpsExternalWarning: t('ui.httpsExternalWarning') || 'Absolute paths are machine-local and not ideal for shared config.',
+          generateLocalCertificate: t('ui.generateLocalCertificate') || 'Generate Local Certificate',
+          httpsLocalCertificateWarning: t('ui.httpsLocalCertificateWarning') || 'Generated certificates are for local debugging only and are not installed into system or browser trust stores.',
+          chooseFile: t('ui.chooseFile') || 'Choose...',
           wsBaseUrl: t('ui.wsBaseUrl') || 'WS Base URL',
           wsInterceptPrefix: t('ui.wsInterceptPrefix') || 'WS Intercept Prefix',
           wsManualPush: t('ui.wsManualPush') || 'Enable Manual Push',

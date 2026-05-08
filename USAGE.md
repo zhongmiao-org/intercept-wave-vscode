@@ -18,7 +18,7 @@ Intercept Wave is a VSCode extension that helps you handle HTTP mocking, proxy f
 1. Open your workspace in VSCode
 2. Click the "Intercept Wave" icon in the Activity Bar
 3. Select a proxy group and click "Start Server", or use "Start All" at the top
-4. After the server starts, use the local access URL such as `http://localhost:8888`
+4. After the server starts, use the local access URL such as `http://localhost:8888`, or `https://localhost:9443` when HTTPS is enabled for that HTTP group
 
 ### 2. Configure Mock Services
 
@@ -30,6 +30,7 @@ Click the "Configure" or settings button to edit proxy groups.
 - **Group Name**: For example, "Gateway", "User Service", or "Order Service"
 - **Port**: The local listening port for the current group
 - **Enabled**: Whether this group should be included in "Start All"
+- **HTTPS**: HTTP groups can optionally listen as `https://localhost:<port>` on the same port using a PKCS#12 `.p12` / `.pfx` keystore
 
 #### HTTP Settings
 
@@ -54,6 +55,54 @@ Frontend build static route example: after running your frontend build, configur
 
 Static roots are resolved from the workspace/project root. Project-internal folders are saved as relative paths such as `dist`, `build`, or `frontend/dist`, which keeps `.intercept-wave/config.json` shareable. Absolute paths outside the project are allowed for local experiments, but they depend on the current machine.
 
+#### HTTPS Local Origin
+
+Enable HTTPS on an HTTP group when your browser or frontend framework needs a secure local origin. When `httpsEnabled=true`, the configured port listens only on HTTPS and does not also expose HTTP.
+
+```json
+{
+    "name": "Gateway",
+    "port": 9443,
+    "protocol": "HTTP",
+    "httpsEnabled": true,
+    "httpsKeystorePath": "certs/intercept-wave-local.p12",
+    "httpsKeystorePassword": "changeit",
+    "routes": [
+        {
+            "name": "API",
+            "pathPrefix": "/api",
+            "targetBaseUrl": "http://localhost:9000",
+            "stripPrefix": true,
+            "rewriteTargetPath": "",
+            "spaFallbackPath": "",
+            "enableMock": true,
+            "mockApis": []
+        }
+    ]
+}
+```
+
+Use **Generate local certificate** in the group editor to create a standard PKCS#12 file at `certs/intercept-wave-local.p12`. The generated certificate uses `CN=localhost` with SAN entries for `localhost` and `127.0.0.1`, and the default password is `changeit`. The file contains a private key and is for local debugging only. Intercept Wave does not install it into the system or browser trust store, so your browser may still ask you to trust the self-signed certificate.
+
+Project-internal certificate paths are saved relative to the workspace and can be shared with the config. External absolute paths are allowed but machine-local.
+
+Equivalent manual `keytool` command:
+
+```bash
+mkdir -p certs
+keytool -genkeypair \
+  -alias intercept-wave-local \
+  -keyalg RSA \
+  -keysize 2048 \
+  -validity 825 \
+  -storetype PKCS12 \
+  -keystore certs/intercept-wave-local.p12 \
+  -storepass changeit \
+  -keypass changeit \
+  -dname "CN=localhost, OU=Intercept Wave, O=Local Development, L=Local, ST=Local, C=US" \
+  -ext "SAN=dns:localhost,ip:127.0.0.1"
+```
+
 #### Nginx Migration Recipes
 
 Use one HTTP group as the local gateway port, then add routes that mirror nginx `location` blocks. This is intended for local development, not production traffic.
@@ -65,6 +114,9 @@ Frontend dev server plus backend API:
     "name": "Gateway",
     "port": 8888,
     "protocol": "HTTP",
+    "httpsEnabled": false,
+    "httpsKeystorePath": "",
+    "httpsKeystorePassword": "",
     "routes": [
         {
             "name": "API",
@@ -186,7 +238,7 @@ Common issues:
 - **SPA refresh returns 404**: for proxy-to-dev-server routes, keep the frontend route at `pathPrefix="/"`, set `enableMock=false`, and set `spaFallbackPath="/index.html"` for HTML navigation requests. For static build routes, set `targetType="STATIC"` and `spaFallback=true`.
 - **Prefix or rewrite mismatch**: `stripPrefix` runs before `rewriteTargetPath`; Mock paths and forwarded paths use the rewritten route-local path.
 - **Unexpected CORS or cache headers**: response header rules run after the default CORS headers, so use `SET` or `REMOVE` on `responseHeaders` for route-specific CORS and cache behavior.
-- **HTTPS**: HTTPS listener support is tracked by [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40).
+- **HTTPS certificate warning**: generated certificates are self-signed and local-debug only; trust them manually only when appropriate for your browser or system.
 
 Related roadmap items: VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39), IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150), and IntelliJ docs [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157).
 

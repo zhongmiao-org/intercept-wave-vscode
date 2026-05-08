@@ -18,7 +18,7 @@ Intercept Wave 是一个 VS Code 扩展，用于在本地开发中统一处理 H
 1. 在 VS Code 中打开工作区
 2. 点击 Activity Bar 中的 "Intercept Wave" 图标
 3. 选择一个配置组后点击“启动服务”，或使用顶部的“全部启动”
-4. 服务启动成功后，使用本地访问地址，例如 `http://localhost:8888`
+4. 服务启动成功后，使用本地访问地址，例如 `http://localhost:8888`；如果该 HTTP 配置组启用了 HTTPS，则使用 `https://localhost:9443`
 
 ### 2. 配置 Mock 服务
 
@@ -30,6 +30,7 @@ Intercept Wave 是一个 VS Code 扩展，用于在本地开发中统一处理 H
 - **配置组名称**：例如“网关”“用户服务”“订单服务”
 - **端口号**：当前配置组监听的本地端口
 - **启用**：是否允许被“全部启动”统一拉起
+- **HTTPS**：HTTP 配置组可使用 PKCS#12 `.p12` / `.pfx` 密钥库，在同一个端口上监听 `https://localhost:<port>`
 
 #### HTTP 配置
 
@@ -54,6 +55,54 @@ Intercept Wave 是一个 VS Code 扩展，用于在本地开发中统一处理 H
 
 静态目录按工作区/项目根目录解析。项目内目录会保存为 `dist`、`build`、`frontend/dist` 这样的相对路径，便于共享 `.intercept-wave/config.json`；项目外绝对路径也允许用于本机实验，但依赖当前机器。
 
+#### HTTPS 本地 Origin
+
+当前端框架或浏览器能力需要安全本地源时，可为 HTTP 配置组启用 HTTPS。`httpsEnabled=true` 后，该端口只监听 HTTPS，不会同时暴露 HTTP。
+
+```json
+{
+    "name": "Gateway",
+    "port": 9443,
+    "protocol": "HTTP",
+    "httpsEnabled": true,
+    "httpsKeystorePath": "certs/intercept-wave-local.p12",
+    "httpsKeystorePassword": "changeit",
+    "routes": [
+        {
+            "name": "API",
+            "pathPrefix": "/api",
+            "targetBaseUrl": "http://localhost:9000",
+            "stripPrefix": true,
+            "rewriteTargetPath": "",
+            "spaFallbackPath": "",
+            "enableMock": true,
+            "mockApis": []
+        }
+    ]
+}
+```
+
+在配置组编辑器点击“生成本地证书”会生成标准 PKCS#12 文件 `certs/intercept-wave-local.p12`。生成证书使用 `CN=localhost`，并包含 `localhost` 与 `127.0.0.1` 的 SAN，默认密码为 `changeit`。该文件包含私钥，仅用于本地调试。Intercept Wave 不会自动安装到系统或浏览器信任链，因此浏览器可能仍需要你手动信任自签证书。
+
+项目内证书路径会保存为工作区相对路径，便于随配置共享。项目外绝对路径也允许，但属于本机路径。
+
+等价的手动 `keytool` 命令：
+
+```bash
+mkdir -p certs
+keytool -genkeypair \
+  -alias intercept-wave-local \
+  -keyalg RSA \
+  -keysize 2048 \
+  -validity 825 \
+  -storetype PKCS12 \
+  -keystore certs/intercept-wave-local.p12 \
+  -storepass changeit \
+  -keypass changeit \
+  -dname "CN=localhost, OU=Intercept Wave, O=Local Development, L=Local, ST=Local, C=US" \
+  -ext "SAN=dns:localhost,ip:127.0.0.1"
+```
+
 #### Nginx 迁移配置片段
 
 用一个 HTTP 配置组作为本地网关端口，再用多条路由对应 nginx 的多个 `location`。该能力面向本地开发，不用于生产流量。
@@ -65,6 +114,9 @@ Intercept Wave 是一个 VS Code 扩展，用于在本地开发中统一处理 H
     "name": "Gateway",
     "port": 8888,
     "protocol": "HTTP",
+    "httpsEnabled": false,
+    "httpsKeystorePath": "",
+    "httpsKeystorePassword": "",
     "routes": [
         {
             "name": "API",
@@ -186,7 +238,7 @@ route 级 Header 覆盖示例：
 - **SPA 刷新返回 404**：proxy 到前端开发服务器时，前端路由保持 `pathPrefix="/"`，设置 `enableMock=false`，并设置 `spaFallbackPath="/index.html"` 处理 HTML 导航请求。static 构建路由则设置 `targetType="STATIC"` 和 `spaFallback=true`。
 - **前缀或重写不符合预期**：`stripPrefix` 会先于 `rewriteTargetPath` 执行；Mock 路径和转发路径都使用重写后的路由本地路径。
 - **CORS 或缓存 Header 不符合预期**：响应 Header 规则会在默认 CORS 头之后执行，可通过 `responseHeaders` 的 `SET` 或 `REMOVE` 配置 route 级 CORS 与缓存行为。
-- **HTTPS**：HTTPS 监听支持由 [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40) 跟进。
+- **HTTPS 证书提示**：生成证书是自签名且仅用于本地调试；是否在浏览器或系统中手动信任由你决定。
 
 相关 roadmap：VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39)、IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150)、IntelliJ 文档 [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157)。
 

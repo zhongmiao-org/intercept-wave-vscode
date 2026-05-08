@@ -394,20 +394,26 @@ server {
   {
     "name": "API",
     "pathPrefix": "/api",
+    "targetType": "PROXY",
     "targetBaseUrl": "http://localhost:9000",
+    "staticRoot": "",
     "stripPrefix": true,
     "rewriteTargetPath": "",
     "spaFallbackPath": "",
+    "spaFallback": false,
     "enableMock": true,
     "mockApis": []
   },
   {
     "name": "Frontend",
     "pathPrefix": "/",
+    "targetType": "PROXY",
     "targetBaseUrl": "http://localhost:5173",
+    "staticRoot": "",
     "stripPrefix": false,
     "rewriteTargetPath": "",
     "spaFallbackPath": "/index.html",
+    "spaFallback": false,
     "enableMock": false,
     "mockApis": []
   }
@@ -427,12 +433,32 @@ server {
 ]
 ```
 
+前端生产构建可将前端 route 切换为静态文件服务：
+
+```json
+{
+  "name": "Frontend Build",
+  "pathPrefix": "/",
+  "targetType": "STATIC",
+  "targetBaseUrl": "http://localhost:8080",
+  "staticRoot": "frontend/dist",
+  "stripPrefix": false,
+  "rewriteTargetPath": "",
+  "spaFallbackPath": "",
+  "spaFallback": true,
+  "enableMock": false,
+  "mockApis": []
+}
+```
+
+静态目录按工作区根目录解析，因此共享配置建议使用 `dist`、`build`、`frontend/dist` 这类项目相对路径。项目外绝对路径也允许用于本机配置，但会让 `.intercept-wave/config.json` 依赖当前机器。static route 使用与 proxy route 相同的 route-local 路径规则：先 `stripPrefix`，再 `rewriteTargetPath`；查询参数不参与文件查找。原始或编码的目录穿越请求会在读取文件前被拒绝。
+
 路径重写遵循 nginx-like 本地网关语义：
 
 - `pathPrefix="/api"`，`stripPrefix=true`：`/api/users` 会按 `/users` 进行 Mock 匹配与转发
 - `pathPrefix="/backend"`，`stripPrefix=true`，`rewriteTargetPath="/v1"`：`/backend/users` 会按 `/v1/users` 进行 Mock 匹配与转发
 
-静态 `dist/` 文件服务由 [#42](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/42) 跟进，route 级请求/响应头覆盖由 [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44) 跟进，HTTPS 监听支持由 [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40) 跟进。跨平台 roadmap 链接：VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39)、IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150)、IntelliJ 文档对应 issue [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157)。
+Route 级请求/响应头覆盖由 [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44) 跟进，HTTPS 监听支持由 [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40) 跟进。跨平台 roadmap 链接：VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39)、IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150)、IntelliJ 文档对应 issue [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157)。
 
 ## 重要提示
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import type { RouteModalProps } from '../interfaces/ui.components';
 
-export function RouteModal({ open, draft, onChange, onSave, onCancel, labels, isEdit }: RouteModalProps) {
+export function RouteModal({ open, draft, onChange, onSave, onCancel, onPickStaticRoot, labels, isEdit }: RouteModalProps) {
   if (!open) return null;
 
   React.useEffect(() => {
@@ -19,6 +19,10 @@ export function RouteModal({ open, draft, onChange, onSave, onCancel, labels, is
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel, onSave]);
 
+  const targetType = draft.targetType === 'STATIC' ? 'STATIC' : 'PROXY';
+  const staticRoot = draft.staticRoot || '';
+  const isExternalStaticRoot = staticRoot.trim() !== '' && /^(\/|[A-Za-z]:[\\/])/.test(staticRoot.trim());
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.24)', overflowY: 'auto', zIndex: 60 }} onClick={onCancel}>
       <div style={{ width: 640, maxWidth: '92vw', margin: '6vh auto', background: 'var(--vscode-editor-background)', padding: 20, borderRadius: 10, border: '1px solid var(--vscode-panel-border)', boxShadow: '0 18px 40px rgba(0,0,0,0.35)' }} onClick={e => e.stopPropagation()}>
@@ -34,8 +38,36 @@ export function RouteModal({ open, draft, onChange, onSave, onCancel, labels, is
           <label>{labels.pathPrefix}</label>
           <input value={draft.pathPrefix} onChange={e => onChange({ ...draft, pathPrefix: e.target.value })} />
 
-          <label>{labels.targetBaseUrl}</label>
-          <input value={draft.targetBaseUrl} onChange={e => onChange({ ...draft, targetBaseUrl: e.target.value })} />
+          <label>{labels.targetType}</label>
+          <select
+            value={targetType}
+            onChange={e => onChange({ ...draft, targetType: e.target.value as 'PROXY' | 'STATIC' })}
+          >
+            <option value="PROXY">{labels.targetTypeProxy}</option>
+            <option value="STATIC">{labels.targetTypeStatic}</option>
+          </select>
+
+          {targetType === 'PROXY' && (
+            <>
+              <label>{labels.targetBaseUrl}</label>
+              <input value={draft.targetBaseUrl} onChange={e => onChange({ ...draft, targetBaseUrl: e.target.value })} />
+            </>
+          )}
+
+          {targetType === 'STATIC' && (
+            <>
+              <label>{labels.staticRoot}</label>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+                  <input value={staticRoot} placeholder="frontend/dist" onChange={e => onChange({ ...draft, staticRoot: e.target.value })} />
+                  <button type="button" onClick={onPickStaticRoot}>{labels.chooseFolder}</button>
+                </div>
+                <span style={{ fontSize: 11.5, lineHeight: 1.35, color: isExternalStaticRoot ? 'var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground))' : 'var(--vscode-descriptionForeground)' }}>
+                  {isExternalStaticRoot ? labels.staticRootExternalHint : labels.staticRootHint}
+                </span>
+              </div>
+            </>
+          )}
 
           <label>{labels.rewriteTargetPath}</label>
           <div style={{ display: 'grid', gap: 4 }}>
@@ -49,11 +81,28 @@ export function RouteModal({ open, draft, onChange, onSave, onCancel, labels, is
             <span>{draft.stripPrefix ? labels.yesLabel : labels.noLabel}</span>
           </div>
 
-          <label>{labels.spaFallbackPath}</label>
-          <div style={{ display: 'grid', gap: 4 }}>
-            <input value={draft.spaFallbackPath || ''} placeholder="/index.html" onChange={e => onChange({ ...draft, spaFallbackPath: e.target.value })} />
-            <span style={{ fontSize: 11.5, lineHeight: 1.35, color: 'var(--vscode-descriptionForeground)' }}>{labels.spaFallbackPathHint}</span>
-          </div>
+          {targetType === 'PROXY' && (
+            <>
+              <label>{labels.spaFallbackPath}</label>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <input value={draft.spaFallbackPath || ''} placeholder="/index.html" onChange={e => onChange({ ...draft, spaFallbackPath: e.target.value })} />
+                <span style={{ fontSize: 11.5, lineHeight: 1.35, color: 'var(--vscode-descriptionForeground)' }}>{labels.spaFallbackPathHint}</span>
+              </div>
+            </>
+          )}
+
+          {targetType === 'STATIC' && (
+            <>
+              <label>{labels.spaFallback}</label>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input type="checkbox" checked={draft.spaFallback === true} onChange={e => onChange({ ...draft, spaFallback: e.target.checked })} />
+                  <span>{draft.spaFallback ? labels.yesLabel : labels.noLabel}</span>
+                </label>
+                <span style={{ fontSize: 11.5, lineHeight: 1.35, color: 'var(--vscode-descriptionForeground)' }}>{labels.spaFallbackHint}</span>
+              </div>
+            </>
+          )}
 
           <label>{labels.enableMock}</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

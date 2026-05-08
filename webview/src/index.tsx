@@ -34,6 +34,9 @@ function Root() {
       if (msg?.type === 'notify') {
         try { console.warn('[IW] notify ←', msg?.level, msg?.text); } catch {}
       }
+      if (msg?.type === 'staticRootSelected') {
+        window.dispatchEvent(new CustomEvent('iw:staticRootSelected', { detail: { staticRoot: msg.staticRoot } }));
+      }
       if (msg?.type === 'closeGroupForm') {
         // Close any open form state in panel/side view
         window.dispatchEvent(new CustomEvent('iw:closeGroupForm'));

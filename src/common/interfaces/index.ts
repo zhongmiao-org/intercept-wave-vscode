@@ -1,5 +1,7 @@
 import type { WsDirection, WsRuleMode, ProxyProtocol } from '../types';
 
+export type HttpRouteTargetType = 'PROXY' | 'STATIC';
+
 export interface MockApiConfig {
     path: string;
     enabled: boolean;
@@ -18,10 +20,13 @@ export interface HttpRoute {
     id: string;
     name: string;
     pathPrefix: string;
+    targetType?: HttpRouteTargetType;
     targetBaseUrl: string;
+    staticRoot?: string;
     stripPrefix: boolean;
     rewriteTargetPath?: string;
     spaFallbackPath?: string;
+    spaFallback?: boolean;
     enableMock: boolean;
     mockApis: MockApiConfig[];
 }

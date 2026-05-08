@@ -56,6 +56,15 @@ export interface RouteListProps {
     delete: string;
     emptyText: string;
     enableMock: string;
+    targetType?: string;
+    targetTypeProxy?: string;
+    targetTypeStatic?: string;
+    staticRoot?: string;
+    staticRootHint?: string;
+    staticRootExternalHint?: string;
+    chooseFolder?: string;
+    spaFallback?: string;
+    spaFallbackHint?: string;
     disableMock: string;
     rewriteTargetPath?: string;
     spaFallbackPath?: string;
@@ -148,6 +157,7 @@ export interface RouteModalProps {
   onChange: (next: RouteDraft) => void;
   onSave: () => void;
   onCancel: () => void;
+  onPickStaticRoot?: () => void;
   labels: {
     titleAdd: string;
     titleEdit: string;
@@ -155,12 +165,21 @@ export interface RouteModalProps {
     hint?: string;
     name: string;
     pathPrefix: string;
+    targetType: string;
+    targetTypeProxy: string;
+    targetTypeStatic: string;
     targetBaseUrl: string;
+    staticRoot: string;
+    staticRootHint: string;
+    staticRootExternalHint: string;
+    chooseFolder: string;
     stripPrefix: string;
     rewriteTargetPath: string;
     rewriteTargetPathHint: string;
     spaFallbackPath: string;
     spaFallbackPathHint: string;
+    spaFallback: string;
+    spaFallbackHint: string;
     enableMock: string;
     yesLabel: string;
     noLabel: string;

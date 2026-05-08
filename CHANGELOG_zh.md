@@ -8,6 +8,7 @@
 
 - 新增 nginx 风格本地网关迁移示例,覆盖前端开发服务、后端路由、路径重写和 SPA 回退。
 - 新增英文和中文使用指南,并与兄弟项目 `intercept-wave` 的文档结构保持一致。
+- 新增 HTTP route 静态前端构建产物服务,支持 `targetType="STATIC"`、`staticRoot`、static `spaFallback`、常见 MIME 类型和目录穿越防护。
 - 新增内置 Mock 响应模板，覆盖成功、分页、空数据、错误和登录过期响应。
 - 新增面向前端开发服务的 `/` HTTP 路由代理能力，并支持 route 级 `spaFallbackPath`，用于刷新 SPA 深链接。
 - 新增 HTTP 路由重写规则 `rewriteTargetPath`,会在 `stripPrefix` 之后执行,同时影响 Mock 匹配和上游转发并保留查询参数。

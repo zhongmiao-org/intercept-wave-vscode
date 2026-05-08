@@ -145,10 +145,13 @@ function createDefaultRouteDraft(name = 'API'): RouteDraft {
   return {
     name,
     pathPrefix: '/api',
+    targetType: 'PROXY',
     targetBaseUrl: 'http://localhost:8080',
+    staticRoot: '',
     stripPrefix: true,
     rewriteTargetPath: '',
     spaFallbackPath: '',
+    spaFallback: false,
     enableMock: true,
   };
 }
@@ -362,14 +365,28 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
     setEditingRoute({
       name: route.name,
       pathPrefix: route.pathPrefix,
+      targetType: route.targetType || 'PROXY',
       targetBaseUrl: route.targetBaseUrl,
+      staticRoot: route.staticRoot || '',
       stripPrefix: route.stripPrefix,
       rewriteTargetPath: route.rewriteTargetPath || '',
       spaFallbackPath: route.spaFallbackPath || '',
+      spaFallback: route.spaFallback === true,
       enableMock: route.enableMock,
     });
     setShowRouteModal(true);
   };
+
+  React.useEffect(() => {
+    const onStaticRootSelected = (event: Event) => {
+      const staticRoot = (event as CustomEvent<{ staticRoot?: string }>).detail?.staticRoot;
+      if (typeof staticRoot === 'string') {
+        setEditingRoute(current => current ? { ...current, staticRoot, targetType: 'STATIC' } : current);
+      }
+    };
+    window.addEventListener('iw:staticRootSelected', onStaticRootSelected as EventListener);
+    return () => window.removeEventListener('iw:staticRootSelected', onStaticRootSelected as EventListener);
+  }, []);
 
   const onSaveRoute = () => {
     if (!activeGroup || !editingRoute) return;
@@ -763,6 +780,11 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                       const selected = route.id === activeRoute?.id && isActiveGroup;
                       const routeKey = `${group.id}:${route.id}`;
                       const showRouteActions = hoveredRouteKey === routeKey || selected;
+                      const routeTargetType = route.targetType === 'STATIC' ? 'STATIC' : 'PROXY';
+                      const routeTargetLabel = routeTargetType === 'STATIC'
+                        ? (t('ui.targetType.static') || 'Static')
+                        : (t('ui.targetType.proxy') || 'Proxy');
+                      const routeTargetDetail = routeTargetType === 'STATIC' ? (route.staticRoot || t('ui.staticRoot') || 'Static root') : route.targetBaseUrl;
                       return (
                         <button
                           key={route.id}
@@ -786,6 +808,19 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                             <span className="codicon codicon-symbol-method" style={{ fontSize: 12, color: 'var(--vscode-descriptionForeground)' }} />
                             <strong style={{ fontSize: 12.5, minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{route.name}</strong>
+                            <span
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: 999,
+                                fontSize: 10,
+                                background: routeTargetType === 'STATIC'
+                                  ? 'color-mix(in srgb, var(--vscode-charts-green) 16%, transparent)'
+                                  : 'color-mix(in srgb, var(--vscode-charts-blue) 16%, transparent)',
+                                color: 'var(--vscode-descriptionForeground)',
+                              }}
+                            >
+                              {routeTargetLabel}
+                            </span>
                             <span
                               style={{
                                 padding: '2px 8px',
@@ -815,7 +850,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                             </span>
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--vscode-foreground)', paddingLeft: 20 }}>{route.pathPrefix}</div>
-                          <div style={{ fontSize: 11.5, color: 'var(--vscode-descriptionForeground)', paddingLeft: 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{route.targetBaseUrl}</div>
+                          <div style={{ fontSize: 11.5, color: 'var(--vscode-descriptionForeground)', paddingLeft: 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{routeTargetDetail}</div>
                         </button>
                       );
                     })}
@@ -1045,6 +1080,11 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                           emptyText: t('ui.noRoutesConfigured') || 'No routes configured.',
                           enableMock: t('ui.mockOn') || 'Mock enabled',
                           disableMock: t('ui.mockOff') || 'Mock disabled',
+                          targetType: t('ui.targetType') || 'Target Type',
+                          targetTypeProxy: t('ui.targetType.proxy') || 'Proxy',
+                          targetTypeStatic: t('ui.targetType.static') || 'Static',
+                          staticRoot: t('ui.staticRoot') || 'Static Root',
+                          spaFallback: t('ui.spaFallback') || 'SPA fallback',
                           rewriteTargetPath: t('ui.rewriteTargetPath') || 'Rewrite',
                           spaFallbackPath: t('ui.spaFallbackPath') || 'SPA fallback path',
                           mocksLabel: t('ui.mocks') || 'mock',
@@ -1091,14 +1131,20 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                               </div>
                             </div>
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                              <StatBadge label={t('ui.targetType') || 'Target Type'} value={activeRoute.targetType === 'STATIC' ? (t('ui.targetType.static') || 'Static') : (t('ui.targetType.proxy') || 'Proxy')} tone="muted" />
                               <StatBadge label={t('ui.enableMock') || 'Enable Mock'} value={activeRoute.enableMock ? (t('ui.yes') || 'Yes') : (t('ui.no') || 'No')} tone={activeRoute.enableMock ? 'success' : 'muted'} />
                               <StatBadge label={t('ui.stripPrefix') || 'Strip Prefix'} value={activeRoute.stripPrefix ? (t('ui.yes') || 'Yes') : (t('ui.no') || 'No')} tone="muted" />
-                              {activeRoute.spaFallbackPath && <StatBadge label={t('ui.spaFallbackPath') || 'SPA Fallback Path'} value={activeRoute.spaFallbackPath} tone="muted" />}
+                              {activeRoute.targetType !== 'STATIC' && activeRoute.spaFallbackPath && <StatBadge label={t('ui.spaFallbackPath') || 'SPA Fallback Path'} value={activeRoute.spaFallbackPath} tone="muted" />}
+                              {activeRoute.targetType === 'STATIC' && activeRoute.spaFallback && <StatBadge label={t('ui.spaFallback') || 'SPA Fallback'} value={t('ui.yes') || 'Yes'} tone="muted" />}
                               {activeRoute.rewriteTargetPath && <StatBadge label={t('ui.rewriteTargetPath') || 'Rewrite Target Path'} value={activeRoute.rewriteTargetPath} tone="muted" />}
                             </div>
                           </div>
 
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                            <div style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--vscode-panel-border)', background: 'color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-sideBar-background))' }}>
+                              <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{t('ui.targetType') || 'Target Type'}</div>
+                              <div style={{ fontSize: 14, fontWeight: 600 }}>{activeRoute.targetType === 'STATIC' ? (t('ui.targetType.static') || 'Static') : (t('ui.targetType.proxy') || 'Proxy')}</div>
+                            </div>
                             <div style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--vscode-panel-border)', background: 'color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-sideBar-background))' }}>
                               <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{t('ui.routePrefix') || 'Path Prefix'}</div>
                               <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeRoute.pathPrefix}</div>
@@ -1116,12 +1162,12 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
                               <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeRoute.rewriteTargetPath || (t('ui.notSet') || '(Not set)')}</div>
                             </div>
                             <div style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--vscode-panel-border)', background: 'color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-sideBar-background))' }}>
-                              <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{t('ui.spaFallbackPath') || 'SPA Fallback Path'}</div>
-                              <div style={{ fontSize: 14, fontWeight: 600 }}>{activeRoute.spaFallbackPath || (t('ui.notSet') || '(Not set)')}</div>
+                              <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{activeRoute.targetType === 'STATIC' ? (t('ui.spaFallback') || 'SPA Fallback') : (t('ui.spaFallbackPath') || 'SPA Fallback Path')}</div>
+                              <div style={{ fontSize: 14, fontWeight: 600 }}>{activeRoute.targetType === 'STATIC' ? (activeRoute.spaFallback ? (t('ui.yes') || 'Yes') : (t('ui.no') || 'No')) : (activeRoute.spaFallbackPath || (t('ui.notSet') || '(Not set)'))}</div>
                             </div>
                             <div style={{ gridColumn: '1 / -1', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--vscode-panel-border)', background: 'color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-sideBar-background))' }}>
-                              <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{t('ui.targetBaseUrl') || 'Target Base URL'}</div>
-                              <div style={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-all' }}>{activeRoute.targetBaseUrl}</div>
+                              <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 12, marginBottom: 6 }}>{activeRoute.targetType === 'STATIC' ? (t('ui.staticRoot') || 'Static Root') : (t('ui.targetBaseUrl') || 'Target Base URL')}</div>
+                              <div style={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-all' }}>{activeRoute.targetType === 'STATIC' ? (activeRoute.staticRoot || (t('ui.notSet') || '(Not set)')) : activeRoute.targetBaseUrl}</div>
                             </div>
                           </div>
 
@@ -1314,6 +1360,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
         onChange={setEditingRoute as (next: RouteDraft) => void}
         onSave={onSaveRoute}
         onCancel={() => setShowRouteModal(false)}
+        onPickStaticRoot={() => vscode.postMessage({ type: 'chooseStaticRoot', current: editingRoute?.staticRoot || '' })}
         isEdit={!!editingRouteId}
         labels={{
           titleAdd: t('ui.addRoute') || 'Add Route',
@@ -1322,12 +1369,21 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
           hint: t('ui.routeModalHint') || 'Configure how this local prefix maps to an upstream service. Press Cmd/Ctrl + Enter to save.',
           name: t('ui.groupName') || 'Name',
           pathPrefix: t('ui.routePrefix') || 'Path Prefix',
+          targetType: t('ui.targetType') || 'Target Type',
+          targetTypeProxy: t('ui.targetType.proxy') || 'Proxy',
+          targetTypeStatic: t('ui.targetType.static') || 'Static',
           targetBaseUrl: t('ui.targetBaseUrl') || 'Target Base URL',
+          staticRoot: t('ui.staticRoot') || 'Static Root',
+          staticRootHint: t('ui.staticRootHint') || 'Project-relative paths such as dist or frontend/dist are best for shared config.',
+          staticRootExternalHint: t('ui.staticRootExternalHint') || 'Absolute paths are allowed but machine-local and not ideal for shared config.',
+          chooseFolder: t('ui.chooseFolder') || 'Choose...',
           stripPrefix: t('ui.stripPrefix') || 'Strip Prefix',
           rewriteTargetPath: t('ui.rewriteTargetPath') || 'Rewrite Target Path',
           rewriteTargetPathHint: t('ui.rewriteTargetPathHint') || 'Optional path base applied after strip-prefix, for example /v1 rewrites /backend/users to /v1/users.',
           spaFallbackPath: t('ui.spaFallbackPath') || 'SPA Fallback Path',
           spaFallbackPathHint: t('ui.spaFallbackPathHint') || 'Optional fallback path such as /index.html for navigation 404s. Leave empty to disable.',
+          spaFallback: t('ui.spaFallback') || 'SPA Fallback',
+          spaFallbackHint: t('ui.spaFallbackHint') || 'Serve index.html for missing browser navigation paths.',
           enableMock: t('ui.enableMock') || 'Enable Mock',
           yesLabel: t('ui.yes') || 'Yes',
           noLabel: t('ui.no') || 'No',

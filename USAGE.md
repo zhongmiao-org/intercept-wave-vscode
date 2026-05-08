@@ -36,15 +36,22 @@ Click the "Configure" or settings button to edit proxy groups.
 - **Global Cookie**: Optionally append a shared cookie to mock responses
 - **Routes**: Each HTTP group can contain multiple routes, and each route includes:
     - **Path Prefix**: Such as `/api` or `/order-api`
+    - **Target Type**: `PROXY` for upstream forwarding, or `STATIC` for local frontend build files
     - **Target Base URL**: Such as `http://localhost:8080`
+    - **Static Root**: Such as `dist`, `build`, or `frontend/dist` when `targetType="STATIC"`
     - **Strip Prefix**: Whether to remove the route prefix before matching and forwarding
     - **Rewrite Target Path**: Optional path base applied after strip-prefix, such as `/v1`
-    - **SPA Fallback Path**: Optional fallback path for frontend navigation 404s, such as `/index.html`
+    - **SPA Fallback Path**: Optional proxy fallback path for frontend navigation 404s, such as `/index.html`
+    - **SPA Fallback**: Static route fallback switch that serves `index.html` for missing browser navigation paths
     - **Enable Mock**: Whether this route should check its own mock list first
 
 Route rewrite is useful when replacing a local nginx rule. For example, with `pathPrefix="/backend"`, `stripPrefix=true`, and `rewriteTargetPath="/v1"`, a request to `/backend/users?active=true` is matched and forwarded as `/v1/users?active=true`. This is local development gateway behavior, not production nginx replacement behavior.
 
 Frontend dev server proxy example: configure an API route with `pathPrefix="/api"`, `stripPrefix=true`, `targetBaseUrl="http://localhost:9000"`, and a frontend route with `pathPrefix="/"`, `stripPrefix=false`, `targetBaseUrl="http://localhost:5173"`, `spaFallbackPath="/index.html"`, `enableMock=false`. Then `/api/users` goes to the backend, while `/`, `/assets/app.js`, and `/dashboard/settings` go to the frontend dev server.
+
+Frontend build static route example: after running your frontend build, configure `targetType="STATIC"`, `staticRoot="frontend/dist"`, `pathPrefix="/"`, and `spaFallback=true`. Then `/assets/index.js` and `/assets/style.css` are served from the build directory with frontend MIME types, while `/dashboard` returns `index.html` for browser navigation refreshes.
+
+Static roots are resolved from the workspace/project root. Project-internal folders are saved as relative paths such as `dist`, `build`, or `frontend/dist`, which keeps `.intercept-wave/config.json` shareable. Absolute paths outside the project are allowed for local experiments, but they depend on the current machine.
 
 #### Nginx Migration Recipes
 
@@ -129,13 +136,33 @@ Multiple backend services with a frontend fallback:
 ]
 ```
 
+Frontend static build route for `dist/` or `build/` output:
+
+```json
+{
+    "name": "Frontend Build",
+    "pathPrefix": "/",
+    "targetType": "STATIC",
+    "targetBaseUrl": "http://localhost:8080",
+    "staticRoot": "frontend/dist",
+    "stripPrefix": false,
+    "rewriteTargetPath": "",
+    "spaFallbackPath": "",
+    "spaFallback": true,
+    "enableMock": false,
+    "mockApis": []
+}
+```
+
+For static routes, Intercept Wave still uses the same route-local path semantics: `stripPrefix` runs first, `rewriteTargetPath` runs second, and the query string is ignored for file lookup. Requests with raw or encoded `..` are rejected before any file is read outside `staticRoot`.
+
 Common issues:
 
 - **Port occupied**: change the group port or stop the process that already listens on it.
-- **SPA refresh returns 404**: keep the frontend route at `pathPrefix="/"`, set `enableMock=false`, and set `spaFallbackPath="/index.html"` for HTML navigation requests.
+- **SPA refresh returns 404**: for proxy-to-dev-server routes, keep the frontend route at `pathPrefix="/"`, set `enableMock=false`, and set `spaFallbackPath="/index.html"` for HTML navigation requests. For static build routes, set `targetType="STATIC"` and `spaFallback=true`.
 - **Prefix or rewrite mismatch**: `stripPrefix` runs before `rewriteTargetPath`; Mock paths and forwarded paths use the rewritten route-local path.
 - **Unexpected CORS or headers**: the local gateway adds default CORS headers for development. Route-level header override recipes are tracked separately.
-- **Static dist and HTTPS**: static build serving is tracked by [#42](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/42), and HTTPS listener support is tracked by [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40).
+- **Headers and HTTPS**: route-level header overrides are tracked by [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44), and HTTPS listener support is tracked by [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40).
 
 Related roadmap items: VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39), IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150), and IntelliJ docs [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157).
 

@@ -393,20 +393,26 @@ Equivalent Intercept Wave HTTP routes:
   {
     "name": "API",
     "pathPrefix": "/api",
+    "targetType": "PROXY",
     "targetBaseUrl": "http://localhost:9000",
+    "staticRoot": "",
     "stripPrefix": true,
     "rewriteTargetPath": "",
     "spaFallbackPath": "",
+    "spaFallback": false,
     "enableMock": true,
     "mockApis": []
   },
   {
     "name": "Frontend",
     "pathPrefix": "/",
+    "targetType": "PROXY",
     "targetBaseUrl": "http://localhost:5173",
+    "staticRoot": "",
     "stripPrefix": false,
     "rewriteTargetPath": "",
     "spaFallbackPath": "/index.html",
+    "spaFallback": false,
     "enableMock": false,
     "mockApis": []
   }
@@ -426,12 +432,32 @@ For multiple backend services, add one route per prefix and rely on longest-pref
 ]
 ```
 
+For a frontend production build, switch the frontend route to static file serving:
+
+```json
+{
+  "name": "Frontend Build",
+  "pathPrefix": "/",
+  "targetType": "STATIC",
+  "targetBaseUrl": "http://localhost:8080",
+  "staticRoot": "frontend/dist",
+  "stripPrefix": false,
+  "rewriteTargetPath": "",
+  "spaFallbackPath": "",
+  "spaFallback": true,
+  "enableMock": false,
+  "mockApis": []
+}
+```
+
+Static roots are resolved from the workspace root, so shared configs should prefer project-relative values such as `dist`, `build`, or `frontend/dist`. Absolute external folders are allowed for local-only setups, but they make `.intercept-wave/config.json` machine-specific. Static routes use the same route-local path rules as proxy routes: `stripPrefix` first, then `rewriteTargetPath`; query strings are ignored for file lookup. Raw and encoded traversal attempts are rejected before files are read.
+
 Path rewrite follows nginx-like local gateway semantics:
 
 - `pathPrefix="/api"`, `stripPrefix=true`: `/api/users` is matched and forwarded as `/users`
 - `pathPrefix="/backend"`, `stripPrefix=true`, `rewriteTargetPath="/v1"`: `/backend/users` is matched and forwarded as `/v1/users`
 
-Static `dist/` serving is tracked by [#42](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/42), route-level header overrides are tracked by [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44), and HTTPS listener support is tracked by [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40). Cross-platform roadmap links: VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39), IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150), and IntelliJ docs counterpart [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157).
+Route-level header overrides are tracked by [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44), and HTTPS listener support is tracked by [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40). Cross-platform roadmap links: VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39), IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150), and IntelliJ docs counterpart [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157).
 
 ## Important Notes
 

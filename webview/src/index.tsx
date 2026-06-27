@@ -37,6 +37,18 @@ function Root() {
       if (msg?.type === 'staticRootSelected') {
         window.dispatchEvent(new CustomEvent('iw:staticRootSelected', { detail: { staticRoot: msg.staticRoot } }));
       }
+      if (msg?.type === 'httpsKeystoreSelected') {
+        window.dispatchEvent(new CustomEvent('iw:httpsKeystoreSelected', { detail: { httpsKeystorePath: msg.httpsKeystorePath } }));
+      }
+      if (msg?.type === 'httpsCertificateGenerated') {
+        window.dispatchEvent(new CustomEvent('iw:httpsCertificateGenerated', {
+          detail: {
+            httpsEnabled: msg.httpsEnabled,
+            httpsKeystorePath: msg.httpsKeystorePath,
+            httpsKeystorePassword: msg.httpsKeystorePassword,
+          },
+        }));
+      }
       if (msg?.type === 'closeGroupForm') {
         // Close any open form state in panel/side view
         window.dispatchEvent(new CustomEvent('iw:closeGroupForm'));

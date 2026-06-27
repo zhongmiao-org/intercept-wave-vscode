@@ -114,6 +114,33 @@ describe('SidebarProvider 4.0', () => {
         expect((sidebarProvider as any).validateGroupData({ name: 'Another', port: 8888 })).to.be.a('string');
     });
 
+    it('validates HTTPS group config before saving', async () => {
+        expect((sidebarProvider as any).validateGroupData({
+            name: 'HTTPS Local',
+            protocol: 'HTTP',
+            port: 9443,
+            httpsEnabled: true,
+            httpsKeystorePath: '',
+            httpsKeystorePassword: 'changeit',
+        })).to.be.a('string');
+        expect((sidebarProvider as any).validateGroupData({
+            name: 'HTTPS Local',
+            protocol: 'HTTP',
+            port: 9443,
+            httpsEnabled: true,
+            httpsKeystorePath: 'certs/intercept-wave-local.p12',
+            httpsKeystorePassword: '',
+        })).to.be.a('string');
+        expect((sidebarProvider as any).validateGroupData({
+            name: 'HTTPS Local',
+            protocol: 'HTTP',
+            port: 9443,
+            httpsEnabled: true,
+            httpsKeystorePath: 'certs/intercept-wave-local.p12',
+            httpsKeystorePassword: 'changeit',
+        })).to.equal(null);
+    });
+
     it('blocks deleting the last group and the last route', async () => {
         await (sidebarProvider as any).handleDeleteGroup('test-group-id');
         await (sidebarProvider as any).handleDeleteRoute('test-group-id', 'route-1');

@@ -81,6 +81,8 @@ export interface GroupModalProps {
   onChange: (next: GroupDraft) => void;
   onSave: () => void;
   onCancel: () => void;
+  onPickHttpsKeystore?: () => void;
+  onGenerateLocalCertificate?: () => void;
   labels: {
     titleAdd: string;
     titleEdit: string;
@@ -99,6 +101,15 @@ export interface GroupModalProps {
     port: string;
     stripPrefix: string;
     globalCookie: string;
+    httpsEnabled: string;
+    httpsKeystorePath: string;
+    httpsKeystorePassword: string;
+    httpsSection: string;
+    httpsHint: string;
+    httpsExternalWarning: string;
+    generateLocalCertificate: string;
+    httpsLocalCertificateWarning: string;
+    chooseFile: string;
     wsBaseUrl: string;
     wsInterceptPrefix: string;
     wsManualPush: string;

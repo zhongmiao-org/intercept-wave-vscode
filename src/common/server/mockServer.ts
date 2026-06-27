@@ -18,6 +18,7 @@ import {
     shouldServeRouteWelcomePage,
 } from './httpRouteUtils';
 import { applyRequestHeaderOverrides, applyResponseHeaderOverrides } from './headerOverrideUtils';
+import { createHttpsServerOptions, getHttpGroupUrl } from './httpTlsUtils';
 
 export class MockServerManager {
     private readonly httpServers: Map<string, http.Server> = new Map(); // groupId -> HTTP server
@@ -90,8 +91,8 @@ export class MockServerManager {
             const urls = succeeded
                 .map(g => {
                     const isWs = (g as ProxyGroup).protocol === 'WS';
-                    const scheme = isWs ? (g.wssEnabled ? 'wss' : 'ws') : 'http';
-                    return `${scheme}://localhost:${g.port} (${g.name})`;
+                    const url = isWs ? `${g.wssEnabled ? 'wss' : 'ws'}://localhost:${g.port}` : getHttpGroupUrl(g);
+                    return `${url} (${g.name})`;
                 })
                 .join(', ');
             this.outputChannel.appendLine(`✅ Mock servers started: ${urls}`);
@@ -116,21 +117,32 @@ export class MockServerManager {
 
         // HTTP group (default)
         return new Promise((resolve, reject) => {
-            const server = http.createServer((req, res) => {
-                // Read config on each request to support dynamic updates
-                const currentConfig = this.configManager.getConfig();
-                const currentGroup = currentConfig.proxyGroups.find(g => g.id === group.id);
-                if (currentGroup && currentGroup.enabled) {
-                    void this.handleRequest(req, res, currentGroup);
-                } else {
-                    this.sendErrorResponse(res, 503, 'Proxy group is disabled');
-                }
-            });
+            let server: http.Server | https.Server;
+            try {
+                const listener = (req: http.IncomingMessage, res: http.ServerResponse) => {
+                    // Read config on each request to support dynamic updates
+                    const currentConfig = this.configManager.getConfig();
+                    const currentGroup = currentConfig.proxyGroups.find(g => g.id === group.id);
+                    if (currentGroup && currentGroup.enabled) {
+                        void this.handleRequest(req, res, currentGroup);
+                    } else {
+                        this.sendErrorResponse(res, 503, 'Proxy group is disabled');
+                    }
+                };
+                server = group.httpsEnabled === true
+                    ? https.createServer(createHttpsServerOptions(group, this.getWorkspaceRoot()), listener)
+                    : http.createServer(listener);
+            } catch (error: any) {
+                const message = error?.message || String(error);
+                this.outputChannel.appendLine(`❌ [${group.name}] HTTPS configuration error: ${message}`);
+                reject(new Error(message));
+                return;
+            }
 
             server.listen(group.port, () => {
                 this.httpServers.set(group.id, server);
                 this.outputChannel.appendLine(
-                    `✅ [${group.name}] started on http://localhost:${group.port}`
+                    `✅ [${group.name}] started on ${getHttpGroupUrl(group)}`
                 );
                 const routes = this.getHttpRoutes(group);
                 this.outputChannel.appendLine(`   🧭 Routes: ${routes.length}`);
@@ -220,8 +232,7 @@ export class MockServerManager {
         this.isRunning = true;
 
         const isWs = group.protocol === 'WS';
-        const scheme = isWs ? (group.wssEnabled ? 'wss' : 'ws') : 'http';
-        const url = `${scheme}://localhost:${group.port} (${group.name})`;
+        const url = `${isWs ? `${group.wssEnabled ? 'wss' : 'ws'}://localhost:${group.port}` : getHttpGroupUrl(group)} (${group.name})`;
         this.outputChannel.appendLine(`✅ Mock server started: ${url}`);
         this.outputChannel.show(true);
 
@@ -361,7 +372,7 @@ export class MockServerManager {
             group: {
                 name: group.name,
                 port: group.port,
-                serverUrl: `http://localhost:${group.port}`,
+                serverUrl: getHttpGroupUrl(group),
             },
             routes: {
                 total: routes.length,

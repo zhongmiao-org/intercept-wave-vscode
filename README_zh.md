@@ -501,12 +501,59 @@ server {
 
 静态目录按工作区根目录解析，因此共享配置建议使用 `dist`、`build`、`frontend/dist` 这类项目相对路径。项目外绝对路径也允许用于本机配置，但会让 `.intercept-wave/config.json` 依赖当前机器。static route 使用与 proxy route 相同的 route-local 路径规则：先 `stripPrefix`，再 `rewriteTargetPath`；查询参数不参与文件查找。原始或编码的目录穿越请求会在读取文件前被拒绝。
 
+HTTP 配置组也可以在同一个端口上启用 HTTPS。启用后该配置组只启动 `https://localhost:<port>`，不会同时监听 HTTP：
+
+```json
+{
+  "name": "Gateway",
+  "protocol": "HTTP",
+  "port": 9443,
+  "httpsEnabled": true,
+  "httpsKeystorePath": "certs/intercept-wave-local.p12",
+  "httpsKeystorePassword": "changeit",
+  "routes": [
+    {
+      "name": "API",
+      "pathPrefix": "/api",
+      "targetType": "PROXY",
+      "targetBaseUrl": "http://localhost:9000",
+      "staticRoot": "",
+      "stripPrefix": true,
+      "rewriteTargetPath": "",
+      "spaFallbackPath": "",
+      "spaFallback": false,
+      "enableMock": true,
+      "mockApis": []
+    }
+  ]
+}
+```
+
+在 HTTP 配置组编辑器中点击“生成本地证书”可创建 `certs/intercept-wave-local.p12`。生成的 PKCS#12 文件包含私钥，仅用于本地调试；Intercept Wave 不会自动把它安装到浏览器或系统信任链。项目内证书路径会保存为工作区相对路径，便于共享配置。项目外绝对路径也允许，但属于本机配置。
+
+偏好命令行的用户可使用等价 `keytool` 命令：
+
+```bash
+mkdir -p certs
+keytool -genkeypair \
+  -alias intercept-wave-local \
+  -keyalg RSA \
+  -keysize 2048 \
+  -validity 825 \
+  -storetype PKCS12 \
+  -keystore certs/intercept-wave-local.p12 \
+  -storepass changeit \
+  -keypass changeit \
+  -dname "CN=localhost, OU=Intercept Wave, O=Local Development, L=Local, ST=Local, C=US" \
+  -ext "SAN=dns:localhost,ip:127.0.0.1"
+```
+
 路径重写遵循 nginx-like 本地网关语义：
 
 - `pathPrefix="/api"`，`stripPrefix=true`：`/api/users` 会按 `/users` 进行 Mock 匹配与转发
 - `pathPrefix="/backend"`，`stripPrefix=true`，`rewriteTargetPath="/v1"`：`/backend/users` 会按 `/v1/users` 进行 Mock 匹配与转发
 
-Route 级请求/响应头覆盖由 [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44) 跟进，HTTPS 监听支持由 [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40) 跟进。跨平台 roadmap 链接：VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39)、IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150)、IntelliJ 文档对应 issue [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157)。
+静态 `dist/` 服务、route 级 Header 和 HTTPS 监听已与兄弟 IntelliJ 插件保持共享配置语义一致。跨平台 roadmap 链接：VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39)、IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150)、IntelliJ 文档对应 issue [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157)。
 
 ## 重要提示
 

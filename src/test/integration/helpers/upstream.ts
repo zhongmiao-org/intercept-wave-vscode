@@ -1,4 +1,5 @@
 import * as http from 'http';
+import * as https from 'https';
 import * as net from 'net';
 import WebSocket from 'ws';
 import type { MockConfig, ProxyGroup, WsRule } from '../../../common';
@@ -186,6 +187,47 @@ export async function httpRequest(options: {
                 port: url.port,
                 path: `${url.pathname}${url.search}`,
                 headers: options.headers,
+            },
+            res => {
+                let body = '';
+                res.setEncoding('utf8');
+                res.on('data', chunk => {
+                    body += chunk;
+                });
+                res.on('end', () => {
+                    resolve({
+                        statusCode: res.statusCode || 0,
+                        headers: res.headers,
+                        body,
+                    });
+                });
+            }
+        );
+        req.on('error', reject);
+        if (options.body) {
+            req.write(options.body);
+        }
+        req.end();
+    });
+}
+
+export async function httpsRequest(options: {
+    method?: string;
+    url: string;
+    headers?: Record<string, string>;
+    body?: string;
+    rejectUnauthorized?: boolean;
+}): Promise<{ statusCode: number; headers: http.IncomingHttpHeaders; body: string }> {
+    return await new Promise((resolve, reject) => {
+        const url = new URL(options.url);
+        const req = https.request(
+            {
+                method: options.method || 'GET',
+                hostname: url.hostname,
+                port: url.port,
+                path: `${url.pathname}${url.search}`,
+                headers: options.headers,
+                rejectUnauthorized: options.rejectUnauthorized !== false,
             },
             res => {
                 let body = '';

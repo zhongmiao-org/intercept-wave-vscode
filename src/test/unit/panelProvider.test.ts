@@ -202,6 +202,7 @@ describe('PanelProvider', () => {
         mutableConfig.proxyGroups.push({
             ...structuredClone(config.proxyGroups[0]),
             id: 'group-2',
+            port: 10002,
             routes: [{ ...structuredClone(config.proxyGroups[0].routes[0]), id: 'route-2' }],
         });
         configManager.getConfig.returns(mutableConfig);

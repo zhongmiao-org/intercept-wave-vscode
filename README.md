@@ -500,12 +500,59 @@ For a frontend production build, switch the frontend route to static file servin
 
 Static roots are resolved from the workspace root, so shared configs should prefer project-relative values such as `dist`, `build`, or `frontend/dist`. Absolute external folders are allowed for local-only setups, but they make `.intercept-wave/config.json` machine-specific. Static routes use the same route-local path rules as proxy routes: `stripPrefix` first, then `rewriteTargetPath`; query strings are ignored for file lookup. Raw and encoded traversal attempts are rejected before files are read.
 
+HTTP groups can also listen on HTTPS on the same configured port. When HTTPS is enabled, the group starts only `https://localhost:<port>` and does not also open HTTP:
+
+```json
+{
+  "name": "Gateway",
+  "protocol": "HTTP",
+  "port": 9443,
+  "httpsEnabled": true,
+  "httpsKeystorePath": "certs/intercept-wave-local.p12",
+  "httpsKeystorePassword": "changeit",
+  "routes": [
+    {
+      "name": "API",
+      "pathPrefix": "/api",
+      "targetType": "PROXY",
+      "targetBaseUrl": "http://localhost:9000",
+      "staticRoot": "",
+      "stripPrefix": true,
+      "rewriteTargetPath": "",
+      "spaFallbackPath": "",
+      "spaFallback": false,
+      "enableMock": true,
+      "mockApis": []
+    }
+  ]
+}
+```
+
+Use **Generate local certificate** in the HTTP group editor to create `certs/intercept-wave-local.p12`. The generated PKCS#12 file contains a private key and is intended only for local debugging; Intercept Wave does not install or trust it in your browser or system store. Project-internal certificate paths are saved relative to the workspace so the config remains shareable. External absolute paths are allowed, but they are machine-local.
+
+Equivalent CLI command for users who prefer `keytool`:
+
+```bash
+mkdir -p certs
+keytool -genkeypair \
+  -alias intercept-wave-local \
+  -keyalg RSA \
+  -keysize 2048 \
+  -validity 825 \
+  -storetype PKCS12 \
+  -keystore certs/intercept-wave-local.p12 \
+  -storepass changeit \
+  -keypass changeit \
+  -dname "CN=localhost, OU=Intercept Wave, O=Local Development, L=Local, ST=Local, C=US" \
+  -ext "SAN=dns:localhost,ip:127.0.0.1"
+```
+
 Path rewrite follows nginx-like local gateway semantics:
 
 - `pathPrefix="/api"`, `stripPrefix=true`: `/api/users` is matched and forwarded as `/users`
 - `pathPrefix="/backend"`, `stripPrefix=true`, `rewriteTargetPath="/v1"`: `/backend/users` is matched and forwarded as `/v1/users`
 
-Route-level header overrides are tracked by [#44](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/44), and HTTPS listener support is tracked by [#40](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/40). Cross-platform roadmap links: VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39), IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150), and IntelliJ docs counterpart [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157).
+Static `dist/` serving, route-level headers, and HTTPS listener support now share config semantics with the sibling IntelliJ plugin. Cross-platform roadmap links: VS Code [#39](https://github.com/zhongmiao-org/intercept-wave-vscode/issues/39), IntelliJ [#150](https://github.com/zhongmiao-org/intercept-wave/issues/150), and IntelliJ docs counterpart [#157](https://github.com/zhongmiao-org/intercept-wave/issues/157).
 
 ## Important Notes
 

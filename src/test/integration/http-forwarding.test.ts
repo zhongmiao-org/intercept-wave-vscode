@@ -1,6 +1,10 @@
 import { afterEach, before, describe, it } from 'mocha';
 import { expect } from 'chai';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { MockServerManager } from '../../common';
+import { generateLocalPkcs12Certificate, LOCAL_CERTIFICATE_PASSWORD, LOCAL_CERTIFICATE_RELATIVE_PATH } from '../../common/utils';
 import {
     createHttpGroup,
     createMockServerManager,
@@ -9,6 +13,7 @@ import {
     getFreePort,
     getUpstreamHttpBase,
     httpRequest,
+    httpsRequest,
 } from './helpers/upstream';
 
 describe('HTTP Forwarding Integration', function () {
@@ -24,6 +29,43 @@ describe('HTTP Forwarding Integration', function () {
         if (manager) {
             await manager.stop();
             manager = undefined;
+        }
+    });
+
+    it('forwards through an HTTPS gateway to the upstream service', async () => {
+        const output = createOutputChannel();
+        const port = await getFreePort();
+        const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'iw-https-integration-'));
+        const cert = generateLocalPkcs12Certificate(workspaceRoot, LOCAL_CERTIFICATE_RELATIVE_PATH, LOCAL_CERTIFICATE_PASSWORD, false);
+        try {
+            manager = createMockServerManager(
+                [
+                    createHttpGroup({
+                        id: 'https-forward',
+                        name: 'HTTPS Forward',
+                        port,
+                        httpsEnabled: true,
+                        httpsKeystorePath: cert.absolutePath,
+                        httpsKeystorePassword: cert.password,
+                        interceptPrefix: '/',
+                        baseUrl: getUpstreamHttpBase(0),
+                        stripPrefix: false,
+                    }),
+                ],
+                output
+            );
+
+            await manager.start();
+            const response = await httpsRequest({
+                url: `https://localhost:${port}/health`,
+                rejectUnauthorized: false,
+            });
+
+            expect(response.statusCode).to.equal(200);
+            expect(response.body).to.contain('ok');
+            expect(output.logs.some(line => line.includes(`https://localhost:${port}`))).to.equal(true);
+        } finally {
+            fs.rmSync(workspaceRoot, { recursive: true, force: true });
         }
     });
 

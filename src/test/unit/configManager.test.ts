@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { ConfigManager } from '../../common';
 
-describe('ConfigManager 4.0', () => {
+describe('ConfigManager 5.0', () => {
     let configManager: ConfigManager;
     let configDir: string;
     let configPath: string;
@@ -55,11 +55,11 @@ describe('ConfigManager 4.0', () => {
         return configManager;
     }
 
-    it('creates a default 4.0 config with one default route', () => {
+    it('creates a default 5.0 config with one default route', () => {
         const cm = createManager();
         const cfg = cm.getConfig();
 
-        expect(cfg.version).to.equal('4.0');
+        expect(cfg.version).to.equal('5.0');
         expect(cfg.proxyGroups).to.have.length(1);
         expect(cfg.proxyGroups[0].routes).to.have.length(1);
         expect(cfg.proxyGroups[0]).to.include({
@@ -83,7 +83,7 @@ describe('ConfigManager 4.0', () => {
         expect(cfg.proxyGroups[0].routes?.[0].responseHeaders).to.deep.equal([]);
     });
 
-    it('migrates legacy flat config into 4.0 routes', () => {
+    it('migrates legacy flat config into 5.0 routes', () => {
         fs.mkdirSync(configDir, { recursive: true });
         fs.writeFileSync(configPath, JSON.stringify({
             port: 9000,
@@ -99,7 +99,7 @@ describe('ConfigManager 4.0', () => {
         const group = cfg.proxyGroups[0];
         const route = group.routes?.[0];
 
-        expect(cfg.version).to.equal('4.0');
+        expect(cfg.version).to.equal('5.0');
         expect(group).to.include({
             httpsEnabled: false,
             httpsKeystorePath: '',
@@ -123,7 +123,7 @@ describe('ConfigManager 4.0', () => {
         expect(route?.mockApis).to.have.length(1);
     });
 
-    it('migrates 3.1 proxy groups into routes while keeping data compatible with 4.0', () => {
+    it('migrates 3.1 HTTP proxy groups into routes while keeping data compatible with 5.0', () => {
         fs.mkdirSync(configDir, { recursive: true });
         fs.writeFileSync(configPath, JSON.stringify({
             version: '3.1',
@@ -161,6 +161,162 @@ describe('ConfigManager 4.0', () => {
         expect(route?.requestHeaders).to.deep.equal([]);
         expect(route?.responseHeaders).to.deep.equal([]);
         expect(route?.mockApis[0].path).to.equal('/test');
+    });
+
+    it('does not inject HTTP routes into migrated WS groups', () => {
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.writeFileSync(configPath, JSON.stringify({
+            version: '3.1',
+            proxyGroups: [
+                {
+                    id: 'ws-only',
+                    name: 'User WS',
+                    protocol: 'WS',
+                    port: 8891,
+                    routes: [],
+                    stripPrefix: true,
+                    globalCookie: '',
+                    enabled: true,
+                    wsBaseUrl: 'ws://localhost:9003',
+                    wsInterceptPrefix: '/ws',
+                    wsManualPush: true,
+                    wsPushRules: [
+                        {
+                            enabled: true,
+                            path: '/echo',
+                            eventKey: 'action',
+                            eventValue: 'test',
+                            direction: 'both',
+                            intercept: true,
+                            mode: 'off',
+                            periodSec: 5,
+                            message: '{"message":"Hello"}',
+                            timeline: [],
+                            loop: false,
+                            onOpenFire: false,
+                        },
+                    ],
+                    wssEnabled: false,
+                    wssKeystorePath: null,
+                    wssKeystorePassword: null,
+                },
+            ],
+        }, null, 2), 'utf-8');
+
+        const cfg = createManager().getConfig();
+        const group = cfg.proxyGroups[0];
+
+        expect(cfg.version).to.equal('5.0');
+        expect(group.protocol).to.equal('WS');
+        expect(group.routes).to.deep.equal([]);
+        expect(group.wsBaseUrl).to.equal('ws://localhost:9003');
+        expect(group.wsInterceptPrefix).to.equal('/ws');
+        expect(group.wsPushRules).to.have.length(1);
+    });
+
+    it('migrates 4.0 configs to 5.0 while preserving explicit shared routes', () => {
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.writeFileSync(configPath, JSON.stringify({
+            version: '4.0',
+            proxyGroups: [
+                {
+                    id: 'http-explicit',
+                    name: 'Gateway',
+                    protocol: 'HTTP',
+                    port: 8888,
+                    enabled: true,
+                    httpsEnabled: true,
+                    httpsKeystorePath: 'certs/intercept-wave-local.p12',
+                    httpsKeystorePassword: 'changeit',
+                    stripPrefix: true,
+                    globalCookie: '',
+                    routes: [
+                        {
+                            id: 'frontend',
+                            name: 'Frontend',
+                            pathPrefix: '/',
+                            targetType: 'STATIC',
+                            targetBaseUrl: 'http://localhost:5173',
+                            staticRoot: 'frontend/dist',
+                            stripPrefix: false,
+                            rewriteTargetPath: '',
+                            spaFallbackPath: '',
+                            spaFallback: true,
+                            requestHeaders: [],
+                            responseHeaders: [
+                                { name: 'Cache-Control', value: 'no-store', operation: 'SET', enabled: true },
+                            ],
+                            enableMock: false,
+                            mockApis: [],
+                        },
+                    ],
+                },
+            ],
+        }, null, 2), 'utf-8');
+
+        const cfg = createManager().getConfig();
+        const group = cfg.proxyGroups[0];
+        const route = group.routes?.[0];
+
+        expect(cfg.version).to.equal('5.0');
+        expect(group).to.include({
+            httpsEnabled: true,
+            httpsKeystorePath: 'certs/intercept-wave-local.p12',
+            httpsKeystorePassword: 'changeit',
+        });
+        expect(route).to.include({
+            id: 'frontend',
+            name: 'Frontend',
+            pathPrefix: '/',
+            targetType: 'STATIC',
+            staticRoot: 'frontend/dist',
+            spaFallback: true,
+            enableMock: false,
+        });
+        expect(route?.responseHeaders).to.deep.equal([
+            { name: 'Cache-Control', value: 'no-store', operation: 'SET', enabled: true },
+        ]);
+    });
+
+    it('replaces placeholder routes with legacy HTTP fields during migration', () => {
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.writeFileSync(configPath, JSON.stringify({
+            version: '3.0',
+            proxyGroups: [
+                {
+                    id: 'legacy-placeholder',
+                    name: 'Legacy Placeholder',
+                    protocol: 'HTTP',
+                    port: 18889,
+                    interceptPrefix: '/backend',
+                    baseUrl: 'http://localhost:5000',
+                    stripPrefix: false,
+                    mockApis: [
+                        { path: '/alive', enabled: true, mockData: '{}', method: 'GET', statusCode: 200 },
+                    ],
+                    routes: [
+                        {
+                            id: 'placeholder',
+                            name: 'API',
+                            pathPrefix: '/api',
+                            targetBaseUrl: 'http://localhost:8080',
+                            stripPrefix: true,
+                            enableMock: true,
+                            mockApis: [],
+                        },
+                    ],
+                },
+            ],
+        }, null, 2), 'utf-8');
+
+        const route = createManager().getConfig().proxyGroups[0].routes?.[0];
+
+        expect(route).to.include({
+            pathPrefix: '/backend',
+            targetBaseUrl: 'http://localhost:5000',
+            stripPrefix: false,
+        });
+        expect(route?.mockApis[0].path).to.equal('/alive');
     });
 
     it('adds, updates and removes routes inside a proxy group', async () => {
@@ -288,7 +444,7 @@ describe('ConfigManager 4.0', () => {
         expect(savedMock).to.not.have.property('templateId');
     });
 
-    it('saves a 4.0-compatible file shape with routes', async () => {
+    it('saves a 5.0-compatible file shape with routes', async () => {
         const cm = createManager();
         const cfg = cm.getConfig();
         cfg.proxyGroups[0].name = 'Shared Config';
@@ -337,7 +493,7 @@ describe('ConfigManager 4.0', () => {
         await cm.saveConfig(cfg);
 
         const saved = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-        expect(saved.version).to.equal('4.0');
+        expect(saved.version).to.equal('5.0');
         expect(saved.proxyGroups[0]).to.include({
             httpsEnabled: true,
             httpsKeystorePath: 'certs/intercept-wave-local.p12',
@@ -552,7 +708,7 @@ describe('ConfigManager 4.0', () => {
         const cm = createManager();
         const cfg = cm.getConfig();
 
-        expect(cfg.version).to.equal('4.0');
+        expect(cfg.version).to.equal('5.0');
         expect(cfg.proxyGroups).to.have.length(1);
     });
 

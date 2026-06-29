@@ -4,7 +4,8 @@ import * as path from 'path';
 import { HttpRoute, MockApiConfig, MockConfig, ProxyGroup } from '../interfaces';
 import { parseJsonTolerant, stringifyCompact } from '../utils';
 import { v4 as uuidv4 } from 'uuid';
-import * as pkg from '../../../package.json';
+
+const CURRENT_CONFIG_VERSION = '5.0';
 
 interface LegacyRootConfig {
     port?: number;
@@ -50,16 +51,7 @@ export class ConfigManager {
     }
 
     private getTargetVersion(): string {
-        try {
-            const full = (pkg as any).version as string;
-            const parts = full.split('.');
-            if (parts.length >= 2) {
-                return `${parts[0]}.${parts[1]}`;
-            }
-        } catch {
-            // ignore
-        }
-        return '2.0';
+        return CURRENT_CONFIG_VERSION;
     }
 
     getConfig(): MockConfig {
@@ -142,13 +134,16 @@ export class ConfigManager {
 
         let current = raw;
         while (current.version !== this.getTargetVersion()) {
-            switch (current.version) {
+            switch (String(current.version).split('.')[0]) {
                 case '2.0':
+                case '2':
                     current = { ...current, version: '3.0' };
                     break;
-                case '3.0':
-                case '3.1':
+                case '3':
                     current = this.migrateV3ToV4(current);
+                    break;
+                case '4':
+                    current = this.migrateV4ToV5(current);
                     break;
                 default:
                     current = { ...current, version: this.getTargetVersion() };
@@ -160,20 +155,82 @@ export class ConfigManager {
     }
 
     private migrateV3ToV4(config: any): MockConfig {
-        const proxyGroups = Array.isArray(config.proxyGroups) ? config.proxyGroups : [];
+        return {
+            ...config,
+            version: '4.0',
+            proxyGroups: this.ensureHttpRoutes(config).proxyGroups,
+        };
+    }
+
+    private migrateV4ToV5(config: any): MockConfig {
         return {
             ...config,
             version: this.getTargetVersion(),
+            proxyGroups: this.ensureHttpRoutes(config).proxyGroups,
+        };
+    }
+
+    private ensureHttpRoutes(config: any): Pick<MockConfig, 'proxyGroups'> {
+        const proxyGroups = Array.isArray(config?.proxyGroups) ? config.proxyGroups : [];
+        return {
             proxyGroups: proxyGroups.map((group: any) => {
-                const routes = Array.isArray(group.routes) && group.routes.length > 0
-                    ? group.routes
-                    : [this.createDefaultHttpRoute(group)];
+                if (String(group?.protocol || 'HTTP').toUpperCase() === 'WS') {
+                    return {
+                        ...group,
+                        routes: Array.isArray(group?.routes) ? group.routes : [],
+                    };
+                }
+
+                const routes = Array.isArray(group?.routes) ? group.routes.filter(Boolean) : [];
+                if (routes.length > 0 && !this.shouldReplacePlaceholderRoute(group, routes)) {
+                    return {
+                        ...group,
+                        routes,
+                    };
+                }
+
                 return {
                     ...group,
-                    routes,
+                    routes: [this.createDefaultHttpRoute(group)],
                 };
             }),
         };
+    }
+
+    private shouldReplacePlaceholderRoute(group: any, routes: any[]): boolean {
+        if (routes.length === 0) {
+            return true;
+        }
+        if (routes.length !== 1 || !this.hasLegacyHttpFields(group)) {
+            return false;
+        }
+
+        const route = routes[0];
+        const legacyRoute = this.createDefaultHttpRoute(group);
+        const routeMatchesLegacy =
+            route?.pathPrefix === legacyRoute.pathPrefix &&
+            route?.targetBaseUrl === legacyRoute.targetBaseUrl &&
+            route?.stripPrefix === legacyRoute.stripPrefix &&
+            JSON.stringify((route?.mockApis || []).map((api: any) => api?.path)) ===
+                JSON.stringify(legacyRoute.mockApis.map(api => api.path));
+
+        if (routeMatchesLegacy) {
+            return false;
+        }
+
+        return route?.name === 'API' &&
+            route?.pathPrefix === '/api' &&
+            route?.targetBaseUrl === 'http://localhost:8080' &&
+            route?.stripPrefix === true &&
+            route?.enableMock !== false &&
+            (!Array.isArray(route?.mockApis) || route.mockApis.length === 0);
+    }
+
+    private hasLegacyHttpFields(group: any): boolean {
+        return group &&
+            (Object.prototype.hasOwnProperty.call(group, 'interceptPrefix') ||
+                Object.prototype.hasOwnProperty.call(group, 'baseUrl') ||
+                Object.prototype.hasOwnProperty.call(group, 'mockApis'));
     }
 
     private migrateFromLegacy(oldConfig: LegacyRootConfig): MockConfig {

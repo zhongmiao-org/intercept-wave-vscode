@@ -6,6 +6,7 @@
 
 ### Added
 
+- Added explicit `5.0` shared config schema migration aligned with the sibling `intercept-wave` plugin, including safe `4.0 -> 5.0` rewriting and WS-group route preservation.
 - Added HTTPS listener support for HTTP groups with shared `httpsEnabled` / PKCS#12 config fields, local certificate generation, HTTPS URL display, and hard-fail validation for invalid keystores.
 - Added nginx-like local gateway migration recipes for frontend dev servers, backend routes, path rewrites, and SPA fallback.
 - Added English and Chinese usage guides aligned with the sibling `intercept-wave` project.

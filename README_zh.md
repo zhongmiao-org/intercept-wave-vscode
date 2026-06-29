@@ -267,47 +267,60 @@ npm run test:vscode-integration
 
 ```json
 {
-    "version": "3.0",
+    "version": "5.0",
     "proxyGroups": [
         {
             "id": "550e8400-e29b-41d4-a716-446655440000",
-            "name": "用户服务",
-            "enabled": true,
+            "name": "Gateway",
+            "protocol": "HTTP",
             "port": 8888,
-            "interceptPrefix": "/api",
-            "baseUrl": "http://localhost:8080",
-            "stripPrefix": true,
+            "httpsEnabled": false,
+            "httpsKeystorePath": "",
+            "httpsKeystorePassword": "",
             "globalCookie": "sessionId=abc123; userId=456",
-            "mockApis": [
-                {
-                    "path": "/user/info",
-                    "enabled": true,
-                    "mockData": "{\"code\":0,\"data\":{\"id\":1,\"name\":\"张三\"}}",
-                    "method": "GET",
-                    "statusCode": 200,
-                    "useCookie": true,
-                    "delay": 0
-                }
-            ]
-        },
-        {
-            "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-            "name": "订单服务",
             "enabled": true,
-            "port": 8889,
-            "interceptPrefix": "/order-api",
-            "baseUrl": "http://localhost:8081",
-            "stripPrefix": true,
-            "globalCookie": "",
-            "mockApis": [
+            "routes": [
                 {
-                    "path": "/orders",
-                    "enabled": true,
-                    "mockData": "{\"code\":0,\"data\":[]}",
-                    "method": "GET",
-                    "statusCode": 200,
-                    "useCookie": false,
-                    "delay": 0
+                    "id": "7c20dc9b-089a-4496-9226-5071a48f2f94",
+                    "name": "API",
+                    "pathPrefix": "/api",
+                    "targetType": "PROXY",
+                    "targetBaseUrl": "http://localhost:9000",
+                    "staticRoot": "",
+                    "stripPrefix": true,
+                    "rewriteTargetPath": "",
+                    "spaFallbackPath": "",
+                    "spaFallback": false,
+                    "requestHeaders": [],
+                    "responseHeaders": [],
+                    "enableMock": true,
+                    "mockApis": [
+                        {
+                            "path": "/user/info",
+                            "enabled": true,
+                            "mockData": "{\"code\":0,\"data\":{\"id\":1,\"name\":\"张三\"}}",
+                            "method": "GET",
+                            "statusCode": 200,
+                            "useCookie": true,
+                            "delay": 0
+                        }
+                    ]
+                },
+                {
+                    "id": "173c004b-7edd-4653-8efc-4564412cb1c8",
+                    "name": "Frontend Build",
+                    "pathPrefix": "/",
+                    "targetType": "STATIC",
+                    "targetBaseUrl": "",
+                    "staticRoot": "frontend/dist",
+                    "stripPrefix": false,
+                    "rewriteTargetPath": "",
+                    "spaFallbackPath": "",
+                    "spaFallback": true,
+                    "requestHeaders": [],
+                    "responseHeaders": [],
+                    "enableMock": false,
+                    "mockApis": []
                 }
             ]
         }
@@ -315,7 +328,7 @@ npm run test:vscode-integration
 }
 ```
 
-说明: `version` 字段由扩展自动维护，会根据安装的主次版本自动更新，无需手动修改。
+说明: `version` 字段由扩展自动维护，表示 VS Code 与 JetBrains 插件共同使用的配置 schema 版本，无需手动修改。
 
 <!-- 旧版本迁移说明已移除，保持简洁 -->
 

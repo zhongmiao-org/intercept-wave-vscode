@@ -963,7 +963,7 @@ export function App({ state, setState }: { state: InitialState; setState: (s: In
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <StatBadge label={t('ui.section.group') || 'Groups'} value={totalGroups} />
           <StatBadge label={t('ui.running') || 'Running'} value={runningCount} tone={runningCount > 0 ? 'success' : 'muted'} />
-          <StatBadge label={t('ui.schema') || 'Schema'} value={state.config?.version || '4.0'} tone="muted" />
+          <StatBadge label={t('ui.schema') || 'Schema'} value={state.config?.version || '5.0'} tone="muted" />
         </div>
       </div>
 

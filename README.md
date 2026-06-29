@@ -266,47 +266,60 @@ All configurations are saved in the `.intercept-wave` folder in your workspace:
 
 ```json
 {
-    "version": "3.0",
+    "version": "5.0",
     "proxyGroups": [
         {
             "id": "550e8400-e29b-41d4-a716-446655440000",
-            "name": "User Service",
-            "enabled": true,
+            "name": "Gateway",
+            "protocol": "HTTP",
             "port": 8888,
-            "interceptPrefix": "/api",
-            "baseUrl": "http://localhost:8080",
-            "stripPrefix": true,
+            "httpsEnabled": false,
+            "httpsKeystorePath": "",
+            "httpsKeystorePassword": "",
             "globalCookie": "sessionId=abc123; userId=456",
-            "mockApis": [
-                {
-                    "path": "/user/info",
-                    "enabled": true,
-                    "mockData": "{\"code\":0,\"data\":{\"id\":1,\"name\":\"John\"}}",
-                    "method": "GET",
-                    "statusCode": 200,
-                    "useCookie": true,
-                    "delay": 0
-                }
-            ]
-        },
-        {
-            "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-            "name": "Order Service",
             "enabled": true,
-            "port": 8889,
-            "interceptPrefix": "/order-api",
-            "baseUrl": "http://localhost:8081",
-            "stripPrefix": true,
-            "globalCookie": "",
-            "mockApis": [
+            "routes": [
                 {
-                    "path": "/orders",
-                    "enabled": true,
-                    "mockData": "{\"code\":0,\"data\":[]}",
-                    "method": "GET",
-                    "statusCode": 200,
-                    "useCookie": false,
-                    "delay": 0
+                    "id": "7c20dc9b-089a-4496-9226-5071a48f2f94",
+                    "name": "API",
+                    "pathPrefix": "/api",
+                    "targetType": "PROXY",
+                    "targetBaseUrl": "http://localhost:9000",
+                    "staticRoot": "",
+                    "stripPrefix": true,
+                    "rewriteTargetPath": "",
+                    "spaFallbackPath": "",
+                    "spaFallback": false,
+                    "requestHeaders": [],
+                    "responseHeaders": [],
+                    "enableMock": true,
+                    "mockApis": [
+                        {
+                            "path": "/user/info",
+                            "enabled": true,
+                            "mockData": "{\"code\":0,\"data\":{\"id\":1,\"name\":\"John\"}}",
+                            "method": "GET",
+                            "statusCode": 200,
+                            "useCookie": true,
+                            "delay": 0
+                        }
+                    ]
+                },
+                {
+                    "id": "173c004b-7edd-4653-8efc-4564412cb1c8",
+                    "name": "Frontend Build",
+                    "pathPrefix": "/",
+                    "targetType": "STATIC",
+                    "targetBaseUrl": "",
+                    "staticRoot": "frontend/dist",
+                    "stripPrefix": false,
+                    "rewriteTargetPath": "",
+                    "spaFallbackPath": "",
+                    "spaFallback": true,
+                    "requestHeaders": [],
+                    "responseHeaders": [],
+                    "enableMock": false,
+                    "mockApis": []
                 }
             ]
         }
@@ -314,7 +327,7 @@ All configurations are saved in the `.intercept-wave` folder in your workspace:
 }
 ```
 
-Note: the `version` field is managed by the extension and may be updated automatically to match the installed major.minor version.
+Note: the `version` field is managed by the extension and represents the shared config schema version used by both VS Code and JetBrains plugins.
 
 <!-- Migration notes for older versions have been removed for brevity. -->
 

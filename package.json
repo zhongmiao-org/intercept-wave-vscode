@@ -4,7 +4,7 @@
     "description": "%description%",
     "version": "4.0.0",
     "publisher": "Ark65",
-    "icon": "resources/logo.png",
+    "icon": "resources/icon.png",
     "repository": {
         "type": "git",
         "url": "https://github.com/zhongmiao-org/intercept-wave-vscode.git"

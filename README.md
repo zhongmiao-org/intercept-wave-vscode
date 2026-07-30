@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="resources/logo.png" alt="Intercept Wave Logo" width="128" height="128">
+  <img src="resources/logo.svg" alt="Intercept Wave Logo" width="160" height="160">
 
 # Intercept Wave for VSCode
 
